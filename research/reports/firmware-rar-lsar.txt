@@ -1,0 +1,26 @@
+research/downloads/original/ASUS_InfoHub_Firmware_TUF_GAMING_LC_III_360_ARGB_LCD_v51.rar: RAR 5
+WW11_320x320_2.8inch_v51_TUF_20250626.exe: 
+  Name:                           WW11_320x320_2.8inch_v51_TUF_20250626.exe
+  Size:                           3.56 MB (3558320 bytes)
+  Compressed size:                1.33 MB (1330858 bytes)
+  Compression type:               Normal v5.0 (0)
+  Last modified:                  2025-06-25 04:48:51 +0200
+  Index in file:                  0
+  Is a solid archive file:        No
+  Internal solid identifier:      0
+  Start of data in solid stream:  0
+  Length of data in solid stream: 3558320
+  RAR5Attributes:                 32
+  RAR5CRC32:                      0xa588501e
+  RAR5CompressionInformation:     5504
+  RAR5CompressionMethod:          3
+  RAR5CompressionVersion:         0
+  RAR5DataLength:                 1330858
+  RAR5DataOffset:                 105
+  RAR5DictionarySize:             4194304
+  RAR5Flags:                      4
+  RAR5InputParts:                 0: CRC32:       2777174046
+                                     InputLength: 1330858
+                                     Offset:      105
+  RAR5OS:                         0
+  RAR5OSName:                     Windows

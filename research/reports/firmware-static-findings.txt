@@ -1,0 +1,75 @@
+Firmware updater static findings, 2026-07-29 (Europe/Berlin)
+
+File
+  research/extracted/firmware-v51/WW11_320x320_2.8inch_v51_TUF_20250626.exe
+  Size: 3558320 bytes
+  SHA-256: 037b581f2bd5bc95db7db1a6f68d25d7ac2c19afe9fa09888851f0d6e448fb65
+  Type: PE32 GUI executable, Intel i386, 6 sections
+  PE timestamp: 2025-06-25 04:42:30 (timestamp semantics not independently verified)
+  VERSIONINFO FileVersion: 1, 0, 0, 1
+  VERSIONINFO ProductVersion: 0.8.5.0
+
+Confirmed imports
+  HID.DLL:
+    HidD_GetAttributes
+    HidD_GetPreparsedData
+    HidP_GetCaps
+    HidD_FreePreparsedData
+  SETUPAPI.dll:
+    SetupDiGetClassDevsW
+    SetupDiGetDeviceInterfaceDetailW
+    SetupDiDestroyDeviceInfoList
+    SetupDiEnumDeviceInterfaces
+
+Confirmed relevant strings
+  hid#vid_([\da-zA-Z]{4})&pid_([\da-zA-Z]{4})(&rev_([\da-zA-Z]){4})?(&mi_([\da-zA-Z]){2})?(&col([\da-zA-Z]){2})?
+  open dev: %08x
+  write ok : %04x
+  write abort : %04x
+  read ok : %04x
+  read abort : %04x
+  got classs: guid={%s}
+  enum interface: guid={%s} index=%d
+  usb writex(%d):%08x
+  usb readex(%d):%08x
+  Waiting to enter boot...
+  Wiping configuration
+  Start updating
+  Waiting to write upgrade completion flag...
+
+Firmware-like data observed inside the updater
+  SEGGER emWin V5481110
+  lcd_boot_proc reboot
+  lcd_boot_proc exit
+  Shenzhen Xinyao Technology Co., Ltd.
+  load eeprom faild
+  A247392SS000000
+  c:\syst\boot
+  c:\syst\wapper.jpg
+  receiving cmd error %02x %02x
+  receiving data error %02x %02x
+  SPI flash id [0x%x]
+  N9H20 UDC Library (%s)
+  USBR_GET_DESCRIPTOR pkt.wLength = %d
+
+Image handling evidence
+  The executable includes libpng/APNG, zlib, Skia and GDI+ related strings.
+  GDI+ imports include frame-count and active-frame selection functions.
+  JPEG, GIF and PNG decoder/error strings are present. No meaningful MP4
+  handling string or import was identified.
+
+Negative findings
+  No meaningful exact textual occurrence of 0b05, 1c7b, VID_0B05, PID_1C7B,
+  MI_00, MI_01 or 0xff06 was identified. Byte/offset coincidences were ignored.
+  No WinUSB or libusb import was identified.
+  No static report size, opcode table, packet header, sequence field or
+  protocol checksum algorithm was confirmed.
+
+Evidence boundary
+  The strings establish updater capabilities and internal terminology, not the
+  semantics of a particular HID interface or transfer. The ARM-looking data
+  and embedded-device strings in the PE .rdata section strongly suggest an
+  embedded firmware image, but its exact byte boundaries and container format
+  were not established, so no payload was carved.
+
+No file was executed and no device access occurred.

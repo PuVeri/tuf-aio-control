@@ -300,6 +300,24 @@ Prüfsummen, Evidenzgrenzen und offene Punkte stehen in
 bislang keine belastbare Funktionszuordnung der beiden HID-Interfaces und keine
 bestätigten Paketfelder.
 
+Am 2026-07-29 wurde außerdem ein sicherer, noch nicht ausgeführter
+[Werkzeug- und Extraktionsplan](TOOLING_PLAN.md) für `innoextract` und das
+bereits installierte, RARv5-fähige `unar` dokumentiert. Installation und
+vertiefte Extraktion warten auf gesonderte menschliche Freigabe.
+
+## Statische Tiefenanalyse 2026-07-29
+
+Nach erneuter Bestätigung der Originalprüfsummen wurde das Firmware-RAR mit
+`lsar` geprüft und mit `unar` in einen neuen Unterordner extrahiert. Der
+Firmware-Updater importiert HID- und SetupAPI-Funktionen und enthält einen
+generischen Regex für HID-Gerätepfade mit VID, PID sowie optional MI und COL.
+Firmware-/Bootloaderstrings und ARM-artige Daten in `.rdata` stützen die
+Hypothese einer eingebetteten Firmware-Nutzlast; Paketfelder und deren Grenzen
+sind noch nicht bestätigt. `innoextract` 1.9 konnte den als Inno Setup
+`6.4.0.1` erkannten InfoHub-Installer nicht lesen, daher erfolgte dort keine
+Tiefenextraktion. Details und Evidenzgrenzen stehen in
+[STATIC_SOFTWARE_ANALYSIS.md](STATIC_SOFTWARE_ANALYSIS.md).
+
 ## Grenzen und nächste passive Schritte
 
 - `lsusb -v` konnte das Gerät ohne zusätzliche Zugriffsrechte nicht öffnen und
@@ -316,3 +334,45 @@ bestätigten Paketfelder.
 - Der nächste weiterhin passive Erkenntnisschritt ist ein autorisierter
   Mitschnitt legitimen Referenzverkehrs. Ohne solchen Verkehr bleibt die
   Funktionszuordnung der beiden Interfaces unbekannt.
+
+## Statische Updater-Funktionsanalyse 2026-07-29
+
+### Beobachtet
+
+- Der Updater verwendet `0x400` Byte Nutzinhalt mit zwei internen
+  Steuerbytes und bis zu `0x3fe` Datenbytes. Die I/O-Schicht stellt davor ein
+  Nullbyte und verwendet einen bis zu `0x401` Byte großen Puffer.
+- Das zweite Steuerbyte führt einen 7-Bit-Folgewert; Bit 7 ist im ersten
+  Segment gesetzt. Die Leseseite prüft denselben Aufbau.
+- Overlapped-I/O wartet höchstens 3000 ms und wird bis zu dreimal versucht.
+- Die 201692 Byte lange Region `VA 0x5c21b0..0x5f358c` wird in äußeren
+  Blöcken bis `0x8000` Byte übertragen.
+- Boot- und Abschlusswarten haben maximal 600 Durchgänge zu 100 ms.
+
+### Abgeleitet
+
+- Die Nutzblockgröße stimmt mit dem 1024-Byte-Output-Report von Interface 1
+  überein. Das ist noch keine bestätigte Interfacezuordnung.
+- Der 7-Bit-Wert ist funktional eine Segmentfolge.
+
+### Hypothesen
+
+- Das erste Steuerbyte könnte einen Befehl oder Kanal wählen.
+- Die DWORDs `0x00100000`, `0x000313dc`, `1` nach dem Transfer könnten
+  Zieladresse, Länge und Abschlussflag darstellen.
+
+### Unbekannt
+
+- Konkrete Opcodes, Zielinterface, Antwortsemantik und Prüfsumme.
+- Ob MI oder COL zur Zielauswahl dienen.
+- Interne Struktur und Architektur der übertragenen Firmwareregion.
+
+Die Belege stehen in den `firmware-updater-*.md`-Berichten unter
+`../research/reports/`. Es wurde weder eine Binärdatei ausgeführt noch ein
+USB-/HID-Gerät geöffnet.
+
+## InfoHub-Extraktionsplanung 2026-07-29
+
+Die Prüfung eines sicheren, rein statischen Extraktionswegs für den
+Inno-Setup-6.4.0.1-Installer ist in
+[INFOHUB_EXTRACTION_PLAN.md](INFOHUB_EXTRACTION_PLAN.md) dokumentiert.

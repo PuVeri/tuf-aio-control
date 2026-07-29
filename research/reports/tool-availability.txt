@@ -16,8 +16,14 @@ Missing:
   unrar
   bsdtar
   cabextract
-  innoextract
   wrestool
   llvm-objdump
 
 No missing tool or package was installed.
+
+Follow-up, 2026-07-29:
+  /usr/bin/innoextract is now present (version 1.9; supports Inno Setup through
+  6.0.5) and was used only for a static list attempt. The target was detected
+  as Inno Setup 6.4.0.1 and could not be parsed.
+  /usr/bin/unar and /usr/bin/lsar are present (program version 1.10.7) and
+  handled the RAR5 archive.

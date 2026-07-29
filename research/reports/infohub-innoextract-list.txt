@@ -1,0 +1,10 @@
+Warning: Unexpected setup data version: 6.4.0.1
+Warning: Unexpected Style value: 77
+Warning: Unexpected Uninstall Log Mode value: 18
+Warning: Unexpected Auto Boolean value: 3
+Stream error while parsing setup headers!
+ ├─ detected setup version: 6.4.0.1
+ └─ error reason: basic_ios::clear: iostream error
+If you are sure the setup file is not corrupted, consider 
+filing a bug report at https://innoextract.constexpr.org/issues
+Done with 1 error and 4 warnings.

@@ -1,3 +1,3 @@
 source_archive	path	size_bytes	file_type	sha256	status
 ASUS_InfoHub_Software_TUF_GAMING_LC_III_360_ARGB_LCD_v1.0.0.15.zip	research/extracted/infohub-v1.0.0.15/ASUS-InfoHub-TUF-1.0.0.15.exe	90476632	PE32 executable for MS Windows 6.01 (GUI), Intel i386, 11 sections	b7d867a13e8918be09675883330a801c6e3dfff2568afd32c3c18193e0ef9164	extracted after path-safety check; never executed
-ASUS_InfoHub_Firmware_TUF_GAMING_LC_III_360_ARGB_LCD_v51.rar	WW11_320x320_2.8inch_v51_TUF_20250626.exe	unknown	embedded filename observed in RAR5 header/strings	unknown	not extracted: installed 7-Zip has no RAR handler and unrar/bsdtar are absent
+ASUS_InfoHub_Firmware_TUF_GAMING_LC_III_360_ARGB_LCD_v51.rar	research/extracted/firmware-v51/WW11_320x320_2.8inch_v51_TUF_20250626.exe	3558320	PE32 executable for MS Windows 5.01 (GUI), Intel i386, 6 sections	037b581f2bd5bc95db7db1a6f68d25d7ac2c19afe9fa09888851f0d6e448fb65	extracted with unar 1.10.7 after lsar path-safety review; never executed

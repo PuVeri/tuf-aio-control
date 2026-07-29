@@ -33,3 +33,18 @@ Static header/string observation:
 Because no installed tool could enumerate RAR5 safely, neither a complete path
 safety check nor extraction was attempted. No package was installed to remove
 this limitation.
+
+Follow-up, 2026-07-29
+=====================
+The later-available lsar/unar 1.10.7 successfully listed the RAR5 as containing
+one regular relative file:
+  WW11_320x320_2.8inch_v51_TUF_20250626.exe
+  3558320 bytes, RAR CRC32 0xa588501e
+
+No absolute path, drive/UNC prefix, ".." component or link was shown. It was
+then extracted with -no-recursion and -force-skip into the new directory
+research/extracted/firmware-v51/. The extracted file was never executed.
+
+innoextract 1.9 detected the InfoHub installer as Inno Setup 6.4.0.1 but failed
+while parsing its setup headers; the tool reports support only through Inno
+Setup 6.0.5. No alternative or unsafe extraction was attempted.
