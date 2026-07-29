@@ -1,0 +1,52 @@
+Befehl	Handler	liest	schreibt	betroffene Komponente	Risiko	Beleglage
+USB bRequest 0x06 / Descriptor-Typ 0x01	0x0012c398	Device-Descriptor und wLength	USB-Control-Antwortzustand	USB-Deskriptor	niedrig im Standard-USB-Kontext	Ghidra-Controlflow und Längenbegrenzung beobachtet; kein Geräteprotokoll-Opcode
+USB bRequest 0x06 / Descriptor-Typ 0x02	0x0012c3c0	Config-Descriptor und wLength	USB-Control-Antwortzustand	USB-Deskriptor	niedrig im Standard-USB-Kontext	Ghidra-Controlflow und Längenbegrenzung beobachtet
+USB bRequest 0x06 / Descriptor-Typ 0x03	0x0012c494	String-Descriptor-Tabelle und wLength	USB-Control-Antwortzustand	USB-Deskriptor	niedrig im Standard-USB-Kontext	Ghidra-Controlflow und Indexauswertung beobachtet
+USB bRequest 0x06 / Descriptor-Typ 0x06	0x0012c40c	Device-Qualifier-Descriptor und wLength	USB-Control-Antwortzustand	USB-Deskriptor	niedrig im Standard-USB-Kontext	Descriptor-Typ und Längenquelle beobachtet; Descriptorname aus USB-Standard abgeleitet
+USB bRequest 0x06 / Descriptor-Typ 0x07	0x0012c42c	Other-Speed-Config-Quelle und wLength	USB-Control-Antwortzustand	USB-Deskriptor	niedrig im Standard-USB-Kontext	Descriptor-Typ und zwei geschwindigkeitsabhängige Quellen beobachtet
+USB bRequest 0x06 / Descriptor-Typ 0x21	0x0012c4c0	0x21-Descriptorquelle und wLength	USB-Control-Antwortzustand	HID-Descriptor	niedrig im Standard-USB-Kontext	Descriptor-Typ und Längenquelle beobachtet; HID-Bedeutung aus USB/HID-Standard abgeleitet
+USB bRequest 0x06 / Descriptor-Typ 0x22	0x0012c4e0	indizierte 0x22-Descriptorquelle und wLength	USB-Control-Antwortzustand	HID-Reportdeskriptor	niedrig im Standard-USB-Kontext	Descriptor-Typ, wValue-Index und Längenquelle beobachtet; Bedeutung aus HID-Standard abgeleitet
+0x00	0x00126dfc	kein Nutzdatenzugriff sichtbar	keine Antwort sichtbar	Geräteprotokoll	offen	Ghidra-Decompiler gibt 0 zurück
+0x01..0x07	0x00126dfc	keine Nutzdaten sichtbar	leere 440-Byte-Antwort über gemeinsamen Paketbauer	Geräteprotokoll	hoch/offen	Controlflow zum gemeinsamen Leerantwortpfad; 0x02 bleibt wegen Updaterkontext ausgeschlossen
+0x08	0x00126dfc	Anzeige-/Systemzustand	mehrere globale Zustände	Grafik/System	hoch	direkte Aufrufe und Zustandsänderungen im Decompiler
+0x09	0x00126dfc	4-Byte-Payload und Anzeigezustand	Anzeige-/Systemzustand	Grafik/Completion	kritisch	direkte Display-/Zustandsaufrufe; zusätzlich Updater-Completion-Flag
+0x0a	0x00126dfc	12-Byte-Payload und Objektzustand	Objekt-/Pufferzustand und 12-Byte-Antwort	Objekt/Datei möglich	hoch/offen	direkte Objektfunktion und Antwortbau; Semantik offen
+0x0b	0x00126dfc	12-Byte-Payload und Objektzustand	Objekt-/Pufferzustand und 12-Byte-Antwort	Objekt/Datei möglich	hoch/offen	direkte Objektfunktionen und möglicher Abschluss
+0x0c	0x00126dfc	12-Byte-Payload	Objektauswahl und 12-Byte-Antwort	Objekt/Datei möglich	hoch/offen	direkte Objektfunktion; Semantik offen
+0x0d	0x00126dfc	12-Byte-Payload und Objektzustand	Objekt-/Pufferzustand und Antwort	Objekt/Datei möglich	hoch/offen	mehrere direkte und indirekte Speicheraufrufe
+0x10	0x00126dfc	1-Byte-Payload	globales Zustandsbit	Displayzustand möglich	hoch	direkte Mutation und Funktionsaufruf
+0x11	0x00126dfc	1-Byte-Payload	Konfigurationsbyte	Display/Modus	hoch	direkte Mutation und Aufruf
+0x12	0x00126dfc	1-Byte-Payload	Konfigurationsbyte	Display/Modus	hoch	direkte Mutation und Aufruf
+0x13	0x00126dfc	keine Nutzdaten	leere Antwort	Geräteprotokoll	offen	Antwortbau bestätigt; Bedeutung unbekannt
+0x14	0x00126dfc	1-Byte-Payload	Konfigurationsbyte	Konfiguration	hoch	direkte Mutation
+0x15	0x00126dfc	keine Nutzdaten	leere Antwort	Geräteprotokoll	offen	Antwortbau bestätigt; Bedeutung unbekannt
+0x16	0x00126dfc	4-Byte-Payload	Konfigurations-DWORD	Konfiguration	hoch	direkte Mutation
+0x17	0x00126dfc	8-Byte-Payload	Konfigurationszustand und Ereignis	Konfiguration	hoch	direkte Mutation und Ereignisaufruf
+0x18	0x00126dfc	4-Byte-Payload	Konfigurations-DWORD	Konfiguration	hoch	direkte Mutation
+0x19	0x00126dfc	4-Byte-Payload	Konfigurations-DWORD	Konfiguration	hoch	direkte Mutation
+0x1a	0x00126dfc	1-Byte-Payload	Konfigurationsbyte	Konfiguration	hoch	direkte Mutation
+0x1b	0x00126dfc	Payload und Konfigurationsstruktur	Konfiguration und persistenznaher Pfad	Konfiguration/Storage	hoch	direkte Strukturmutation und FUN_00126814
+0x1c	0x00126dfc	Payload und Konfigurationslänge	Konfigurationspuffer und persistenznaher Pfad	Konfiguration/Storage	hoch	direkte Kopie und FUN_00126814
+0x1d	0x00126dfc	4-Byte-Payload	Konfigurations-DWORD	Konfiguration	hoch	direkte Mutation
+0x1e	0x00126dfc	globales Halbwort	2-Byte-Antwort	Status/Diagnose möglich	niedrig bis offen	nur Lesen plus gemeinsamer Antwortbauer im Handler sichtbar; Semantik und Interface offen
+0x1f	0x00126dfc	1-Byte-Payload	Modusbyte; kann Bootcallback anlegen	Boot/Modus	hoch	direkte Mutation und Referenz auf FUN_001268d0
+0x80	0x00126dfc	globaler 8-Byte-Puffer	8-Byte-Antwort	Status/Identität möglich	niedrig bis offen	nur Quelle plus gemeinsamer Antwortbauer im Handler sichtbar
+0x81	0x00126dfc	Strukturbyte	1-Byte-Antwort	Status möglich	niedrig bis offen	nur Quelle plus gemeinsamer Antwortbauer im Handler sichtbar
+0x82	0x00126dfc	globaler 4-Byte-Puffer	4-Byte-Antwort	Status möglich	niedrig bis offen	nur Quelle plus gemeinsamer Antwortbauer im Handler sichtbar
+0x83	0x00126dfc	Strukturbyte bei Offset 0x110	1-Byte-Antwort	Status möglich	niedrig bis offen	nur Quelle plus gemeinsamer Antwortbauer im Handler sichtbar
+0x84	0x00126dfc	erstes Konfigurationsbyte	1-Byte-Antwort	Display-/Konfigurationszustand möglich	niedrig bis offen	nur Quelle plus gemeinsamer Antwortbauer im Handler sichtbar
+0x85	0x00126dfc	0x20 Konfigurationsbytes	0x20-Byte-Antwort	Gerätekennung/Konfiguration möglich	offen	nur Quelle plus gemeinsamer Antwortbauer im Handler sichtbar; sensible Daten möglich
+0x86	0x00126dfc	variabler Konfigurations-/Transferpuffer	variable Antwort	Firmware/Transfer	kritisch	normaler Antwortzweig sichtbar, aber Updater belegt Firmwareblocktransfer; modusabhängig
+0x87	0x00126dfc	Konstante 0x0051	2-Byte-Antwort	Version möglich	niedrig bis offen	stärkster statischer Versionskandidat; gemeinsamer Antwortbauer, Interface/Report-ID offen
+0x88	0x00128bc0	SPI-Bereich 0x21000	bedingt SPI-Bereich 0x21000	SPI-Flash	kritisch	Sonderzweig des Transportdispatchers; direkter Calltree zu FUN_0012a6d8 und FUN_0012a814
+0xfd	0x00126dfc	keine Nutzdaten	leere Antwort	Geräteprotokoll	hoch/offen	Antwortbau bestätigt; Semantik unbekannt
+0xfe	0x00126dfc	0x3c-Byte-Payload	Identitäts-/Konfigurationsdaten und persistenznaher Pfad	Identität/Storage	hoch	Herstellertext, Vergleich, Mutation und FUN_00126814 sichtbar
+0xff	0x00126dfc	Payload-DWORD	indirekter Callback	Ereignissystem	hoch/unklar	nur bei Payload-DWORD 1; unaufgelöster indirekter Zielpfad
+Transportereignis 0x03	0x001293f8	Transportkonstanten	440-Byte-Queue und zwei 0x32000-Puffer	Transport	hoch/offen	Initialisierungspfad beobachtet
+Transportereignis 0x06	0x001293f8	kein Zugriff sichtbar	keiner sichtbar	Transport	niedrig/offen	direkter Rückgabepfad; keine Statusantwort
+Transportereignis 0x38	0x001293f8	440-Byte-Empfangsqueue	440-Byte-Sendequeue und Callbackzustellung	Transport	hoch/offen	segmentierter Empfang, Sonderfall 0x88 und Antworttransfer beobachtet
+Transportereignis 0x3b	0x001293f8	Callbackparameter	Antwortpaket mit Befehl 0xff	Transport	hoch/offen	direkter Call zum Antwortbauer; Semantik unbekannt
+Updater 0x45	Windows-Updater 0x402d17	keine Anfragedaten	Gerätekonfiguration	Konfigurationslöschung	kritisch	direkt nach UI-Text Wiping configuration
+Updater 0x09	Windows-Updater 0x402f40	Abschlussstruktur	Upgrade-Completion-Flag	Firmwareupgrade	kritisch	durch Updaterablauf belegt
+Updater 0x02	Windows-Updater 0x402f7c	keine Anfragedaten	Reset/Abschluss möglich	Reenumeration/Abschluss	kritisch	direkt vor Reenumerationswartephase
+Updater 88 01 00 80 ...	0x00128bc0	Modus-/SPI-Zustand	bedingt SPI-Flash	SPI/Bootzustand	kritisch	Updaterkontext plus Firmware-Calltree zu SPI-Lesen/-Schreiben

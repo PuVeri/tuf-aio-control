@@ -1,0 +1,4395 @@
+PROGRAM	device-firmware-v51.bin
+LANGUAGE	ARM:LE:32:v5t
+COMPILER	default
+IMAGE_BASE	00000000
+MIN_ADDRESS	00100000
+MAX_ADDRESS	001313db
+
+MEMORY_BLOCKS
+ram	00100000	001313db	R=true W=false X=true
+
+FUNCTION_COUNT	694
+
+DEFINED_STRINGS_OF_INTEREST
+0010efd0	SEGGER emWin V5481110
+00126d04	lcd_boot_proc reboot\n
+00126d24	lcd_boot_proc exit\n
+00127824	load config ok\n
+00127834	load config faild\n
+001278cc	c:\syst\boot
+001278dc	c:\syst\wapper.jpg
+001281e8	----->uid:%08x%08x\n
+001293d4	======>sn: %s, %02x %02x %02x %02x\n
+001297c4	---->receiving cmd error %02x %02x\n
+001298d0	---->receiving data error %02x %02x\n
+0012a6a0	SPI flash id [0x%x]\n
+0012bc44	lcd_boot_proc restart--- \n
+0012c644	USBR_GET_DESCRIPTOR pkt.wLength = %d\n
+
+TARGET	00100000
+FUNCTION	NONE
+REFERENCES_TO_TARGET
+00100024	NO_FUNCTION	DATA
+INSTRUCTION_WINDOW
+00100000	b 0x00100064
+0010004c	mov r0,#0x0
+00100050	movs pc,lr
+00100064	msr cpsr_c,#0xdb
+00100068	ldr sp,[0x1000a4]
+0010006c	msr cpsr_c,#0xd7
+00100070	ldr sp,[0x1000a8]
+00100074	msr cpsr_c,#0xd2
+00100078	ldr sp,[0x1000ac]
+0010007c	msr cpsr_c,#0xd1
+00100080	ldr sp,[0x1000b0]
+00100084	msr cpsr_c,#0xdf
+00100088	ldr sp,[0x1000a4]
+0010008c	msr cpsr_c,#0xd3
+00100090	ldr sp,[0x1000b4]
+00100094	mrc p15,0x0,r0,cr1,cr0,0x0
+00100098	bic r0,r0,#0x2000
+0010009c	mcr p15,0x0,r0,cr1,cr0,0x0
+001000a0	b 0x001000b8
+001000b8	bl 0x001000c0
+
+TARGET	00101fb4
+FUNCTION	NONE
+REFERENCES_TO_TARGET
+00101d6c	FUN_00101ca8	PARAM
+INSTRUCTION_WINDOW
+001020f4	stmdb sp!,{r4,r5,r6,lr}
+001020f8	bl 0x00101e98
+001020fc	mov r5,r0
+00102100	mov r0,#0xb0000000
+00102104	ldr r0,[r0,#0x21c]
+00102108	and r0,r0,#0xf
+0010210c	cmp r0,#0x0
+00102110	bne 0x0010211c
+00102114	mov r4,r5, lsr #0x1
+00102118	b 0x00102120
+0010211c	mov r4,r5
+00102120	mov r0,#0xb0000000
+00102124	ldr r0,[r0,#0x21c]
+00102128	and r0,r0,#0xf00
+0010212c	mov r2,#0x1
+00102130	add r1,r2,r0, lsr #0x8
+00102134	mov r0,r4
+00102138	bl 0x0010dcf8
+0010213c	ldmia sp!,{r4,r5,r6,pc}
+00102140	stmdb sp!,{r4,r5,r6,r7,r8,lr}
+
+TARGET	0010d024
+FUNCTION	NONE
+REFERENCES_TO_TARGET
+0010ccd4	FUN_0010ccd0	PARAM
+INSTRUCTION_WINDOW
+0010d07c	stmdb sp!,{r4,r5,r6,r8,lr}
+0010d080	sub sp,sp,#0x14
+0010d084	mov r5,r0
+0010d088	mov r4,r1
+0010d08c	ldr r1,[0x10d244]
+0010d090	ldmia r1,{r0,r1}
+0010d094	str r0,[sp,#0xc]
+0010d098	str r1,[sp,#0x10]
+0010d09c	ldr r0,[0x10d248]
+0010d0a0	ldr r0,[r0,#0x0]
+0010d0a4	str r0,[sp,#0x8]
+0010d0a8	ldr r0,[0x10d24c]
+0010d0ac	ldr r0,[r0,#0x0]
+0010d0b0	str r0,[sp,#0x4]
+0010d0b4	ldr r0,[0x10d250]
+0010d0b8	ldr r0,[r0,#0x0]
+0010d0bc	str r0,[sp,#0x0]
+0010d0c0	mov r0,#0x0
+0010d0c4	bl 0x0010dd58
+0010d0c8	bl 0x0010ccd0
+
+TARGET	0010ccd0
+FUNCTION	FUN_0010ccd0	0010ccd0	[[0010ccd0, 0010d023]]
+CALLERS
+0010d0c8	FUN_0010d07c	UNCONDITIONAL_CALL
+CALLEES
+0010c948	FUN_0010c948
+00103d14	FUN_00103d14
+0010ca0c	FUN_0010ca0c
+0010cc90	FUN_0010cc90
+0010c8c4	FUN_0010c8c4
+REFERENCES_TO_TARGET
+0010d0c8	FUN_0010d07c	UNCONDITIONAL_CALL
+INSTRUCTION_WINDOW
+0010ccd0	stmdb sp!,{r4,lr}
+0010ccd4	adr r0,0x10d024
+0010ccd8	bl 0x00103d14
+0010ccdc	bl 0x0010ca0c
+0010cce0	ldr r0,[0x10c9dc]
+0010cce4	ldr r0,[r0,#0x48]
+0010cce8	bic r0,r0,#0x800
+0010ccec	ldr r1,[0x10c9dc]
+0010ccf0	str r0,[r1,#0x48]
+0010ccf4	bl 0x0010c948
+0010ccf8	mov r1,#0xc0
+0010ccfc	mov r0,#0x0
+0010cd00	bl 0x0010cc90
+0010cd04	mov r1,#0x110
+0010cd08	mov r0,#0x0
+0010cd0c	bl 0x0010cc90
+0010cd10	ldr r1,[0x10d038]
+0010cd14	mov r0,#0x0
+0010cd18	bl 0x0010cc90
+0010cd1c	mov r1,#0xc1
+DECOMPILE_BEGIN
+
+void FUN_0010ccd0(void)
+
+{
+  FUN_00103d14("LCM_Init Start!!\n");
+  FUN_0010ca0c();
+  *(uint *)(DAT_0010c9dc + 0x48) = *(uint *)(DAT_0010c9dc + 0x48) & 0xfffff7ff;
+  FUN_0010c948();
+  FUN_0010cc90(0,0xc0);
+  FUN_0010cc90(0,0x110);
+  FUN_0010cc90(0,DAT_0010d038);
+  FUN_0010cc90(0,0xc1);
+  FUN_0010cc90(0,DAT_0010d03c);
+  FUN_0010cc90(0,0xc5);
+  FUN_0010cc90(0,0x100);
+  FUN_0010cc90(0,DAT_0010d040);
+  FUN_0010cc90(0,0x180);
+  FUN_0010cc90(0,0x36);
+  FUN_0010cc90(0,0x140);
+  FUN_0010cc90(0,0x21);
+  FUN_0010cc90(0,0x100);
+  FUN_0010cc90(0,0x3a);
+  FUN_0010cc90(0,DAT_0010d03c);
+  FUN_0010cc90(0,0xb0);
+  FUN_0010cc90(0,0x180);
+  FUN_0010cc90(0,0xb1);
+  FUN_0010cc90(0,0x1a0);
+  FUN_0010cc90(0,0xb4);
+  FUN_0010cc90(0,DAT_0010d044);
+  FUN_0010cc90(0,0xb6);
+  FUN_0010cc90(0,0x130);
+  FUN_0010cc90(0,DAT_0010d044);
+  FUN_0010cc90(0,0xe0);
+  FUN_0010cc90(0,0x100);
+  FUN_0010cc90(0,0x108);
+  FUN_0010cc90(0,DAT_0010d048);
+  FUN_0010cc90(0,DAT_0010d04c);
+  FUN_0010cc90(0,DAT_0010d050);
+  FUN_0010cc90(0,DAT_0010d054);
+  FUN_0010cc90(0,DAT_0010d058);
+  FUN_0010cc90(0,DAT_0010d05c);
+  FUN_0010cc90(0,DAT_0010d060);
+  FUN_0010cc90(0,0x104);
+  FUN_0010cc90(0,DAT_0010d064);
+  FUN_0010cc90(0,0x10c);
+  FUN_0010cc90(0,0x130);
+  FUN_0010cc90(0,DAT_0010d068);
+  FUN_0010cc90(0,DAT_0010d06c);
+  FUN_0010cc90(0,0xe1);
+  FUN_0010cc90(0,0x100);
+  FUN_0010cc90(0,0x108);
+  FUN_0010cc90(0,DAT_0010d048);
+  FUN_0010cc90(0,DAT_0010d04c);
+  FUN_0010cc90(0,DAT_0010d050);
+  FUN_0010cc90(0,DAT_0010d054);
+  FUN_0010cc90(0,DAT_0010d058);
+  FUN_0010cc90(0,DAT_0010d05c);
+  FUN_0010cc90(0,DAT_0010d060);
+  FUN_0010cc90(0,0x104);
+  FUN_0010cc90(0,DAT_0010d064);
+  FUN_0010cc90(0,0x10c);
+  FUN_0010cc90(0,0x130);
+  FUN_0010cc90(0,DAT_0010d068);
+  FUN_0010cc90(0,DAT_0010d06c);
+  FUN_0010cc90(0,0xe9);
+  FUN_0010cc90(0,0x100);
+  FUN_0010cc90(0,0xf7);
+  FUN_0010cc90(0,DAT_0010d070);
+  FUN_0010cc90(0,DAT_0010d074);
+  FUN_0010cc90(0,300);
+  FUN_0010cc90(0,DAT_0010d078);
+  FUN_0010cc90(0,0x21);
+  FUN_0010cc90(0,0x11);
+  FUN_0010c8c4(0x78);
+  FUN_0010cc90(0,0x29);
+  FUN_0010c8c4(0x14);
+  return;
+}
+
+
+DECOMPILE_END
+
+TARGET	0010efd0
+FUNCTION	NONE
+REFERENCES_TO_TARGET
+0010eea0	FUN_0010ee20	DATA
+INSTRUCTION_WINDOW
+0010eff4	stmdb sp!,{r4,r5,r6,r7,r8,r9,r10,lr}
+0010eff8	ldr r12,[0x10f0c4]
+0010effc	sub sp,sp,#0x10
+0010f000	strd r0,r1,[sp,#0x8]
+0010f004	str r0,[r12,#0x14]
+0010f008	str r1,[r12,#0x18]
+0010f00c	ldr r12,[r12,#0x0]
+0010f010	ldr r7,[0x10f0c8]
+0010f014	ldr r9,[0x10f0cc]
+0010f018	cmp r12,#0x0
+0010f01c	add r6,sp,#0x8
+0010f020	mov r5,r2
+0010f024	mov r4,r3
+0010f028	beq 0x0010f03c
+0010f02c	mov r1,r6
+0010f030	mov r0,r7
+0010f034	blx r12
+0010f038	b 0x0010f074
+0010f03c	mov r0,r9
+0010f040	bl 0x0010e3c8
+
+TARGET	0010ee20
+FUNCTION	FUN_0010ee20	0010ee20	[[0010ee20, 0010efbb]]
+CALLERS
+00127ee0	FUN_00127e9c	UNCONDITIONAL_CALL
+CALLEES
+00116774	FUN_00116774
+0011640c	FUN_0011640c
+00113f54	FUN_00113f54
+00115c54	FUN_00115c54
+00115df0	FUN_00115df0
+00115ba8	FUN_00115ba8
+00112d60	FUN_00112d60
+00117928	FUN_00117928
+00117998	FUN_00117998
+00116554	FUN_00116554
+00115ca0	FUN_00115ca0
+00113ef8	FUN_00113ef8
+001164c4	FUN_001164c4
+00115b5c	FUN_00115b5c
+REFERENCES_TO_TARGET
+00127ee0	FUN_00127e9c	UNCONDITIONAL_CALL
+INSTRUCTION_WINDOW
+0010ee20	mov r1,#0xb0000000
+0010ee24	ldr r0,[0x10efbc]
+0010ee28	ldr r1,[r1,#0x0]
+0010ee2c	bics r0,r0,r1
+0010ee30	bne 0x0010ee44
+0010ee34	ldr r0,[0x10efc0]
+0010ee38	ldr r0,[r0,#0xc]
+0010ee3c	tst r0,#0x100
+0010ee40	beq 0x0010ee4c
+0010ee44	mvn r0,#0x0
+0010ee48	bx lr
+0010ee4c	stmdb sp!,{r4,r5,r6,r7,r8,lr}
+0010ee50	ldr r4,[0x10efc4]
+0010ee54	mov r6,#0x1
+0010ee58	ldr r0,[r4,#0x38]
+0010ee5c	cmp r0,#0x0
+0010ee60	bne 0x0010ee8c
+0010ee64	str r6,[r4,#0x38]
+0010ee68	bl 0x00113ef8
+0010ee6c	bl 0x00116774
+DECOMPILE_BEGIN
+
+/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */
+
+undefined4 FUN_0010ee20(void)
+
+{
+  undefined1 *puVar1;
+  int iVar2;
+  undefined4 uVar3;
+  undefined4 uVar4;
+  int iVar5;
+  undefined4 uVar6;
+  undefined4 *puVar7;
+  
+  puVar1 = DAT_0010efc4;
+  if (((DAT_0010efbc & ~_DAT_b0000000) == 0) && ((*(uint *)(DAT_0010efc0 + 0xc) & 0x100) == 0)) {
+    if (*(int *)(DAT_0010efc4 + 0x38) == 0) {
+      *(undefined4 *)(DAT_0010efc4 + 0x38) = 1;
+      FUN_00113ef8();
+      FUN_00116774();
+      *(undefined4 *)(puVar1 + 0x3c) = DAT_0010efc8;
+      *(undefined4 *)(puVar1 + 0x40) = *(undefined4 *)(puVar1 + 0x30);
+      *(undefined1 **)(puVar1 + 0x30) = puVar1 + 0x3c;
+    }
+    *puVar1 = 0x2e;
+    FUN_00113f54();
+    iVar5 = DAT_0010efcc;
+    *(char **)(DAT_0010efcc + 0x74) = "SEGGER emWin V5481110";
+    iVar2 = *(int *)(puVar1 + 0x14);
+    *(int *)(iVar2 + 0x38) = iVar2;
+    *(int *)(iVar2 + 0x3c) = iVar2 + 4;
+    *(int *)(iVar5 + 0x14) = iVar2 + 8;
+    iVar2 = *(int *)(iVar5 + 0x78 + (uint)*(byte *)(iVar2 + 0x11) * 4);
+    (**(code **)(*(int *)(iVar2 + 0xc) + 0x30))(iVar2,iVar5 + 8);
+    *(undefined4 *)(iVar5 + 0x68) = DAT_0010efe8;
+    *(undefined4 *)(iVar5 + 0x1c) = *(undefined4 *)(puVar1 + 8);
+    *(int *)(iVar5 + 0x14) = *(int *)(puVar1 + 0x14) + 8;
+    *(undefined1 *)(iVar5 + 0x18) = 1;
+    *(undefined1 *)(iVar5 + 0x1b) = 1;
+    uVar3 = FUN_00117928();
+    uVar4 = DAT_0010efec;
+    *(undefined4 *)(iVar5 + 0x44) = uVar3;
+    *(undefined1 *)(iVar5 + 0x6c) = 3;
+    *(undefined4 *)(iVar5 + 0x30) = uVar4;
+    *(undefined4 *)(iVar5 + 0x34) = uVar4;
+    FUN_0011640c(*(undefined4 *)(puVar1 + 0x10));
+    FUN_001164c4(*(undefined4 *)(puVar1 + 0xc));
+    *(undefined4 *)(puVar1 + 0x1c) = DAT_0010eff0;
+    uVar4 = FUN_00115df0();
+    iVar5 = FUN_00115b5c();
+    iVar2 = FUN_00115c54();
+    if (iVar2 == 0 || iVar5 == 0) {
+      uVar3 = FUN_00115ca0();
+      uVar6 = FUN_00115ba8();
+      FUN_00116554(uVar6,uVar3);
+    }
+    FUN_00112d60(0);
+    FUN_00117998();
+    puVar7 = *(undefined4 **)(puVar1 + 0x34);
+    while (puVar7 != (undefined4 *)0x0) {
+      if ((code *)*puVar7 != (code *)0x0) {
+        (*(code *)*puVar7)();
+      }
+      puVar7 = *(undefined4 **)(*(int *)(puVar1 + 0x34) + 4);
+      *(undefined4 **)(puVar1 + 0x34) = puVar7;
+    }
+    puVar1[2] = 1;
+    return uVar4;
+  }
+  return 0xffffffff;
+}
+
+
+DECOMPILE_END
+
+TARGET	00126d04
+FUNCTION	NONE
+REFERENCES_TO_TARGET
+00126b4c	FUN_001268d0	PARAM
+INSTRUCTION_WINDOW
+00126d58	sub r2,r0,#0x30
+00126d5c	cmp r2,#0x9
+00126d60	movls r1,r2
+00126d64	bls 0x00126d84
+00126d68	sub r2,r0,#0x61
+00126d6c	cmp r2,#0x19
+00126d70	subls r1,r0,#0x57
+00126d74	bls 0x00126d84
+00126d78	sub r2,r0,#0x41
+00126d7c	cmp r2,#0x5
+00126d80	subls r1,r0,#0x37
+00126d84	mov r0,r1
+00126d88	bx lr
+00126d8c	stmdb sp!,{r4,r5,r6,lr}
+00126d90	mov r3,r1
+00126d94	mov r5,r0
+00126d98	mov r6,r2, lsl #0x1
+00126d9c	mov r4,#0x0
+00126da0	b 0x00126de4
+00126da4	ldrb r0,[r3,#0x0]
+
+TARGET	00126814
+FUNCTION	FUN_00126814	00126814	[[00126814, 0012688f]]
+CALLERS
+0012743c	device_command_dispatch_candidate	UNCONDITIONAL_CALL
+00127488	device_command_dispatch_candidate	UNCONDITIONAL_CALL
+00127708	FUN_00127660	UNCONDITIONAL_CALL
+00127918	FUN_001278f0	UNCONDITIONAL_CALL
+CALLEES
+00128b54	FUN_00128b54
+0012890c	FUN_0012890c
+001286f4	FUN_001286f4
+00128ab8	FUN_00128ab8
+REFERENCES_TO_TARGET
+0012743c	device_command_dispatch_candidate	UNCONDITIONAL_CALL
+00127488	device_command_dispatch_candidate	UNCONDITIONAL_CALL
+00127708	FUN_00127660	UNCONDITIONAL_CALL
+00127918	FUN_001278f0	UNCONDITIONAL_CALL
+INSTRUCTION_WINDOW
+00126814	stmdb sp!,{r1,r2,r3,r4,r5,r6,r7,lr}
+00126818	mov r4,r1
+0012681c	mov r5,r3
+00126820	mov r6,r2
+00126824	mov r7,r0
+00126828	mov r1,sp
+0012682c	bl 0x0012890c
+00126830	cmp r0,#0x0
+00126834	beq 0x00126888
+00126838	mov r3,r6
+0012683c	mov r2,r4
+00126840	mov r1,#0x0
+00126844	mov r0,sp
+00126848	bl 0x00128b54
+0012684c	cmp r0,#0x0
+00126850	beq 0x00126888
+00126854	cmp r5,#0x0
+00126858	movne r4,#0x0
+0012685c	mov r0,r4
+00126860	mov r1,r6
+DECOMPILE_BEGIN
+
+undefined8 FUN_00126814(int param_1,undefined4 param_2,undefined4 param_3,int param_4)
+
+{
+  int iVar1;
+  undefined4 uStack_20;
+  undefined4 uStack_1c;
+  int iStack_18;
+  
+  uStack_20 = param_2;
+  uStack_1c = param_3;
+  iStack_18 = param_4;
+  iVar1 = FUN_0012890c(param_1,&uStack_20);
+  if ((iVar1 != 0) && (iVar1 = FUN_00128b54(&uStack_20,0,param_2,param_3), iVar1 != 0)) {
+    if (param_4 != 0) {
+      param_2 = 0;
+    }
+    iVar1 = FUN_001286f4(param_2,param_3);
+    iVar1 = FUN_00128ab8(&uStack_20,*(int *)(*(int *)(param_1 + 0x18) + 0xc) + iVar1);
+    if (iVar1 != 0) goto LAB_0012688c;
+  }
+  param_3 = 0;
+LAB_0012688c:
+  return CONCAT44(uStack_20,param_3);
+}
+
+
+DECOMPILE_END
+
+TARGET	001268d0
+FUNCTION	FUN_001268d0	001268d0	[[001268d0, 00126ce7]]
+CALLERS
+00129ec0	protocol_task_setup_candidate	PARAM
+001274b4	device_command_dispatch_candidate	PARAM
+CALLEES
+001056a4	FUN_001056a4
+00105ea8	FUN_00105ea8
+0012b624	FUN_0012b624
+00102954	FUN_00102954
+001065c4	FUN_001065c4
+0012ae74	FUN_0012ae74
+00128368	FUN_00128368
+00103d14	FUN_00103d14
+00105e60	FUN_00105e60
+001029dc	FUN_001029dc
+00102928	FUN_00102928
+0010d260	FUN_0010d260
+0010d2cc	FUN_0010d2cc
+0010dd58	FUN_0010dd58
+00106914	FUN_00106914
+0012b098	FUN_0012b098
+001115b8	FUN_001115b8
+00128290	FUN_00128290
+00102980	FUN_00102980
+0010e7f8	FUN_0010e7f8
+REFERENCES_TO_TARGET
+00129ec0	protocol_task_setup_candidate	PARAM
+001274b4	device_command_dispatch_candidate	PARAM
+INSTRUCTION_WINDOW
+001268d0	stmdb sp!,{r0,r1,r2,r3,r4,r5,r6,r7,r8,lr}
+001268d4	ldr r6,[0x126ce8]
+001268d8	cmp r1,#0x3
+001268dc	sub sp,sp,#0x28
+001268e0	mov r5,#0x0
+001268e4	beq 0x00126904
+001268e8	cmp r1,#0x6
+001268ec	beq 0x00126b84
+001268f0	cmp r1,#0x15
+001268f4	beq 0x00126bd4
+001268f8	cmp r1,#0x19
+001268fc	beq 0x00126b4c
+00126900	b 0x00126cdc
+00126904	bl 0x00106914
+00126908	bl 0x00105ea8
+0012690c	ldr r1,[0x126cec]
+00126910	ldr r2,[0x126cf0]
+00126914	str r1,[r2,#0x0]
+00126918	bl 0x0010e7f8
+0012691c	mov r0,#0x0
+DECOMPILE_BEGIN
+
+undefined4 FUN_001268d0(undefined4 param_1,int param_2,undefined4 param_3,undefined4 param_4)
+
+{
+  uint uVar1;
+  int *piVar2;
+  undefined4 uVar3;
+  int iVar4;
+  int iVar5;
+  int local_4c;
+  int local_48;
+  int local_44;
+  uint local_40;
+  int local_3c;
+  int local_38;
+  int local_34;
+  uint local_30;
+  undefined4 local_28;
+  int iStack_24;
+  undefined4 uStack_20;
+  undefined4 uStack_1c;
+  
+  piVar2 = DAT_00126ce8;
+  local_28 = param_1;
+  iStack_24 = param_2;
+  uStack_20 = param_3;
+  uStack_1c = param_4;
+  if (param_2 == 3) {
+    FUN_00106914();
+    FUN_00105ea8();
+    *DAT_00126cf0 = DAT_00126cec;
+    FUN_0010e7f8();
+    FUN_001115b8(0);
+    uVar3 = DAT_00126cf4;
+    *piVar2 = 0;
+    iVar5 = FUN_00128290(uVar3);
+    uVar3 = DAT_00126cf8;
+    if (iVar5 < 1) {
+      FUN_0012ae74(&local_28,0,0);
+    }
+    else {
+      iVar5 = 0;
+      while( true ) {
+        iVar4 = FUN_00128368(DAT_00126cf4,iVar5,&local_4c,0x10);
+        if ((iVar4 < 1) ||
+           (local_44 + (local_40 & 0xffff) + (local_40 >> 0x10 & 0xfff) + local_48 + local_4c != 0))
+        goto LAB_00126a80;
+        if (local_48 == 0) break;
+        if (iVar5 == 0) {
+          local_34 = local_44;
+          local_30 = local_40;
+          local_3c = local_4c;
+          local_38 = local_48;
+        }
+        iVar5 = iVar5 + local_48;
+        FUN_0012b624(local_28,0,1,uVar3,0);
+      }
+      uVar1 = local_30 >> 0x10;
+      if ((local_30 & 0xfff0000) != 0) {
+        iVar5 = FUN_0010d260(local_34);
+        piVar2[2] = iVar5;
+        iVar5 = FUN_00128368(DAT_00126cf4,(local_30 & 0xffff) + 0x10);
+        if (0 < iVar5) {
+          iVar5 = 0;
+          goto LAB_00126a78;
+        }
+      }
+LAB_00126a80:
+      if (*piVar2 == 0) {
+LAB_00126aec:
+        if (piVar2[2] != 0) {
+          FUN_0010d2cc();
+          piVar2[2] = 0;
+        }
+        FUN_0012ae74(&local_28,0,0);
+      }
+      else {
+        iVar5 = piVar2[2] + piVar2[1] * 0x10;
+        iVar5 = FUN_00128368(DAT_00126cf4,*(int *)(iVar5 + 4) + (uint)*(ushort *)(iVar5 + 0xc),
+                             *(undefined4 *)(piVar2[3] + 4),*(undefined4 *)(iVar5 + 8));
+        if (0 < iVar5) {
+          *(int *)(piVar2[3] + 0xc) = iVar5;
+        }
+        piVar2[1] = piVar2[1] + 1;
+      }
+      FUN_0012b624(local_28,0,1,uVar3,0);
+    }
+    FUN_0010dd58(100);
+    FUN_00106914();
+    FUN_00105ea8();
+    *DAT_00126d00 = DAT_00126cfc;
+  }
+  else if (param_2 == 6) {
+    FUN_00103d14("lcd_boot_proc exit\n");
+    *DAT_00126d38 = 0;
+    *DAT_00126d3c = 0;
+    *piVar2 = 0;
+    if (piVar2[2] != 0) {
+      FUN_0010d2cc();
+      piVar2[2] = 0;
+    }
+    FUN_0012b098(*DAT_00126d40,0x20,0,0,0);
+  }
+  else if (param_2 == 0x15) {
+    if ((*DAT_00126d44 == 0) && (iVar5 = FUN_00105e60(), iVar5 != 0)) {
+      if (piVar2[1] < *piVar2) {
+        iVar5 = piVar2[2] + piVar2[1] * 0x10;
+        FUN_00128368(DAT_00126cf4,*(int *)(iVar5 + 4) + (uint)*(ushort *)(iVar5 + 0xc),DAT_00126d48,
+                     *(undefined4 *)(iVar5 + 8));
+        piVar2[1] = piVar2[1] + 1;
+        *(undefined4 *)(*(int *)piVar2[3] + 0xc) = 0xffffffff;
+        FUN_001056a4();
+        FUN_001065c4(8,DAT_00126d4c,0);
+        FUN_001065c4(0,*(uint *)(*(int *)piVar2[3] + 4) | 0x80000000);
+        FUN_001065c4(0x11,DAT_00126d50,0);
+        FUN_001065c4(4,DAT_00126d48,0);
+        FUN_001065c4(0xc,0);
+      }
+      else {
+        *(undefined4 *)(*(int *)piVar2[3] + 0xc) = 0;
+        if (*(char *)(DAT_00126d54 + 0x111) == '\0' || *(char *)(DAT_00126d54 + 0x111) == '\x02') {
+          FUN_0012ae74(&local_28,0,0);
+        }
+        else {
+          piVar2[1] = 0;
+        }
+      }
+    }
+  }
+  else if (param_2 == 0x19) {
+    FUN_00103d14("lcd_boot_proc reboot\n");
+    *DAT_00126d1c = 1;
+    FUN_0010e7f8();
+    FUN_00102980(1,DAT_00126d20);
+    FUN_001029dc(0);
+    FUN_00102928();
+    FUN_00102954();
+    do {
+                    /* WARNING: Do nothing block with infinite loop */
+    } while( true );
+  }
+  return 0;
+LAB_00126a78:
+  if ((int)(uVar1 & 0xfff) <= iVar5) goto LAB_00126a80;
+  iVar4 = piVar2[2] + iVar5 * 0x10;
+  if (*(int *)(iVar4 + 4) +
+      *(int *)(iVar4 + 8) + (uint)*(ushort *)(iVar4 + 0xc) + (*(ushort *)(iVar4 + 0xe) & 0xffff0fff)
+      + *(int *)(piVar2[2] + iVar5 * 0x10) != 0) {
+    *piVar2 = 0;
+    goto LAB_00126aec;
+  }
+  iVar5 = iVar5 + 1;
+  *piVar2 = *piVar2 + 1;
+  goto LAB_00126a78;
+}
+
+
+DECOMPILE_END
+
+TARGET	00126e00
+FUNCTION	device_command_dispatch_candidate	00126dfc	[[00126dfc, 001275d3]]
+CALLERS
+00129dd8	protocol_task_setup_candidate	PARAM
+CALLEES
+00112d44	thunk_FUN_0011640c
+001056a4	FUN_001056a4
+0010d318	FUN_0010d318
+00128580	FUN_00128580
+00129fd4	FUN_00129fd4
+001065c4	FUN_001065c4
+00112dac	FUN_00112dac
+0011305c	FUN_0011305c
+0010d260	FUN_0010d260
+001298f8	response_packet_builder_candidate
+00128290	FUN_00128290
+00112d48	thunk_FUN_001164c4
+0012a0fc	FUN_0012a0fc
+001284d0	FUN_001284d0
+00128368	FUN_00128368
+0010d2c4	thunk_FUN_0010d2cc
+0010d430	FUN_0010d430
+00109388	FUN_00109388
+00128404	FUN_00128404
+0012b37c	FUN_0012b37c
+0012ae34	FUN_0012ae34
+0010dd58	FUN_0010dd58
+00126814	FUN_00126814
+00126d8c	FUN_00126d8c
+0012b098	FUN_0012b098
+001115b8	FUN_001115b8
+0010ed1c	FUN_0010ed1c
+REFERENCES_TO_TARGET
+INSTRUCTION_WINDOW
+00126e00	cmp r1,#0x3
+00126e04	sub sp,sp,#0x12c
+00126e08	mov r4,r3
+00126e0c	beq 0x001275cc
+00126e10	cmp r1,#0x35
+00126e14	bne 0x001275cc
+00126e18	ldr r5,[0x1275d4]
+00126e1c	mov r7,#0x1
+00126e20	ldrb r1,[r5,#0x111]
+00126e24	mov r6,#0x0
+00126e28	cmp r1,#0x2
+00126e2c	bne 0x00126e50
+00126e30	ldr r1,[0x1275d8]
+00126e34	str r6,[r1,#0x0]
+00126e38	ldr r1,[0x1275dc]
+00126e3c	ldr r2,[r1,#0x0]
+00126e40	cmp r2,#0x0
+00126e44	streq r7,[r1,#0x0]
+00126e48	ldrbeq r0,[r5,#0x0]
+00126e4c	bleq 0x0010dd58
+DECOMPILE_BEGIN
+
+undefined4
+device_command_dispatch_candidate(undefined4 param_1,int param_2,int param_3,byte *param_4)
+
+{
+  undefined4 *puVar1;
+  undefined1 *puVar2;
+  undefined4 *puVar3;
+  int *piVar4;
+  byte *pbVar5;
+  byte bVar6;
+  undefined4 uVar7;
+  int iVar8;
+  byte *pbVar9;
+  int iVar10;
+  undefined4 local_160;
+  undefined4 local_15c;
+  undefined1 auStack_ac [16];
+  char local_9c;
+  undefined1 auStack_9b [43];
+  byte local_70 [60];
+  undefined4 uStack_34;
+  int iStack_30;
+  int local_2c;
+  byte *pbStack_28;
+  
+  pbVar9 = DAT_001275d4;
+  if (param_2 == 3) {
+    return 0xffffffff;
+  }
+  if (param_2 != 0x35) {
+    return 0xffffffff;
+  }
+  uStack_34 = param_1;
+  iStack_30 = param_2;
+  local_2c = param_3;
+  pbStack_28 = param_4;
+  if ((DAT_001275d4[0x111] == 2) && (*DAT_001275d8 = 0, *DAT_001275dc == 0)) {
+    *DAT_001275dc = 1;
+    FUN_0010dd58();
+  }
+  iVar10 = DAT_00127618;
+  iVar8 = DAT_001275f4;
+  pbVar5 = DAT_001275f0;
+  piVar4 = DAT_001275ec;
+  puVar3 = DAT_001275e8;
+  puVar2 = DAT_001275e4;
+  puVar1 = DAT_001275e0;
+  if (local_2c == 0x17) {
+    *(undefined4 *)(pbVar9 + 0xfc) = *(undefined4 *)param_4;
+    *(undefined4 *)(pbVar9 + 0x100) = *(undefined4 *)(param_4 + 4);
+LAB_00127330:
+    local_160 = 0;
+    FUN_0012b098(*DAT_00127608,0x20,0);
+    goto LAB_001274d0;
+  }
+  if (0x17 < local_2c) {
+    iVar10 = DAT_001275f4 + -0x21;
+    if (local_2c == 0x81) {
+      param_4 = (byte *)0x0;
+      iVar10 = 1;
+      pbVar9 = pbVar9 + 1;
+      iVar8 = 0x81;
+      local_160 = 0;
+      goto LAB_001275c8;
+    }
+    if (local_2c < 0x82) {
+      if (local_2c == 0x1c) {
+        FUN_0010d430(DAT_001275f0 + 0x21,param_4,iVar10);
+LAB_00127468:
+        FUN_0010d430(&local_160,DAT_001275f0,iVar8);
+        FUN_00126814(DAT_00127648,&local_160,iVar8,0);
+        return 0xffffffff;
+      }
+      if (local_2c < 0x1d) {
+        if (local_2c == 0x18) {
+          *(undefined4 *)(pbVar9 + 0x104) = *(undefined4 *)param_4;
+        }
+        else if (local_2c == 0x19) {
+          *(undefined4 *)(pbVar9 + 0x108) = *(undefined4 *)param_4;
+        }
+        else {
+          if (local_2c != 0x1a) {
+            if (local_2c != 0x1b) {
+              return 0;
+            }
+            *DAT_001275f0 = *param_4;
+            goto LAB_00127468;
+          }
+          pbVar9[0x110] = *param_4;
+        }
+      }
+      else {
+        if (local_2c != 0x1d) {
+          if (local_2c == 0x1e) {
+            param_4 = (byte *)0x0;
+            iVar10 = 2;
+            pbVar9 = (byte *)&local_15c;
+            local_15c = CONCAT22(local_15c._2_2_,*DAT_0012765c);
+            local_160 = 0;
+            iVar8 = 0x1e;
+          }
+          else {
+            if (local_2c == 0x1f) {
+              bVar6 = *param_4;
+              pbVar9[0x111] = bVar6;
+              piVar4 = DAT_0012764c;
+              if ((bVar6 != 0) && (*DAT_0012764c == 0)) {
+                local_160 = 0;
+                local_15c = 0;
+                iVar8 = FUN_0012ae34(DAT_00127654,DAT_00127650,0);
+                *piVar4 = iVar8;
+              }
+              goto LAB_001274d0;
+            }
+            if (local_2c != 0x80) {
+              return 0;
+            }
+            param_4 = (byte *)0x0;
+            iVar10 = 8;
+            local_160 = 0;
+            iVar8 = 0x80;
+            pbVar9 = DAT_00127644;
+          }
+          goto LAB_001275c8;
+        }
+        *(undefined4 *)(pbVar9 + 0x10c) = *(undefined4 *)param_4;
+      }
+      goto LAB_001274d0;
+    }
+    if (local_2c == 0x86) {
+      param_4 = (byte *)0x0;
+      pbVar9 = DAT_001275f0 + 0x21;
+      iVar8 = 0x86;
+      local_160 = 0;
+      goto LAB_001275c8;
+    }
+    if (local_2c < 0x87) {
+      if (local_2c == 0x82) {
+        param_4 = (byte *)0x0;
+        iVar10 = 4;
+        local_160 = 0;
+        iVar8 = 0x82;
+        pbVar9 = DAT_00127658;
+      }
+      else if (local_2c == 0x83) {
+        param_4 = (byte *)0x0;
+        iVar10 = 1;
+        pbVar9 = pbVar9 + 0x110;
+        local_160 = 0;
+        iVar8 = 0x83;
+      }
+      else if (local_2c == 0x84) {
+        param_4 = (byte *)0x0;
+        iVar10 = 1;
+        local_160 = 0;
+        iVar8 = 0x84;
+        pbVar9 = DAT_001275f0;
+      }
+      else {
+        if (local_2c != 0x85) {
+          return 0;
+        }
+        param_4 = (byte *)0x0;
+        iVar10 = 0x20;
+        pbVar9 = DAT_001275f0 + 1;
+        local_160 = 0;
+        iVar8 = 0x85;
+      }
+      goto LAB_001275c8;
+    }
+    if (local_2c == 0x87) {
+      local_15c = CONCAT22(local_15c._2_2_,0x51);
+      param_4 = (byte *)0x0;
+      iVar10 = 2;
+      pbVar9 = (byte *)&local_15c;
+      iVar8 = 0x87;
+      local_160 = 0;
+      goto LAB_001275c8;
+    }
+    if (local_2c != 0xfd) {
+      if (local_2c != 0xfe) {
+        if (local_2c != 0xff) {
+          return 0;
+        }
+        if (*(int *)param_4 != 1) {
+          return 0xffffffff;
+        }
+        local_160 = 0;
+        FUN_0012b37c(*DAT_001275f8,0x1d,0);
+        return 0xffffffff;
+      }
+      FUN_0010d430(auStack_ac,param_4,0x3c);
+      FUN_0012a0fc(&local_15c,"Shenzhen Xinyao Technology Co., Ltd.",0x25);
+      FUN_00129fd4(&local_15c,auStack_ac,auStack_ac,0x3c);
+      local_70[0] = 0;
+      local_70[1] = 0;
+      local_70[2] = 0;
+      local_70[3] = 0;
+      if (local_9c == '+') {
+        local_9c = '0';
+        FUN_00126d8c(auStack_ac,local_70 + 4,8);
+        iVar10 = FUN_0010d318(DAT_00127644,local_70 + 4,8);
+        if (iVar10 == 0) {
+          FUN_0010d430(pbVar5 + 1,auStack_9b,0x20);
+          FUN_00126814(DAT_00127648,DAT_001275f0,iVar8,0);
+          local_70[0] = 1;
+          local_70[1] = 0;
+          local_70[2] = 0;
+          local_70[3] = 0;
+        }
+      }
+      param_4 = (byte *)0x0;
+      iVar10 = 4;
+      pbVar9 = local_70;
+      local_160 = 0;
+      iVar8 = 0xfe;
+      goto LAB_001275c8;
+    }
+    goto LAB_0012718c;
+  }
+  switch(local_2c) {
+  case 0:
+    return 0;
+  case 1:
+    break;
+  case 2:
+    break;
+  case 3:
+    break;
+  case 4:
+    break;
+  case 5:
+    break;
+  case 6:
+    break;
+  case 7:
+    break;
+  case 8:
+    *DAT_001275e4 = 0;
+    *puVar3 = *(undefined4 *)(pbVar9 + 0x108);
+    FUN_001056a4();
+    FUN_001065c4(8,DAT_0012760c,0);
+    uVar7 = FUN_00109388();
+    FUN_001065c4(0,uVar7);
+    FUN_001065c4(0x11,DAT_00127610,0);
+    FUN_001065c4(4,(uint)param_4 | 0x80000000,0);
+    FUN_001065c4(0xc,0);
+    return 0xffffffff;
+  case 9:
+    FUN_0010d430(&local_160,param_4,4);
+    puVar1 = DAT_00127614;
+    if (local_160._3_1_ != '\0') {
+      *puVar3 = 0xffffffff;
+      bVar6 = 0;
+      if (local_160._2_1_ == '\0' && (local_160._1_1_ == '\0' && (char)local_160 == '\0')) {
+        bVar6 = 0x80;
+      }
+      FUN_0010dd58(bVar6 | *pbVar9);
+      local_15c = CONCAT13(0xff,(int3)local_160);
+      FUN_001115b8(0);
+      thunk_FUN_001164c4(~local_15c & 0xff000000 | (local_15c & 0xffffff) >> 0x10 |
+                         local_15c & 0xff00 | (local_15c & 0xff) << 0x10);
+      thunk_FUN_0011640c(0);
+      FUN_0011305c(2);
+      FUN_0010ed1c(0,0,0x140);
+      *puVar1 = *(undefined4 *)(pbVar9 + 0x10c);
+      return 0xffffffff;
+    }
+    *puVar2 = 0;
+    *puVar3 = 0;
+    *puVar1 = 0;
+    FUN_0010dd58(*pbVar9);
+    return 0xffffffff;
+  case 10:
+    *DAT_001275e4 = 1;
+    uVar7 = DAT_00127604;
+    *puVar3 = *(undefined4 *)(pbVar9 + 0x108);
+    iVar8 = DAT_001275fc;
+    if (*(int *)param_4 == 0) {
+      iVar8 = DAT_00127600;
+    }
+    iVar8 = FUN_00128404(iVar8,uVar7,*(undefined4 *)(param_4 + 4));
+    if (iVar8 < 1) {
+      param_4[4] = 0xff;
+      param_4[5] = 0xff;
+      param_4[6] = 0xff;
+      param_4[7] = 0xff;
+    }
+    local_160 = 8;
+    pbVar9 = *(byte **)(*piVar4 + 0x18);
+    iVar10 = 0xc;
+    iVar8 = 10;
+    goto LAB_001275c8;
+  case 0xb:
+    *DAT_001275e4 = 1;
+    *puVar3 = *(undefined4 *)(pbVar9 + 0x108);
+    iVar8 = FUN_001284d0(DAT_00127604,*(undefined4 *)param_4,param_4 + 0xc,
+                         *(undefined4 *)(param_4 + 4));
+    if (iVar8 < 1) {
+      *(int *)(param_4 + 8) = iVar8;
+    }
+    else {
+      iVar8 = *(int *)(param_4 + 8);
+    }
+    if (99 < iVar8) {
+      iVar8 = FUN_00128580(DAT_00127604);
+      if (iVar8 < 1) {
+        *(int *)(param_4 + 8) = iVar8;
+      }
+      local_160 = 0;
+      FUN_0012b098(*DAT_00127608,0x20,0);
+    }
+    local_160 = 0xc;
+    pbVar9 = *(byte **)(*piVar4 + 0x18);
+    iVar10 = 0xc;
+    iVar8 = 0xb;
+    goto LAB_001275c8;
+  case 0xc:
+    iVar8 = DAT_001275fc;
+    if (*(int *)param_4 == 0) {
+      iVar8 = DAT_00127600;
+    }
+    *DAT_001275ec = iVar8;
+    uVar7 = FUN_00128290();
+    *(undefined4 *)(param_4 + 4) = uVar7;
+    local_160 = 8;
+    iVar10 = 0xc;
+    pbVar9 = *(byte **)(*piVar4 + 0x18);
+    iVar8 = 0xc;
+    goto LAB_001275c8;
+  case 0xd:
+    iVar8 = 0;
+    if (*DAT_001275ec == 0) {
+      iVar10 = -0x17;
+    }
+    else {
+      iVar8 = FUN_0010d260(*(undefined4 *)(param_4 + 4));
+      if (iVar8 == 0) {
+        iVar10 = -0x15;
+      }
+      else {
+        iVar10 = FUN_00128368(*piVar4,*(undefined4 *)param_4,iVar8,*(undefined4 *)(param_4 + 4));
+        if (0 < iVar10) {
+          *(int *)(param_4 + 4) = iVar10;
+          goto LAB_00127154;
+        }
+      }
+    }
+    *(int *)(param_4 + 8) = iVar10;
+LAB_00127154:
+    local_160 = 0xc;
+    response_packet_builder_candidate(0xd,iVar8);
+    if (iVar8 == 0) {
+      return 0xffffffff;
+    }
+    thunk_FUN_0010d2cc(iVar8);
+    return 0xffffffff;
+  case 0xe:
+    return 0;
+  case 0xf:
+    return 0;
+  case 0x10:
+    if (*param_4 == 0) {
+      bVar6 = *pbVar9 & 0x7f;
+    }
+    else {
+      bVar6 = *pbVar9 | 0x80;
+    }
+    *pbVar9 = bVar6;
+    goto LAB_00127310;
+  case 0x11:
+    bVar6 = *param_4;
+    pbVar9[1] = bVar6;
+    FUN_00112dac(*(undefined1 *)(iVar10 + (bVar6 & 3)));
+    goto LAB_00127330;
+  case 0x12:
+    bVar6 = *pbVar9 & 0x80 | *param_4 & 0x7f;
+    *pbVar9 = bVar6;
+LAB_00127310:
+    FUN_0010dd58(bVar6);
+LAB_001274d0:
+    *puVar1 = 1;
+    return 0xffffffff;
+  case 0x13:
+    param_4 = (byte *)0x0;
+    iVar10 = 0;
+    pbVar9 = (byte *)0x0;
+    iVar8 = 0x13;
+    local_160 = 0;
+    goto LAB_001275c8;
+  case 0x14:
+    pbVar9[2] = *param_4;
+    goto LAB_001274d0;
+  case 0x15:
+    param_4 = (byte *)0x0;
+    iVar10 = 0;
+    pbVar9 = (byte *)0x0;
+    iVar8 = 0x15;
+    local_160 = 0;
+    goto LAB_001275c8;
+  case 0x16:
+    *(undefined4 *)(pbVar9 + 0xf8) = *(undefined4 *)param_4;
+    goto LAB_001274d0;
+  default:
+    return 0;
+  }
+LAB_0012718c:
+  param_4 = (byte *)0x0;
+  iVar10 = 0;
+  pbVar9 = (byte *)0x0;
+  local_160 = 0;
+  iVar8 = local_2c;
+LAB_001275c8:
+  response_packet_builder_candidate(iVar8,pbVar9,iVar10,param_4);
+  return 0xffffffff;
+}
+
+
+DECOMPILE_END
+
+TARGET	0012718c
+FUNCTION	device_command_dispatch_candidate	00126dfc	[[00126dfc, 001275d3]]
+CALLERS
+00129dd8	protocol_task_setup_candidate	PARAM
+CALLEES
+0012ae34	FUN_0012ae34
+0012b37c	FUN_0012b37c
+0012a0fc	FUN_0012a0fc
+0010d318	FUN_0010d318
+0010d2c4	thunk_FUN_0010d2cc
+0010d430	FUN_0010d430
+00128404	FUN_00128404
+00112d48	thunk_FUN_001164c4
+00128368	FUN_00128368
+001065c4	FUN_001065c4
+00109388	FUN_00109388
+00128290	FUN_00128290
+0011305c	FUN_0011305c
+00126814	FUN_00126814
+0010dd58	FUN_0010dd58
+001115b8	FUN_001115b8
+0010ed1c	FUN_0010ed1c
+0012b098	FUN_0012b098
+001284d0	FUN_001284d0
+00112dac	FUN_00112dac
+0010d260	FUN_0010d260
+001298f8	response_packet_builder_candidate
+00112d44	thunk_FUN_0011640c
+00126d8c	FUN_00126d8c
+00128580	FUN_00128580
+00129fd4	FUN_00129fd4
+001056a4	FUN_001056a4
+REFERENCES_TO_TARGET
+00126fb8	device_command_dispatch_candidate	CONDITIONAL_JUMP
+00126e90	device_command_dispatch_candidate	UNCONDITIONAL_JUMP
+00126e94	device_command_dispatch_candidate	UNCONDITIONAL_JUMP
+00126e98	device_command_dispatch_candidate	UNCONDITIONAL_JUMP
+00126e9c	device_command_dispatch_candidate	UNCONDITIONAL_JUMP
+00126ea0	device_command_dispatch_candidate	UNCONDITIONAL_JUMP
+00126ea4	device_command_dispatch_candidate	UNCONDITIONAL_JUMP
+00126ea8	device_command_dispatch_candidate	UNCONDITIONAL_JUMP
+INSTRUCTION_WINDOW
+0012718c	mov r3,#0x0
+00127190	ldr r0,[sp,#0x134]
+00127194	mov r2,r3
+00127198	mov r1,r3
+0012719c	str r6,[sp,#0x0]
+001271a0	b 0x001275c8
+001271a4	strb r6,[r11,#0x0]
+001271a8	ldr r1,[r5,#0x108]
+001271ac	str r1,[r9,#0x0]
+001271b0	bl 0x001056a4
+001271b4	ldr r1,[0x12760c]
+001271b8	mov r2,#0x0
+001271bc	mov r0,#0x8
+001271c0	bl 0x001065c4
+001271c4	bl 0x00109388
+001271c8	mov r1,r0
+001271cc	mov r2,#0x0
+001271d0	mov r0,r2
+001271d4	bl 0x001065c4
+001271d8	ldr r1,[0x127610]
+
+TARGET	001273a8
+FUNCTION	device_command_dispatch_candidate	00126dfc	[[00126dfc, 001275d3]]
+CALLERS
+00129dd8	protocol_task_setup_candidate	PARAM
+CALLEES
+0012ae34	FUN_0012ae34
+0012b37c	FUN_0012b37c
+0012a0fc	FUN_0012a0fc
+0010d318	FUN_0010d318
+0010d2c4	thunk_FUN_0010d2cc
+0010d430	FUN_0010d430
+00128404	FUN_00128404
+00112d48	thunk_FUN_001164c4
+00128368	FUN_00128368
+001065c4	FUN_001065c4
+00109388	FUN_00109388
+00128290	FUN_00128290
+0011305c	FUN_0011305c
+00126814	FUN_00126814
+0010dd58	FUN_0010dd58
+001115b8	FUN_001115b8
+0010ed1c	FUN_0010ed1c
+0012b098	FUN_0012b098
+001284d0	FUN_001284d0
+00112dac	FUN_00112dac
+0010d260	FUN_0010d260
+001298f8	response_packet_builder_candidate
+00112d44	thunk_FUN_0011640c
+00126d8c	FUN_00126d8c
+00128580	FUN_00128580
+00129fd4	FUN_00129fd4
+001056a4	FUN_001056a4
+REFERENCES_TO_TARGET
+00126fc0	device_command_dispatch_candidate	CONDITIONAL_JUMP
+INSTRUCTION_WINDOW
+001273a8	mov r2,#0x3c
+001273ac	mov r1,r4
+001273b0	add r0,sp,#0xb4
+001273b4	bl 0x0010d430
+001273b8	mov r2,#0x25
+001273bc	adr r1,0x12761c
+001273c0	add r0,sp,#0x4
+001273c4	bl 0x0012a0fc
+001273c8	add r2,sp,#0xb4
+001273cc	mov r3,#0x3c
+001273d0	mov r1,r2
+001273d4	add r0,sp,#0x4
+001273d8	bl 0x00129fd4
+001273dc	ldrb r0,[sp,#0xc4]
+001273e0	str r6,[sp,#0xf0]
+001273e4	cmp r0,#0x2b
+001273e8	bne 0x00127444
+001273ec	mov r0,#0x30
+001273f0	strb r0,[sp,#0xc4]
+001273f4	mov r2,#0x8
+
+TARGET	00127490
+FUNCTION	device_command_dispatch_candidate	00126dfc	[[00126dfc, 001275d3]]
+CALLERS
+00129dd8	protocol_task_setup_candidate	PARAM
+CALLEES
+0012ae34	FUN_0012ae34
+0012b37c	FUN_0012b37c
+0012a0fc	FUN_0012a0fc
+0010d318	FUN_0010d318
+0010d2c4	thunk_FUN_0010d2cc
+0010d430	FUN_0010d430
+00128404	FUN_00128404
+00112d48	thunk_FUN_001164c4
+00128368	FUN_00128368
+001065c4	FUN_001065c4
+00109388	FUN_00109388
+00128290	FUN_00128290
+0011305c	FUN_0011305c
+00126814	FUN_00126814
+0010dd58	FUN_0010dd58
+001115b8	FUN_001115b8
+0010ed1c	FUN_0010ed1c
+0012b098	FUN_0012b098
+001284d0	FUN_001284d0
+00112dac	FUN_00112dac
+0010d260	FUN_0010d260
+001298f8	response_packet_builder_candidate
+00112d44	thunk_FUN_0011640c
+00126d8c	FUN_00126d8c
+00128580	FUN_00128580
+00129fd4	FUN_00129fd4
+001056a4	FUN_001056a4
+REFERENCES_TO_TARGET
+00126f6c	device_command_dispatch_candidate	CONDITIONAL_JUMP
+INSTRUCTION_WINDOW
+00127490	ldrb r0,[r4,#0x0]
+00127494	cmp r0,#0x0
+00127498	strb r0,[r5,#0x111]
+0012749c	beq 0x001274d0
+001274a0	ldr r4,[0x12764c]
+001274a4	ldr r0,[r4,#0x0]
+001274a8	cmp r0,#0x0
+001274ac	bne 0x001274d0
+001274b0	mov r3,#0x0
+001274b4	ldr r1,[0x127650]
+001274b8	ldr r0,[0x127654]
+001274bc	mov r2,r3
+001274c0	str r6,[sp,#0x0]
+001274c4	str r6,[sp,#0x4]
+001274c8	bl 0x0012ae34
+001274cc	str r0,[r4,#0x0]
+001274d0	str r7,[r8,#0x0]
+001274d4	b 0x001275cc
+001274d8	ldrb r0,[r4,#0x0]
+001274dc	strb r0,[r5,#0x2]
+
+TARGET	001274fc
+FUNCTION	device_command_dispatch_candidate	00126dfc	[[00126dfc, 001275d3]]
+CALLERS
+00129dd8	protocol_task_setup_candidate	PARAM
+CALLEES
+0012ae34	FUN_0012ae34
+0012b37c	FUN_0012b37c
+0012a0fc	FUN_0012a0fc
+0010d318	FUN_0010d318
+0010d2c4	thunk_FUN_0010d2cc
+0010d430	FUN_0010d430
+00128404	FUN_00128404
+00112d48	thunk_FUN_001164c4
+00128368	FUN_00128368
+001065c4	FUN_001065c4
+00109388	FUN_00109388
+00128290	FUN_00128290
+0011305c	FUN_0011305c
+00126814	FUN_00126814
+0010dd58	FUN_0010dd58
+001115b8	FUN_001115b8
+0010ed1c	FUN_0010ed1c
+0012b098	FUN_0012b098
+001284d0	FUN_001284d0
+00112dac	FUN_00112dac
+0010d260	FUN_0010d260
+001298f8	response_packet_builder_candidate
+00112d44	thunk_FUN_0011640c
+00126d8c	FUN_00126d8c
+00128580	FUN_00128580
+00129fd4	FUN_00129fd4
+001056a4	FUN_001056a4
+REFERENCES_TO_TARGET
+00126f8c	device_command_dispatch_candidate	CONDITIONAL_JUMP
+INSTRUCTION_WINDOW
+001274fc	ldr r1,[0x127658]
+00127500	mov r3,#0x0
+00127504	mov r2,#0x4
+00127508	mov r0,#0x82
+0012750c	str r6,[sp,#0x0]
+00127510	b 0x001275c8
+00127514	ldr r1,[0x1275f0]
+00127518	mov r3,#0x0
+0012751c	mov r2,#0x1
+00127520	mov r0,#0x84
+00127524	str r6,[sp,#0x0]
+00127528	b 0x001275c8
+0012752c	mov r3,#0x0
+00127530	mov r2,#0x20
+00127534	add r1,r9,#0x1
+00127538	mov r0,#0x85
+0012753c	str r6,[sp,#0x0]
+00127540	b 0x001275c8
+00127544	mov r3,#0x0
+00127548	add r1,r9,#0x21
+
+TARGET	00127514
+FUNCTION	device_command_dispatch_candidate	00126dfc	[[00126dfc, 001275d3]]
+CALLERS
+00129dd8	protocol_task_setup_candidate	PARAM
+CALLEES
+0012ae34	FUN_0012ae34
+0012b37c	FUN_0012b37c
+0012a0fc	FUN_0012a0fc
+0010d318	FUN_0010d318
+0010d2c4	thunk_FUN_0010d2cc
+0010d430	FUN_0010d430
+00128404	FUN_00128404
+00112d48	thunk_FUN_001164c4
+00128368	FUN_00128368
+001065c4	FUN_001065c4
+00109388	FUN_00109388
+00128290	FUN_00128290
+0011305c	FUN_0011305c
+00126814	FUN_00126814
+0010dd58	FUN_0010dd58
+001115b8	FUN_001115b8
+0010ed1c	FUN_0010ed1c
+0012b098	FUN_0012b098
+001284d0	FUN_001284d0
+00112dac	FUN_00112dac
+0010d260	FUN_0010d260
+001298f8	response_packet_builder_candidate
+00112d44	thunk_FUN_0011640c
+00126d8c	FUN_00126d8c
+00128580	FUN_00128580
+00129fd4	FUN_00129fd4
+001056a4	FUN_001056a4
+REFERENCES_TO_TARGET
+00126f9c	device_command_dispatch_candidate	CONDITIONAL_JUMP
+INSTRUCTION_WINDOW
+00127514	ldr r1,[0x1275f0]
+00127518	mov r3,#0x0
+0012751c	mov r2,#0x1
+00127520	mov r0,#0x84
+00127524	str r6,[sp,#0x0]
+00127528	b 0x001275c8
+0012752c	mov r3,#0x0
+00127530	mov r2,#0x20
+00127534	add r1,r9,#0x1
+00127538	mov r0,#0x85
+0012753c	str r6,[sp,#0x0]
+00127540	b 0x001275c8
+00127544	mov r3,#0x0
+00127548	add r1,r9,#0x21
+0012754c	mov r0,#0x86
+00127550	str r6,[sp,#0x0]
+00127554	b 0x001275c8
+00127558	mov r3,#0x0
+0012755c	mov r2,#0x1
+00127560	add r1,r5,#0x110
+
+TARGET	0012752c
+FUNCTION	device_command_dispatch_candidate	00126dfc	[[00126dfc, 001275d3]]
+CALLERS
+00129dd8	protocol_task_setup_candidate	PARAM
+CALLEES
+0012ae34	FUN_0012ae34
+0012b37c	FUN_0012b37c
+0012a0fc	FUN_0012a0fc
+0010d318	FUN_0010d318
+0010d2c4	thunk_FUN_0010d2cc
+0010d430	FUN_0010d430
+00128404	FUN_00128404
+00112d48	thunk_FUN_001164c4
+00128368	FUN_00128368
+001065c4	FUN_001065c4
+00109388	FUN_00109388
+00128290	FUN_00128290
+0011305c	FUN_0011305c
+00126814	FUN_00126814
+0010dd58	FUN_0010dd58
+001115b8	FUN_001115b8
+0010ed1c	FUN_0010ed1c
+0012b098	FUN_0012b098
+001284d0	FUN_001284d0
+00112dac	FUN_00112dac
+0010d260	FUN_0010d260
+001298f8	response_packet_builder_candidate
+00112d44	thunk_FUN_0011640c
+00126d8c	FUN_00126d8c
+00128580	FUN_00128580
+00129fd4	FUN_00129fd4
+001056a4	FUN_001056a4
+REFERENCES_TO_TARGET
+00126fa4	device_command_dispatch_candidate	CONDITIONAL_JUMP
+INSTRUCTION_WINDOW
+0012752c	mov r3,#0x0
+00127530	mov r2,#0x20
+00127534	add r1,r9,#0x1
+00127538	mov r0,#0x85
+0012753c	str r6,[sp,#0x0]
+00127540	b 0x001275c8
+00127544	mov r3,#0x0
+00127548	add r1,r9,#0x21
+0012754c	mov r0,#0x86
+00127550	str r6,[sp,#0x0]
+00127554	b 0x001275c8
+00127558	mov r3,#0x0
+0012755c	mov r2,#0x1
+00127560	add r1,r5,#0x110
+00127564	mov r0,#0x83
+00127568	str r6,[sp,#0x0]
+0012756c	b 0x001275c8
+00127570	ldr r1,[0x127644]
+00127574	mov r3,#0x0
+00127578	mov r2,#0x8
+
+TARGET	00127544
+FUNCTION	device_command_dispatch_candidate	00126dfc	[[00126dfc, 001275d3]]
+CALLERS
+00129dd8	protocol_task_setup_candidate	PARAM
+CALLEES
+0012ae34	FUN_0012ae34
+0012b37c	FUN_0012b37c
+0012a0fc	FUN_0012a0fc
+0010d318	FUN_0010d318
+0010d2c4	thunk_FUN_0010d2cc
+0010d430	FUN_0010d430
+00128404	FUN_00128404
+00112d48	thunk_FUN_001164c4
+00128368	FUN_00128368
+001065c4	FUN_001065c4
+00109388	FUN_00109388
+00128290	FUN_00128290
+0011305c	FUN_0011305c
+00126814	FUN_00126814
+0010dd58	FUN_0010dd58
+001115b8	FUN_001115b8
+0010ed1c	FUN_0010ed1c
+0012b098	FUN_0012b098
+001284d0	FUN_001284d0
+00112dac	FUN_00112dac
+0010d260	FUN_0010d260
+001298f8	response_packet_builder_candidate
+00112d44	thunk_FUN_0011640c
+00126d8c	FUN_00126d8c
+00128580	FUN_00128580
+00129fd4	FUN_00129fd4
+001056a4	FUN_001056a4
+REFERENCES_TO_TARGET
+00126f80	device_command_dispatch_candidate	CONDITIONAL_JUMP
+INSTRUCTION_WINDOW
+00127544	mov r3,#0x0
+00127548	add r1,r9,#0x21
+0012754c	mov r0,#0x86
+00127550	str r6,[sp,#0x0]
+00127554	b 0x001275c8
+00127558	mov r3,#0x0
+0012755c	mov r2,#0x1
+00127560	add r1,r5,#0x110
+00127564	mov r0,#0x83
+00127568	str r6,[sp,#0x0]
+0012756c	b 0x001275c8
+00127570	ldr r1,[0x127644]
+00127574	mov r3,#0x0
+00127578	mov r2,#0x8
+0012757c	mov r0,#0x80
+00127580	str r6,[sp,#0x0]
+00127584	b 0x001275c8
+00127588	mov r0,#0x51
+0012758c	strh r0,[sp,#0x4]
+00127590	mov r3,#0x0
+
+TARGET	00127558
+FUNCTION	device_command_dispatch_candidate	00126dfc	[[00126dfc, 001275d3]]
+CALLERS
+00129dd8	protocol_task_setup_candidate	PARAM
+CALLEES
+0012ae34	FUN_0012ae34
+0012b37c	FUN_0012b37c
+0012a0fc	FUN_0012a0fc
+0010d318	FUN_0010d318
+0010d2c4	thunk_FUN_0010d2cc
+0010d430	FUN_0010d430
+00128404	FUN_00128404
+00112d48	thunk_FUN_001164c4
+00128368	FUN_00128368
+001065c4	FUN_001065c4
+00109388	FUN_00109388
+00128290	FUN_00128290
+0011305c	FUN_0011305c
+00126814	FUN_00126814
+0010dd58	FUN_0010dd58
+001115b8	FUN_001115b8
+0010ed1c	FUN_0010ed1c
+0012b098	FUN_0012b098
+001284d0	FUN_001284d0
+00112dac	FUN_00112dac
+0010d260	FUN_0010d260
+001298f8	response_packet_builder_candidate
+00112d44	thunk_FUN_0011640c
+00126d8c	FUN_00126d8c
+00128580	FUN_00128580
+00129fd4	FUN_00129fd4
+001056a4	FUN_001056a4
+REFERENCES_TO_TARGET
+00126f94	device_command_dispatch_candidate	CONDITIONAL_JUMP
+INSTRUCTION_WINDOW
+00127558	mov r3,#0x0
+0012755c	mov r2,#0x1
+00127560	add r1,r5,#0x110
+00127564	mov r0,#0x83
+00127568	str r6,[sp,#0x0]
+0012756c	b 0x001275c8
+00127570	ldr r1,[0x127644]
+00127574	mov r3,#0x0
+00127578	mov r2,#0x8
+0012757c	mov r0,#0x80
+00127580	str r6,[sp,#0x0]
+00127584	b 0x001275c8
+00127588	mov r0,#0x51
+0012758c	strh r0,[sp,#0x4]
+00127590	mov r3,#0x0
+00127594	mov r2,#0x2
+00127598	add r1,sp,#0x4
+0012759c	mov r0,#0x87
+001275a0	str r6,[sp,#0x0]
+001275a4	b 0x001275c8
+
+TARGET	00127570
+FUNCTION	device_command_dispatch_candidate	00126dfc	[[00126dfc, 001275d3]]
+CALLERS
+00129dd8	protocol_task_setup_candidate	PARAM
+CALLEES
+0012ae34	FUN_0012ae34
+0012b37c	FUN_0012b37c
+0012a0fc	FUN_0012a0fc
+0010d318	FUN_0010d318
+0010d2c4	thunk_FUN_0010d2cc
+0010d430	FUN_0010d430
+00128404	FUN_00128404
+00112d48	thunk_FUN_001164c4
+00128368	FUN_00128368
+001065c4	FUN_001065c4
+00109388	FUN_00109388
+00128290	FUN_00128290
+0011305c	FUN_0011305c
+00126814	FUN_00126814
+0010dd58	FUN_0010dd58
+001115b8	FUN_001115b8
+0010ed1c	FUN_0010ed1c
+0012b098	FUN_0012b098
+001284d0	FUN_001284d0
+00112dac	FUN_00112dac
+0010d260	FUN_0010d260
+001298f8	response_packet_builder_candidate
+00112d44	thunk_FUN_0011640c
+00126d8c	FUN_00126d8c
+00128580	FUN_00128580
+00129fd4	FUN_00129fd4
+001056a4	FUN_001056a4
+REFERENCES_TO_TARGET
+00126f74	device_command_dispatch_candidate	CONDITIONAL_JUMP
+INSTRUCTION_WINDOW
+00127570	ldr r1,[0x127644]
+00127574	mov r3,#0x0
+00127578	mov r2,#0x8
+0012757c	mov r0,#0x80
+00127580	str r6,[sp,#0x0]
+00127584	b 0x001275c8
+00127588	mov r0,#0x51
+0012758c	strh r0,[sp,#0x4]
+00127590	mov r3,#0x0
+00127594	mov r2,#0x2
+00127598	add r1,sp,#0x4
+0012759c	mov r0,#0x87
+001275a0	str r6,[sp,#0x0]
+001275a4	b 0x001275c8
+001275a8	ldr r0,[0x12765c]
+001275ac	mov r3,#0x0
+001275b0	ldrh r0,[r0,#0x0]
+001275b4	mov r2,#0x2
+001275b8	add r1,sp,#0x4
+001275bc	strh r0,[sp,#0x4]
+
+TARGET	00127588
+FUNCTION	device_command_dispatch_candidate	00126dfc	[[00126dfc, 001275d3]]
+CALLERS
+00129dd8	protocol_task_setup_candidate	PARAM
+CALLEES
+0012ae34	FUN_0012ae34
+0012b37c	FUN_0012b37c
+0012a0fc	FUN_0012a0fc
+0010d318	FUN_0010d318
+0010d2c4	thunk_FUN_0010d2cc
+0010d430	FUN_0010d430
+00128404	FUN_00128404
+00112d48	thunk_FUN_001164c4
+00128368	FUN_00128368
+001065c4	FUN_001065c4
+00109388	FUN_00109388
+00128290	FUN_00128290
+0011305c	FUN_0011305c
+00126814	FUN_00126814
+0010dd58	FUN_0010dd58
+001115b8	FUN_001115b8
+0010ed1c	FUN_0010ed1c
+0012b098	FUN_0012b098
+001284d0	FUN_001284d0
+00112dac	FUN_00112dac
+0010d260	FUN_0010d260
+001298f8	response_packet_builder_candidate
+00112d44	thunk_FUN_0011640c
+00126d8c	FUN_00126d8c
+00128580	FUN_00128580
+00129fd4	FUN_00129fd4
+001056a4	FUN_001056a4
+REFERENCES_TO_TARGET
+00126fb0	device_command_dispatch_candidate	CONDITIONAL_JUMP
+INSTRUCTION_WINDOW
+00127588	mov r0,#0x51
+0012758c	strh r0,[sp,#0x4]
+00127590	mov r3,#0x0
+00127594	mov r2,#0x2
+00127598	add r1,sp,#0x4
+0012759c	mov r0,#0x87
+001275a0	str r6,[sp,#0x0]
+001275a4	b 0x001275c8
+001275a8	ldr r0,[0x12765c]
+001275ac	mov r3,#0x0
+001275b0	ldrh r0,[r0,#0x0]
+001275b4	mov r2,#0x2
+001275b8	add r1,sp,#0x4
+001275bc	strh r0,[sp,#0x4]
+001275c0	mov r0,#0x1e
+001275c4	str r6,[sp,#0x0]
+001275c8	bl 0x001298f8
+001275cc	mvn r0,#0x0
+001275d0	b 0x00126fd0
+00127660	stmdb sp!,{r4,r5,r6,lr}
+
+TARGET	001275a8
+FUNCTION	device_command_dispatch_candidate	00126dfc	[[00126dfc, 001275d3]]
+CALLERS
+00129dd8	protocol_task_setup_candidate	PARAM
+CALLEES
+0012ae34	FUN_0012ae34
+0012b37c	FUN_0012b37c
+0012a0fc	FUN_0012a0fc
+0010d318	FUN_0010d318
+0010d2c4	thunk_FUN_0010d2cc
+0010d430	FUN_0010d430
+00128404	FUN_00128404
+00112d48	thunk_FUN_001164c4
+00128368	FUN_00128368
+001065c4	FUN_001065c4
+00109388	FUN_00109388
+00128290	FUN_00128290
+0011305c	FUN_0011305c
+00126814	FUN_00126814
+0010dd58	FUN_0010dd58
+001115b8	FUN_001115b8
+0010ed1c	FUN_0010ed1c
+0012b098	FUN_0012b098
+001284d0	FUN_001284d0
+00112dac	FUN_00112dac
+0010d260	FUN_0010d260
+001298f8	response_packet_builder_candidate
+00112d44	thunk_FUN_0011640c
+00126d8c	FUN_00126d8c
+00128580	FUN_00128580
+00129fd4	FUN_00129fd4
+001056a4	FUN_001056a4
+REFERENCES_TO_TARGET
+00126f64	device_command_dispatch_candidate	CONDITIONAL_JUMP
+INSTRUCTION_WINDOW
+001275a8	ldr r0,[0x12765c]
+001275ac	mov r3,#0x0
+001275b0	ldrh r0,[r0,#0x0]
+001275b4	mov r2,#0x2
+001275b8	add r1,sp,#0x4
+001275bc	strh r0,[sp,#0x4]
+001275c0	mov r0,#0x1e
+001275c4	str r6,[sp,#0x0]
+001275c8	bl 0x001298f8
+001275cc	mvn r0,#0x0
+001275d0	b 0x00126fd0
+00127660	stmdb sp!,{r4,r5,r6,lr}
+00127664	cmp r1,#0x3
+00127668	sub sp,sp,#0x128
+0012766c	mov r4,r0
+00127670	mov r5,#0x0
+00127674	beq 0x0012768c
+00127678	cmp r1,#0x15
+0012767c	beq 0x00127788
+00127680	cmp r1,#0x1d
+
+TARGET	0012780c
+FUNCTION	NONE
+REFERENCES_TO_TARGET
+001276e0	FUN_00127660	PARAM
+INSTRUCTION_WINDOW
+00127854	stmdb sp!,{r4,lr}
+00127858	ldr r0,[0x1278c0]
+0012785c	mov r1,#0x114
+00127860	bl 0x0010d6a8
+00127864	ldr r4,[0x1278c0]
+00127868	mov r0,#0x0
+0012786c	mov r1,#0x64
+00127870	strb r0,[r4,#0x1]
+00127874	strb r1,[r4,#0x0]
+00127878	str r0,[r4,#0xfc]
+0012787c	ldr r0,[0x1278c4]
+00127880	str r1,[r4,#0x100]
+00127884	str r0,[r4,#0xf8]
+00127888	ldr r0,[0x1278c8]
+0012788c	adr r1,0x1278cc
+00127890	str r0,[r4,#0x108]
+00127894	str r0,[r4,#0x10c]
+00127898	mov r0,#0x14
+0012789c	strb r0,[r4,#0x2]
+001278a0	mov r0,#0x1
+
+TARGET	00127660
+FUNCTION	FUN_00127660	00127660	[[00127660, 001277df]]
+CALLERS
+00129e64	protocol_task_setup_candidate	PARAM
+CALLEES
+0012b6f8	FUN_0012b6f8
+00126714	FUN_00126714
+00126814	FUN_00126814
+0012b624	FUN_0012b624
+001278f0	FUN_001278f0
+0012a5ac	FUN_0012a5ac
+001282b8	FUN_001282b8
+0010d5d8	FUN_0010d5d8
+0012b708	FUN_0012b708
+0010d394	FUN_0010d394
+001287bc	FUN_001287bc
+00112dac	FUN_00112dac
+00103d14	FUN_00103d14
+00127854	FUN_00127854
+REFERENCES_TO_TARGET
+00129e64	protocol_task_setup_candidate	PARAM
+INSTRUCTION_WINDOW
+00127660	stmdb sp!,{r4,r5,r6,lr}
+00127664	cmp r1,#0x3
+00127668	sub sp,sp,#0x128
+0012766c	mov r4,r0
+00127670	mov r5,#0x0
+00127674	beq 0x0012768c
+00127678	cmp r1,#0x15
+0012767c	beq 0x00127788
+00127680	cmp r1,#0x1d
+00127684	beq 0x0012777c
+00127688	b 0x001277d4
+0012768c	bl 0x0012a5ac
+00127690	ldr r0,[0x1277e0]
+00127694	bl 0x001287bc
+00127698	ldr r0,[0x1277e4]
+0012769c	bl 0x001287bc
+001276a0	ldr r0,[0x1277e8]
+001276a4	bl 0x001282b8
+001276a8	ldr r0,[0x1277ec]
+001276ac	bl 0x001282b8
+DECOMPILE_BEGIN
+
+undefined4 FUN_00127660(undefined4 param_1,int param_2)
+
+{
+  undefined4 uVar1;
+  int *piVar2;
+  int iVar3;
+  uint uVar4;
+  undefined4 local_138 [74];
+  
+  piVar2 = DAT_00127850;
+  if (param_2 == 3) {
+    FUN_0012a5ac();
+    FUN_001287bc(DAT_001277e0);
+    FUN_001287bc(DAT_001277e4);
+    FUN_001282b8(DAT_001277e8);
+    FUN_001282b8(DAT_001277ec);
+    uVar1 = DAT_001277f0;
+    local_138[0] = DAT_001277f0;
+    iVar3 = FUN_00126714(DAT_001277e4,0,DAT_001277f4,DAT_001277f0);
+    if (iVar3 == 0) {
+      FUN_00103d14("load eeprom faild\n");
+      FUN_0010d394(DAT_0012781c,"A247392SS000000");
+      FUN_0010d5d8(local_138,DAT_001277f4,0x128);
+      FUN_00126814(DAT_001277e4,local_138,uVar1,0);
+    }
+    local_138[0] = 0x114;
+    iVar3 = FUN_00126714(DAT_001277e0,0,DAT_00127820,0x114);
+    if (iVar3 == 0) {
+      FUN_00103d14("load config faild\n");
+      FUN_00127854();
+    }
+    else {
+      FUN_00103d14("load config ok\n");
+    }
+    FUN_00112dac(*(undefined1 *)(DAT_00127848 + (*(byte *)(DAT_00127820 + 1) & 3)));
+    local_138[0] = 0;
+    FUN_0012b624(param_1,0,1,DAT_0012784c);
+  }
+  else if (param_2 == 0x15) {
+    if (*DAT_00127850 == 1) {
+      iVar3 = FUN_0012b6f8();
+      piVar2[1] = iVar3;
+      *piVar2 = *piVar2 + 1;
+    }
+    else if ((*DAT_00127850 == 2) && (uVar4 = FUN_0012b708(DAT_00127850[1]), 299 < uVar4)) {
+      FUN_001278f0();
+      *piVar2 = 0;
+    }
+  }
+  else if (param_2 == 0x1d) {
+    FUN_00127854();
+    FUN_001278f0();
+  }
+  return 0;
+}
+
+
+DECOMPILE_END
+
+TARGET	00127854
+FUNCTION	FUN_00127854	00127854	[[0010d38c, 0010d393] [00127854, 001278bf]]
+CALLERS
+00127744	FUN_00127660	UNCONDITIONAL_CALL
+0012777c	FUN_00127660	UNCONDITIONAL_CALL
+CALLEES
+0010d394	FUN_0010d394
+0010d6a8	FUN_0010d6a8
+REFERENCES_TO_TARGET
+00127744	FUN_00127660	UNCONDITIONAL_CALL
+0012777c	FUN_00127660	UNCONDITIONAL_CALL
+INSTRUCTION_WINDOW
+00127854	stmdb sp!,{r4,lr}
+00127858	ldr r0,[0x1278c0]
+0012785c	mov r1,#0x114
+00127860	bl 0x0010d6a8
+00127864	ldr r4,[0x1278c0]
+00127868	mov r0,#0x0
+0012786c	mov r1,#0x64
+00127870	strb r0,[r4,#0x1]
+00127874	strb r1,[r4,#0x0]
+00127878	str r0,[r4,#0xfc]
+0012787c	ldr r0,[0x1278c4]
+00127880	str r1,[r4,#0x100]
+00127884	str r0,[r4,#0xf8]
+00127888	ldr r0,[0x1278c8]
+0012788c	adr r1,0x1278cc
+00127890	str r0,[r4,#0x108]
+00127894	str r0,[r4,#0x10c]
+00127898	mov r0,#0x14
+0012789c	strb r0,[r4,#0x2]
+001278a0	mov r0,#0x1
+DECOMPILE_BEGIN
+
+void FUN_00127854(void)
+
+{
+  char cVar1;
+  int iVar2;
+  undefined1 *puVar3;
+  undefined4 uVar4;
+  uint *puVar5;
+  char *pcVar6;
+  uint uVar7;
+  uint uVar8;
+  
+  FUN_0010d6a8(DAT_001278c0,0x114);
+  puVar3 = DAT_001278c0;
+  DAT_001278c0[1] = 0;
+  *puVar3 = 100;
+  *(undefined4 *)(puVar3 + 0xfc) = 0;
+  uVar4 = DAT_001278c4;
+  *(undefined4 *)(puVar3 + 0x100) = 100;
+  *(undefined4 *)(puVar3 + 0xf8) = uVar4;
+  uVar4 = DAT_001278c8;
+  *(undefined4 *)(puVar3 + 0x108) = DAT_001278c8;
+  *(undefined4 *)(puVar3 + 0x10c) = uVar4;
+  puVar3[2] = 0x14;
+  puVar3[0x111] = 1;
+  FUN_0010d394(puVar3 + 3,"c:\\syst\\boot");
+  iVar2 = DAT_0010d3dc;
+  puVar5 = (uint *)(puVar3 + 0x7b);
+  pcVar6 = "c:\\syst\\wapper.jpg";
+  if (((uint)puVar5 & 3) == 0) {
+    uVar8 = DAT_0010d3dc << 7;
+    while( true ) {
+      uVar7 = *(uint *)pcVar6;
+      pcVar6 = (char *)((int)pcVar6 + 4);
+      if ((uVar7 - iVar2 & ~uVar7 & uVar8) != 0) break;
+      *puVar5 = uVar7;
+      puVar5 = puVar5 + 1;
+    }
+    while( true ) {
+      *(char *)puVar5 = (char)uVar7;
+      puVar5 = (uint *)((int)puVar5 + 1);
+      if ((uVar7 & 0xff) == 0) break;
+      uVar7 = uVar7 >> 8;
+    }
+  }
+  else {
+    do {
+      cVar1 = *pcVar6;
+      *(char *)puVar5 = cVar1;
+      if (cVar1 == '\0') {
+        return;
+      }
+      cVar1 = pcVar6[1];
+      pcVar6 = pcVar6 + 2;
+      *(char *)((int)puVar5 + 1) = cVar1;
+      puVar5 = (uint *)((int)puVar5 + 2);
+    } while (cVar1 != '\0');
+  }
+  return;
+}
+
+
+DECOMPILE_END
+
+TARGET	001278cc
+FUNCTION	NONE
+REFERENCES_TO_TARGET
+0012788c	FUN_00127854	PARAM
+INSTRUCTION_WINDOW
+001278f0	str lr,[sp,#-0x4]!
+001278f4	sub sp,sp,#0x114
+001278f8	ldr r1,[0x127924]
+001278fc	mov r2,#0x114
+00127900	mov r0,sp
+00127904	bl 0x0010d5d8
+00127908	ldr r0,[0x127928]
+0012790c	mov r3,#0x0
+00127910	mov r2,#0x114
+00127914	mov r1,sp
+00127918	bl 0x00126814
+0012791c	add sp,sp,#0x114
+00127920	ldr pc,[sp],#0x4
+0012792c	stmdb sp!,{r4,lr}
+00127930	mov r4,r3
+00127934	ldr r3,[sp,#0x8]
+00127938	sub r2,r2,r0
+0012793c	sub r3,r3,r4
+00127940	mul r2,r3,r2
+00127944	sub r1,r1,r0
+
+TARGET	00128290
+FUNCTION	FUN_00128290	00128290	[[00128290, 001282b7]]
+CALLERS
+00127a88	FUN_001279e8	UNCONDITIONAL_CALL
+00127afc	FUN_001279e8	UNCONDITIONAL_CALL
+001270e4	device_command_dispatch_candidate	UNCONDITIONAL_CALL
+0012692c	FUN_001268d0	UNCONDITIONAL_CALL
+CALLEES
+001281fc	FUN_001281fc
+REFERENCES_TO_TARGET
+00127a88	FUN_001279e8	UNCONDITIONAL_CALL
+00127afc	FUN_001279e8	UNCONDITIONAL_CALL
+001270e4	device_command_dispatch_candidate	UNCONDITIONAL_CALL
+0012692c	FUN_001268d0	UNCONDITIONAL_CALL
+INSTRUCTION_WINDOW
+00128290	str lr,[sp,#-0x4]!
+00128294	ldr r1,[r0,#0x18]
+00128298	sub sp,sp,#0x14
+0012829c	ldr r1,[r1,#0x0]
+001282a0	mov r2,sp
+001282a4	bl 0x001281fc
+001282a8	cmp r0,#0x0
+001282ac	ldrne r0,[sp,#0x4]
+001282b0	add sp,sp,#0x14
+001282b4	ldr pc,[sp],#0x4
+001282b8	stmdb sp!,{r4,r5,r6,r7,r8,r9,r10,lr}
+001282bc	ldr r10,[r0,#0x18]
+001282c0	ldr r4,[r0,#0x10]
+001282c4	sub sp,sp,#0x18
+001282c8	mov r5,r0
+001282cc	add r7,r10,#0x4
+001282d0	mvn r6,#0x0
+001282d4	mov r8,#0x0
+001282d8	b 0x00128340
+001282dc	sub r9,r0,r4
+DECOMPILE_BEGIN
+
+undefined4 FUN_00128290(int param_1)
+
+{
+  int iVar1;
+  undefined4 uVar2;
+  undefined1 auStack_18 [4];
+  undefined4 local_14;
+  
+  iVar1 = FUN_001281fc(param_1,**(undefined4 **)(param_1 + 0x18),auStack_18);
+  uVar2 = 0;
+  if (iVar1 != 0) {
+    uVar2 = local_14;
+  }
+  return uVar2;
+}
+
+
+DECOMPILE_END
+
+TARGET	00128404
+FUNCTION	FUN_00128404	00128404	[[00128404, 001284cf]]
+CALLERS
+00127024	device_command_dispatch_candidate	UNCONDITIONAL_CALL
+CALLEES
+REFERENCES_TO_TARGET
+00127024	device_command_dispatch_candidate	UNCONDITIONAL_CALL
+INSTRUCTION_WINDOW
+00128404	stmdb sp!,{r4,r5,r6,r7,r8,lr}
+00128408	mov r5,r1
+0012840c	add r1,r2,#0x3
+00128410	bic r1,r1,#0x3
+00128414	add r3,r1,#0x14
+00128418	ldr r1,[r0,#0xc]
+0012841c	sub sp,sp,#0x18
+00128420	add r3,r3,r1
+00128424	sub r1,r1,#0x1
+00128428	sub r3,r3,#0x1
+0012842c	bic r8,r3,r1
+00128430	ldr r1,[r0,#0x18]
+00128434	ldr r3,[r0,#0x10]
+00128438	mov r6,#0x0
+0012843c	str r3,[r1,#0x4]
+00128440	ldr r12,[r0,#0x14]
+00128444	add r1,r3,r8
+00128448	cmp r1,r12
+0012844c	bhi 0x001284c4
+00128450	mov r7,r2
+DECOMPILE_BEGIN
+
+undefined4 FUN_00128404(undefined4 *param_1,int *param_2,int param_3)
+
+{
+  int iVar1;
+  undefined4 uVar2;
+  uint uVar3;
+  uint local_30;
+  int local_2c;
+  undefined4 local_28;
+  
+  uVar3 = (param_3 + 3U & 0xfffffffc) + param_1[3] + 0x13 & ~(param_1[3] - 1);
+  iVar1 = param_1[4];
+  uVar2 = 0;
+  *(int *)(param_1[6] + 4) = iVar1;
+  if ((iVar1 + uVar3 <= (uint)param_1[5]) &&
+     (iVar1 = (*(code *)*param_1)(iVar1,param_1[3]), iVar1 != 0)) {
+    local_28 = *(undefined4 *)param_1[6];
+    local_30 = uVar3;
+    local_2c = param_3;
+    iVar1 = (*(code *)param_1[2])(*(undefined4 *)(param_1[6] + 4),&local_30,0xc);
+    if (iVar1 != 0) {
+      uVar2 = 1;
+      param_2[1] = *(int *)(param_1[6] + 4);
+      *param_2 = (int)param_1;
+      param_2[2] = param_3;
+      param_2[3] = local_30;
+    }
+  }
+  return uVar2;
+}
+
+
+DECOMPILE_END
+
+TARGET	001284d0
+FUNCTION	FUN_001284d0	001284d0	[[001284d0, 0012857f]]
+CALLERS
+0012706c	device_command_dispatch_candidate	UNCONDITIONAL_CALL
+CALLEES
+REFERENCES_TO_TARGET
+0012706c	device_command_dispatch_candidate	UNCONDITIONAL_CALL
+INSTRUCTION_WINDOW
+001284d0	stmdb sp!,{r4,r5,r6,r7,r8,lr}
+001284d4	movs r7,r0
+001284d8	ldrne r0,[r7,#0x0]
+001284dc	mov r4,r3
+001284e0	cmpne r0,#0x0
+001284e4	mov r8,r2
+001284e8	moveq r0,#0x0
+001284ec	ldmiaeq sp!,{r4,r5,r6,r7,r8,pc}
+001284f0	ldr r2,[r7,#0x4]
+001284f4	add r1,r1,r2
+001284f8	add r6,r1,#0x14
+001284fc	ldr r1,[r0,#0xc]
+00128500	sub r2,r1,#0x1
+00128504	and r2,r2,r6
+00128508	subs r5,r1,r2
+0012850c	beq 0x00128544
+00128510	cmp r5,r4
+00128514	movhi r5,r3
+00128518	ldr r3,[r0,#0x8]
+0012851c	mov r2,r5
+DECOMPILE_BEGIN
+
+undefined4 FUN_001284d0(int *param_1,int param_2,int param_3,uint param_4)
+
+{
+  int iVar1;
+  uint uVar2;
+  uint uVar3;
+  
+  iVar1 = 0;
+  if (param_1 != (int *)0x0) {
+    iVar1 = *param_1;
+  }
+  if (param_1 == (int *)0x0 || iVar1 == 0) {
+    return 0;
+  }
+  uVar3 = param_2 + param_1[1] + 0x14;
+  uVar2 = *(int *)(iVar1 + 0xc) - (*(int *)(iVar1 + 0xc) - 1U & uVar3);
+  if (uVar2 == 0) goto LAB_00128544;
+  if (param_4 < uVar2) {
+    uVar2 = param_4;
+  }
+  while( true ) {
+    iVar1 = (**(code **)(iVar1 + 8))(uVar3,param_3,uVar2);
+    if (iVar1 == 0) {
+      return 0xffffffff;
+    }
+    uVar3 = uVar3 + uVar2;
+    param_4 = param_4 - uVar2;
+    param_3 = param_3 + uVar2;
+LAB_00128544:
+    if (param_4 == 0) break;
+    uVar2 = ((undefined4 *)*param_1)[3];
+    if (param_4 <= uVar2) {
+      uVar2 = param_4;
+    }
+    iVar1 = (**(code **)*param_1)(uVar3,uVar2);
+    if (iVar1 == 0) {
+      return 0;
+    }
+    iVar1 = *param_1;
+  }
+  return 1;
+}
+
+
+DECOMPILE_END
+
+TARGET	00128580
+FUNCTION	FUN_00128580	00128580	[[00128580, 00128647]]
+CALLERS
+00127088	device_command_dispatch_candidate	UNCONDITIONAL_CALL
+CALLEES
+REFERENCES_TO_TARGET
+00127088	device_command_dispatch_candidate	UNCONDITIONAL_CALL
+INSTRUCTION_WINDOW
+00128580	stmdb sp!,{r3,r4,r5,lr}
+00128584	movs r4,r0
+00128588	ldrne r0,[r4,#0x0]
+0012858c	cmpne r0,#0x0
+00128590	beq 0x00128640
+00128594	ldr r1,[r0,#0x18]
+00128598	ldr r1,[r1,#0x0]
+0012859c	cmn r1,#0x1
+001285a0	beq 0x001285c4
+001285a4	add r12,r1,#0xc
+001285a8	ldr r3,[r0,#0x8]
+001285ac	mov r2,#0x4
+001285b0	add r1,r4,#0x4
+001285b4	mov r0,r12
+001285b8	blx r3
+001285bc	cmp r0,#0x0
+001285c0	beq 0x00128640
+001285c4	ldr r0,[r4,#0x0]
+001285c8	ldr r1,[r4,#0x8]
+001285cc	ldr r0,[r0,#0x18]
+DECOMPILE_BEGIN
+
+undefined4 FUN_00128580(int *param_1,undefined4 param_2,undefined4 param_3,int param_4)
+
+{
+  int iVar1;
+  int local_10;
+  
+  iVar1 = 0;
+  if (param_1 != (int *)0x0) {
+    iVar1 = *param_1;
+  }
+  if ((param_1 != (int *)0x0 && iVar1 != 0) &&
+     ((**(int **)(iVar1 + 0x18) == -1 ||
+      (local_10 = param_4,
+      iVar1 = (**(code **)(iVar1 + 8))(**(int **)(iVar1 + 0x18) + 0xc,param_1 + 1,4), iVar1 != 0))))
+  {
+    local_10 = ~(**(int **)(*param_1 + 0x18) + param_1[2] + (*(int **)(*param_1 + 0x18))[2]) + 1;
+    iVar1 = (**(code **)(*param_1 + 8))(param_1[1] + 0x10,&local_10,4);
+    if (iVar1 != 0) {
+      **(int **)(*param_1 + 0x18) = param_1[1];
+      *(int *)(*(int *)(*param_1 + 0x18) + 4) = param_1[1] + param_1[3];
+      return 1;
+    }
+  }
+  return 0xffffffff;
+}
+
+
+DECOMPILE_END
+
+TARGET	00128bc0
+FUNCTION	FUN_00128bc0	00128bc0	[[00128bc0, 00128c8f]]
+CALLERS
+00129654	transport_dispatch_candidate	UNCONDITIONAL_CALL
+CALLEES
+0012a6d8	FUN_0012a6d8
+0012a814	FUN_0012a814
+0012a218	FUN_0012a218
+REFERENCES_TO_TARGET
+00129654	transport_dispatch_candidate	UNCONDITIONAL_CALL
+INSTRUCTION_WINDOW
+00128bc0	stmdb sp!,{r4,r5,r6,lr}
+00128bc4	sub sp,sp,#0x28
+00128bc8	mov r6,r0
+00128bcc	mov r4,#0x0
+00128bd0	mov r2,sp
+00128bd4	mov r1,#0x20
+00128bd8	mov r0,#0x21000
+00128bdc	bl 0x0012a6d8
+00128be0	ldr r5,[0x128c90]
+00128be4	cmp r6,#0x0
+00128be8	beq 0x00128c28
+00128bec	ldr r1,[sp,#0xc]
+00128bf0	cmn r1,#0x1
+00128bf4	bne 0x00128c20
+00128bf8	ldr r0,[0x128c94]
+00128bfc	add r2,sp,#0x20
+00128c00	mov r1,#0x4
+00128c04	str r5,[sp,#0x20]
+00128c08	bl 0x0012a814
+00128c0c	mov r2,sp
+DECOMPILE_BEGIN
+
+void FUN_00128bc0(int param_1)
+
+{
+  int iVar1;
+  bool bVar2;
+  int local_38;
+  int local_34;
+  int local_2c;
+  int local_18;
+  undefined4 uStack_14;
+  
+  FUN_0012a6d8(0x21000,0x20,&local_38);
+  iVar1 = DAT_00128c90;
+  if (param_1 == 0) {
+    if (local_38 != DAT_00128c90) {
+      return;
+    }
+    bVar2 = local_34 != -1;
+    if (!bVar2) {
+      local_18 = *(int *)(DAT_00128c98 + 4);
+      uStack_14 = *(undefined4 *)(DAT_00128c98 + 8);
+      FUN_0012a814(DAT_00128c9c,8,&local_18);
+      FUN_0012a6d8(0x21000,0x20,&local_38);
+    }
+  }
+  else {
+    bVar2 = local_2c != -1;
+    local_34 = local_2c;
+    if (!bVar2) {
+      local_18 = DAT_00128c90;
+      FUN_0012a814(DAT_00128c94,4,&local_18);
+      FUN_0012a6d8(0x21000,0x20,&local_38);
+      local_34 = local_2c;
+    }
+  }
+  if ((local_34 == iVar1) && (!bVar2)) {
+    FUN_0012a218();
+  }
+  return;
+}
+
+
+DECOMPILE_END
+
+TARGET	00128f8c
+FUNCTION	FUN_00128f8c	00128f8c	[[00128f8c, 0012938b]]
+CALLERS
+001294b4	transport_dispatch_candidate	UNCONDITIONAL_CALL
+CALLEES
+00103d14	FUN_00103d14
+0010d6a8	FUN_0010d6a8
+REFERENCES_TO_TARGET
+001294b4	transport_dispatch_candidate	UNCONDITIONAL_CALL
+INSTRUCTION_WINDOW
+00128f8c	stmdb sp!,{r2,r3,r4,r5,r6,r7,r8,lr}
+00128f90	ldr r4,[0x12938c]
+00128f94	mov r0,#0x1
+00128f98	strb r0,[r4,#0x88]
+00128f9c	mov r1,#0x0
+00128fa0	strb r1,[r4,#0x89]
+00128fa4	strb r1,[r4,#0x8a]
+00128fa8	strb r1,[r4,#0x8b]
+00128fac	mov r0,#0x2
+00128fb0	strb r0,[r4,#0x8c]
+00128fb4	strb r1,[r4,#0x8d]
+00128fb8	strb r1,[r4,#0x8e]
+00128fbc	strb r1,[r4,#0x8f]
+00128fc0	mov r7,#0x3
+00128fc4	strb r7,[r4,#0x90]
+00128fc8	strb r1,[r4,#0x91]
+00128fcc	strb r1,[r4,#0x92]
+00128fd0	strb r1,[r4,#0x93]
+00128fd4	mov r0,#0x4
+00128fd8	strb r0,[r4,#0x94]
+DECOMPILE_BEGIN
+
+void FUN_00128f8c(undefined4 param_1,undefined4 param_2,undefined4 param_3,undefined4 param_4)
+
+{
+  undefined1 *puVar1;
+  undefined4 uVar2;
+  undefined1 *puVar3;
+  char *pcVar4;
+  char *pcVar5;
+  char *pcVar6;
+  char cVar7;
+  char *pcVar8;
+  undefined1 *puVar9;
+  char *pcVar10;
+  undefined1 *puVar11;
+  
+  puVar1 = DAT_0012938c;
+  DAT_0012938c[0x88] = 1;
+  puVar1[0x89] = 0;
+  puVar1[0x8a] = 0;
+  puVar1[0x8b] = 0;
+  puVar1[0x8c] = 2;
+  puVar1[0x8d] = 0;
+  puVar1[0x8e] = 0;
+  puVar1[0x8f] = 0;
+  puVar1[0x90] = 3;
+  puVar1[0x91] = 0;
+  puVar1[0x92] = 0;
+  puVar1[0x93] = 0;
+  puVar1[0x94] = 4;
+  puVar1[0x95] = 0;
+  puVar1[0x96] = 0;
+  puVar1[0x97] = 0;
+  uVar2 = DAT_00129390;
+  puVar1[0x84] = (char)DAT_00129390;
+  puVar1[0x85] = (char)((uint)uVar2 >> 8);
+  puVar1[0x86] = (char)((uint)uVar2 >> 0x10);
+  puVar1[0x87] = (char)((uint)uVar2 >> 0x18);
+  uVar2 = DAT_00129394;
+  puVar1[0x80] = (char)DAT_00129394;
+  puVar1[0x81] = (char)((uint)uVar2 >> 8);
+  puVar1[0x82] = (char)((uint)uVar2 >> 0x10);
+  puVar1[0x83] = (char)((uint)uVar2 >> 0x18);
+  uVar2 = DAT_00129398;
+  *puVar1 = (char)DAT_00129398;
+  puVar1[1] = (char)((uint)uVar2 >> 8);
+  puVar1[2] = (char)((uint)uVar2 >> 0x10);
+  puVar1[3] = (char)((uint)uVar2 >> 0x18);
+  uVar2 = DAT_0012939c;
+  puVar1[8] = (char)DAT_0012939c;
+  puVar1[9] = (char)((uint)uVar2 >> 8);
+  puVar1[10] = (char)((uint)uVar2 >> 0x10);
+  puVar1[0xb] = (char)((uint)uVar2 >> 0x18);
+  uVar2 = DAT_001293a0;
+  puVar1[0xc] = (char)DAT_001293a0;
+  puVar1[0xd] = (char)((uint)uVar2 >> 8);
+  puVar1[0xe] = (char)((uint)uVar2 >> 0x10);
+  puVar1[0xf] = (char)((uint)uVar2 >> 0x18);
+  uVar2 = DAT_001293a4;
+  puVar1[0x18] = (char)DAT_001293a4;
+  puVar1[0x19] = (char)((uint)uVar2 >> 8);
+  puVar1[0x1a] = (char)((uint)uVar2 >> 0x10);
+  puVar1[0x1b] = (char)((uint)uVar2 >> 0x18);
+  uVar2 = DAT_001293a8;
+  puVar1[0xac] = (char)DAT_001293a8;
+  puVar1[0xad] = (char)((uint)uVar2 >> 8);
+  puVar1[0xae] = (char)((uint)uVar2 >> 0x10);
+  puVar1[0xaf] = (char)((uint)uVar2 >> 0x18);
+  uVar2 = DAT_001293ac;
+  puVar1[0x1c] = (char)DAT_001293ac;
+  puVar1[0x1d] = (char)((uint)uVar2 >> 8);
+  puVar1[0x1e] = (char)((uint)uVar2 >> 0x10);
+  puVar1[0x1f] = (char)((uint)uVar2 >> 0x18);
+  puVar1[0x5c] = 0x1d;
+  puVar1[0x5d] = 0;
+  puVar1[0x5e] = 0;
+  puVar1[0x5f] = 0;
+  uVar2 = DAT_001293b0;
+  puVar1[0x20] = (char)DAT_001293b0;
+  puVar1[0x21] = (char)((uint)uVar2 >> 8);
+  puVar1[0x22] = (char)((uint)uVar2 >> 0x10);
+  puVar1[0x23] = (char)((uint)uVar2 >> 0x18);
+  puVar1[0x60] = 0x1d;
+  puVar1[0x61] = 0;
+  puVar1[0x62] = 0;
+  puVar1[99] = 0;
+  uVar2 = DAT_001293b4;
+  puVar1[0x98] = (char)DAT_001293b4;
+  puVar1[0x99] = (char)((uint)uVar2 >> 8);
+  puVar1[0x9a] = (char)((uint)uVar2 >> 0x10);
+  puVar1[0x9b] = (char)((uint)uVar2 >> 0x18);
+  uVar2 = DAT_001293b8;
+  puVar1[0x9c] = (char)DAT_001293b8;
+  puVar1[0x9d] = (char)((uint)uVar2 >> 8);
+  puVar1[0x9e] = (char)((uint)uVar2 >> 0x10);
+  puVar1[0x9f] = (char)((uint)uVar2 >> 0x18);
+  uVar2 = DAT_001293bc;
+  puVar1[0xa0] = (char)DAT_001293bc;
+  puVar1[0xa1] = (char)((uint)uVar2 >> 8);
+  puVar1[0xa2] = (char)((uint)uVar2 >> 0x10);
+  puVar1[0xa3] = (char)((uint)uVar2 >> 0x18);
+  uVar2 = DAT_001293c0;
+  puVar1[0xa4] = (char)DAT_001293c0;
+  puVar1[0xa5] = (char)((uint)uVar2 >> 8);
+  puVar1[0xa6] = (char)((uint)uVar2 >> 0x10);
+  puVar1[0xa7] = (char)((uint)uVar2 >> 0x18);
+  uVar2 = DAT_001293c4;
+  puVar1[0xb4] = (char)DAT_001293c4;
+  puVar1[0xb5] = (char)((uint)uVar2 >> 8);
+  puVar1[0xb6] = (char)((uint)uVar2 >> 0x10);
+  puVar1[0xb7] = (char)((uint)uVar2 >> 0x18);
+  puVar3 = DAT_001293c8;
+  puVar1[0x2c] = (char)DAT_001293c8;
+  puVar1[0x2d] = (char)((uint)puVar3 >> 8);
+  puVar1[0x2e] = (char)((uint)puVar3 >> 0x10);
+  puVar1[0x2f] = (char)((uint)puVar3 >> 0x18);
+  puVar11 = puVar3 + 0x124;
+  puVar1[0x30] = (char)puVar11;
+  puVar1[0x31] = (char)((uint)puVar11 >> 8);
+  puVar1[0x32] = (char)((uint)puVar11 >> 0x10);
+  puVar1[0x33] = (char)((uint)puVar11 >> 0x18);
+  puVar9 = puVar3 + 0x138;
+  puVar1[0x34] = (char)puVar9;
+  puVar1[0x35] = (char)((uint)puVar9 >> 8);
+  puVar1[0x36] = (char)((uint)puVar9 >> 0x10);
+  puVar1[0x37] = (char)((uint)puVar9 >> 0x18);
+  puVar1[0x40] = 0x12;
+  puVar1[0x41] = 0;
+  puVar1[0x42] = 0;
+  puVar1[0x43] = 0;
+  puVar1[0x48] = 0x49;
+  puVar1[0x49] = 0;
+  puVar1[0x4a] = 0;
+  puVar1[0x4b] = 0;
+  puVar1[0x4c] = 0x49;
+  puVar1[0x4d] = 0;
+  puVar1[0x4e] = 0;
+  puVar1[0x4f] = 0;
+  *puVar3 = 4;
+  puVar1[0x6c] = 4;
+  puVar1[0x6d] = 0;
+  puVar1[0x6e] = 0;
+  puVar1[0x6f] = 0;
+  *puVar11 = 0x12;
+  puVar1[0x70] = 0x12;
+  puVar1[0x71] = 0;
+  puVar1[0x72] = 0;
+  puVar1[0x73] = 0;
+  *puVar9 = 0x3e;
+  puVar1[0x74] = 0x3e;
+  puVar1[0x75] = 0;
+  puVar1[0x76] = 0;
+  puVar1[0x77] = 0;
+  pcVar4 = DAT_001293cc;
+  cVar7 = '\x02';
+  FUN_0010d6a8(DAT_001293cc,0x44,0,puVar9,param_3,param_4);
+  pcVar5 = DAT_001293d0;
+  pcVar8 = DAT_001293d0 + 0x21;
+  pcVar6 = DAT_001293d0;
+  pcVar10 = pcVar4;
+  while( true ) {
+    pcVar10 = pcVar10 + 2;
+    pcVar6 = pcVar6 + 1;
+    if ((pcVar8 <= pcVar6) || (*pcVar6 == '\0')) break;
+    *pcVar10 = *pcVar6;
+    cVar7 = cVar7 + '\x02';
+  }
+  *pcVar10 = '\0';
+  pcVar4[1] = '\x03';
+  puVar1[0x38] = (char)pcVar4;
+  puVar1[0x39] = (char)((uint)pcVar4 >> 8);
+  puVar1[0x3a] = (char)((uint)pcVar4 >> 0x10);
+  puVar1[0x3b] = (char)((uint)pcVar4 >> 0x18);
+  *pcVar4 = cVar7;
+  puVar1[0x78] = cVar7;
+  puVar1[0x79] = 0;
+  puVar1[0x7a] = 0;
+  puVar1[0x7b] = 0;
+  FUN_00103d14("======>sn: %s, %02x %02x %02x %02x\n",pcVar5 + 1,cVar7,0,3,0);
+  return;
+}
+
+
+DECOMPILE_END
+
+TARGET	00129400
+FUNCTION	transport_dispatch_candidate	001293f8	[[001293f8, 00129697]]
+CALLERS
+00129e88	protocol_task_setup_candidate	PARAM
+CALLEES
+0012a390	FUN_0012a390
+00128bc0	FUN_00128bc0
+0012a310	FUN_0012a310
+0012b624	FUN_0012b624
+0012a2a4	FUN_0012a2a4
+0012a3bc	FUN_0012a3bc
+0012a3f0	FUN_0012a3f0
+0010d430	FUN_0010d430
+0012be1c	FUN_0012be1c
+00128f8c	FUN_00128f8c
+0012a218	FUN_0012a218
+001298f8	response_packet_builder_candidate
+0012bf8c	FUN_0012bf8c
+001296d8	segmented_command_receive_candidate
+0012b3bc	FUN_0012b3bc
+REFERENCES_TO_TARGET
+INSTRUCTION_WINDOW
+00129400	cmp r1,#0x6
+00129404	mov r12,r3
+00129408	mov r4,r0
+0012940c	mov r6,#0x0
+00129410	beq 0x00129690
+00129414	bgt 0x00129424
+00129418	cmp r1,#0x3
+0012941c	bne 0x00129690
+00129420	b 0x00129440
+00129424	ldr r8,[0x129698]
+00129428	cmp r1,#0x38
+0012942c	mvn r7,#0x0
+00129430	beq 0x001294ec
+00129434	cmp r1,#0x3b
+00129438	beq 0x0012967c
+0012943c	b 0x00129690
+00129440	mrs r0,cpsr
+00129444	orr r0,r0,#0x80
+00129448	msr cpsr_c,r0
+0012944c	ldr r0,[0x12969c]
+DECOMPILE_BEGIN
+
+longlong transport_dispatch_candidate
+                   (undefined4 param_1,uint param_2,undefined4 param_3,undefined4 param_4)
+
+{
+  undefined4 uVar1;
+  int iVar2;
+  int *piVar3;
+  int iVar4;
+  uint *puVar5;
+  uint uVar6;
+  uint uVar7;
+  bool bVar8;
+  undefined4 local_20;
+  
+  uVar1 = DAT_00129698;
+  if (param_2 != 6) {
+    local_20 = param_4;
+    if ((int)param_2 < 7) {
+      if (param_2 == 3) {
+        FUN_0012a2a4(DAT_001296a0,DAT_0012969c | 0x80000000,0x1b8,300);
+        FUN_0012a3bc(DAT_001296a8,DAT_001296a4 | 0x80000000,0x32000);
+        FUN_0012a3bc(DAT_001296b0,DAT_001296ac | 0x80000000,0x32000);
+        param_2 = 0;
+        FUN_0012b624(param_1,0,1,DAT_001296b4);
+        FUN_0012bf8c();
+        FUN_00128f8c();
+        FUN_0012be1c();
+        piVar3 = (int *)*DAT_001296b8;
+        piVar3[3] = 0;
+        *(undefined4 *)(*piVar3 + 0xc) = 0;
+      }
+    }
+    else {
+      if (param_2 == 0x38) {
+        iVar4 = FUN_0012a390(DAT_001296b0,&local_20,0,param_4,0x38,param_3);
+        if (iVar4 != 0) {
+          iVar4 = segmented_command_receive_candidate(DAT_001296bc,local_20);
+          if (iVar4 != 0) {
+            if (*(int *)(DAT_001296bc + 0xc) == 0x88) {
+              FUN_00128bc0(*(undefined4 *)(DAT_001296bc + 0x10));
+            }
+            else {
+              param_2 = *(int *)(DAT_001296bc + 4) * 0x1b4;
+              FUN_0012b3bc(DAT_001296c0,uVar1,*(int *)(DAT_001296bc + 0xc),DAT_001296bc + 0x10,
+                           param_2,0xffffffff);
+            }
+          }
+          FUN_0012a310(DAT_001296b0);
+        }
+        iVar2 = DAT_001296c8;
+        iVar4 = DAT_001296c4;
+        if ((*(int *)(DAT_001296c4 + 0x10) == 0) ||
+           (puVar5 = (uint *)FUN_0012a3f0(DAT_001296b0,0x1b8), puVar5 == (uint *)0x0))
+        goto LAB_00129690;
+        uVar7 = DAT_001296cc | 0x80000000;
+        *(undefined4 *)(iVar2 + 0x5c) = 1;
+        *DAT_001296d0 = uVar7;
+        *(undefined4 *)(iVar2 + 0x60) = 0x1b8;
+        *(uint *)(iVar2 + 0x5c) = *(uint *)(iVar2 + 0x5c) | 0x20;
+        do {
+          bVar8 = *(char *)(DAT_001296d4 + 0xe0) != '\0';
+          uVar6 = 0;
+          if (bVar8) {
+            uVar6 = *(uint *)(iVar2 + 0x5c) & 0x20;
+          }
+        } while (bVar8 && uVar6 != 0);
+        *(undefined4 *)(iVar4 + 0x10) = 0;
+        FUN_0010d430(puVar5,uVar7,0x1b8);
+        if ((~*puVar5 & 0xff) != 0) goto LAB_00129690;
+        FUN_0012b3bc(DAT_001296c0,uVar1,*puVar5 & 0xff,puVar5 + 1,0x1b4,0xffffffff);
+        FUN_0012a218();
+      }
+      else if (param_2 != 0x3b) goto LAB_00129690;
+      param_2 = 0;
+      response_packet_builder_candidate(0xff,param_4);
+    }
+  }
+LAB_00129690:
+  return (ulonglong)param_2 << 0x20;
+}
+
+
+DECOMPILE_END
+
+TARGET	00129440
+FUNCTION	transport_dispatch_candidate	001293f8	[[001293f8, 00129697]]
+CALLERS
+00129e88	protocol_task_setup_candidate	PARAM
+CALLEES
+0012a390	FUN_0012a390
+00128bc0	FUN_00128bc0
+0012a310	FUN_0012a310
+0012b624	FUN_0012b624
+0012a2a4	FUN_0012a2a4
+0012a3bc	FUN_0012a3bc
+0012a3f0	FUN_0012a3f0
+0010d430	FUN_0010d430
+0012be1c	FUN_0012be1c
+00128f8c	FUN_00128f8c
+0012a218	FUN_0012a218
+001298f8	response_packet_builder_candidate
+0012bf8c	FUN_0012bf8c
+001296d8	segmented_command_receive_candidate
+0012b3bc	FUN_0012b3bc
+REFERENCES_TO_TARGET
+00129420	transport_dispatch_candidate	UNCONDITIONAL_JUMP
+INSTRUCTION_WINDOW
+00129440	mrs r0,cpsr
+00129444	orr r0,r0,#0x80
+00129448	msr cpsr_c,r0
+0012944c	ldr r0,[0x12969c]
+00129450	mov r3,#0x12c
+00129454	orr r1,r0,#0x80000000
+00129458	ldr r0,[0x1296a0]
+0012945c	mov r2,#0x1b8
+00129460	bl 0x0012a2a4
+00129464	ldr r0,[0x1296a4]
+00129468	mov r2,#0x32000
+0012946c	orr r1,r0,#0x80000000
+00129470	ldr r0,[0x1296a8]
+00129474	bl 0x0012a3bc
+00129478	ldr r0,[0x1296ac]
+0012947c	mov r2,#0x32000
+00129480	orr r1,r0,#0x80000000
+00129484	ldr r0,[0x1296b0]
+00129488	bl 0x0012a3bc
+0012948c	mrs r0,cpsr
+
+TARGET	001294ec
+FUNCTION	transport_dispatch_candidate	001293f8	[[001293f8, 00129697]]
+CALLERS
+00129e88	protocol_task_setup_candidate	PARAM
+CALLEES
+0012a390	FUN_0012a390
+00128bc0	FUN_00128bc0
+0012a310	FUN_0012a310
+0012b624	FUN_0012b624
+0012a2a4	FUN_0012a2a4
+0012a3bc	FUN_0012a3bc
+0012a3f0	FUN_0012a3f0
+0010d430	FUN_0010d430
+0012be1c	FUN_0012be1c
+00128f8c	FUN_00128f8c
+0012a218	FUN_0012a218
+001298f8	response_packet_builder_candidate
+0012bf8c	FUN_0012bf8c
+001296d8	segmented_command_receive_candidate
+0012b3bc	FUN_0012b3bc
+REFERENCES_TO_TARGET
+00129430	transport_dispatch_candidate	CONDITIONAL_JUMP
+INSTRUCTION_WINDOW
+001294ec	mrs r0,cpsr
+001294f0	orr r0,r0,#0x80
+001294f4	msr cpsr_c,r0
+001294f8	ldr r0,[0x1296b0]
+001294fc	mov r2,#0x0
+00129500	add r1,sp,#0x8
+00129504	bl 0x0012a390
+00129508	mov r2,r0
+0012950c	mrs r0,cpsr
+00129510	bic r0,r0,#0x80
+00129514	msr cpsr_c,r0
+00129518	cmp r2,#0x0
+0012951c	beq 0x00129584
+00129520	ldr r0,[0x1296bc]
+00129524	ldr r1,[sp,#0x8]
+00129528	bl 0x001296d8
+0012952c	cmp r0,#0x0
+00129530	beq 0x00129564
+00129534	ldr r0,[0x1296bc]
+00129538	ldr r2,[r0,#0xc]
+
+TARGET	0012967c
+FUNCTION	transport_dispatch_candidate	001293f8	[[001293f8, 00129697]]
+CALLERS
+00129e88	protocol_task_setup_candidate	PARAM
+CALLEES
+0012a390	FUN_0012a390
+00128bc0	FUN_00128bc0
+0012a310	FUN_0012a310
+0012b624	FUN_0012b624
+0012a2a4	FUN_0012a2a4
+0012a3bc	FUN_0012a3bc
+0012a3f0	FUN_0012a3f0
+0010d430	FUN_0010d430
+0012be1c	FUN_0012be1c
+00128f8c	FUN_00128f8c
+0012a218	FUN_0012a218
+001298f8	response_packet_builder_candidate
+0012bf8c	FUN_0012bf8c
+001296d8	segmented_command_receive_candidate
+0012b3bc	FUN_0012b3bc
+REFERENCES_TO_TARGET
+00129438	transport_dispatch_candidate	CONDITIONAL_JUMP
+INSTRUCTION_WINDOW
+0012967c	mov r3,#0x0
+00129680	mov r1,r12
+00129684	mov r0,#0xff
+00129688	str r6,[sp,#0x0]
+0012968c	bl 0x001298f8
+00129690	mov r0,#0x0
+00129694	ldmia sp!,{r1,r2,r3,r4,r5,r6,r7,r8,r9,pc}
+001296d8	stmdb sp!,{r4,r5,r6,lr}
+001296dc	mov r4,r0
+001296e0	ldr r0,[r1,#0x0]
+001296e4	mov r5,r1
+001296e8	tst r0,#0x80000000
+001296ec	mov r6,#0x0
+001296f0	and r1,r0,#0xff
+001296f4	beq 0x00129724
+001296f8	str r1,[r4,#0xc]
+001296fc	str r6,[r4,#0x8]
+00129700	ldr r0,[r5,#0x0]
+00129704	mov r2,#0x1b4
+00129708	mov r0,r0, lsl #0x1
+
+TARGET	00129690
+FUNCTION	transport_dispatch_candidate	001293f8	[[001293f8, 00129697]]
+CALLERS
+00129e88	protocol_task_setup_candidate	PARAM
+CALLEES
+0012a390	FUN_0012a390
+00128bc0	FUN_00128bc0
+0012a310	FUN_0012a310
+0012b624	FUN_0012b624
+0012a2a4	FUN_0012a2a4
+0012a3bc	FUN_0012a3bc
+0012a3f0	FUN_0012a3f0
+0010d430	FUN_0010d430
+0012be1c	FUN_0012be1c
+00128f8c	FUN_00128f8c
+0012a218	FUN_0012a218
+001298f8	response_packet_builder_candidate
+0012bf8c	FUN_0012bf8c
+001296d8	segmented_command_receive_candidate
+0012b3bc	FUN_0012b3bc
+REFERENCES_TO_TARGET
+00129410	transport_dispatch_candidate	CONDITIONAL_JUMP
+0012941c	transport_dispatch_candidate	CONDITIONAL_JUMP
+0012943c	transport_dispatch_candidate	UNCONDITIONAL_JUMP
+001294e8	transport_dispatch_candidate	UNCONDITIONAL_JUMP
+00129594	transport_dispatch_candidate	CONDITIONAL_JUMP
+001295c4	transport_dispatch_candidate	CONDITIONAL_JUMP
+00129648	transport_dispatch_candidate	CONDITIONAL_JUMP
+INSTRUCTION_WINDOW
+00129690	mov r0,#0x0
+00129694	ldmia sp!,{r1,r2,r3,r4,r5,r6,r7,r8,r9,pc}
+001296d8	stmdb sp!,{r4,r5,r6,lr}
+001296dc	mov r4,r0
+001296e0	ldr r0,[r1,#0x0]
+001296e4	mov r5,r1
+001296e8	tst r0,#0x80000000
+001296ec	mov r6,#0x0
+001296f0	and r1,r0,#0xff
+001296f4	beq 0x00129724
+001296f8	str r1,[r4,#0xc]
+001296fc	str r6,[r4,#0x8]
+00129700	ldr r0,[r5,#0x0]
+00129704	mov r2,#0x1b4
+00129708	mov r0,r0, lsl #0x1
+0012970c	mov r0,r0, lsr #0x9
+00129710	str r0,[r4,#0x4]
+00129714	add r1,r5,#0x4
+00129718	add r0,r4,#0x10
+0012971c	bl 0x0010d5d8
+
+TARGET	001296d8
+FUNCTION	segmented_command_receive_candidate	001296d8	[[001296d8, 001297c3]]
+CALLERS
+00129528	transport_dispatch_candidate	UNCONDITIONAL_CALL
+CALLEES
+00103ebc	FUN_00103ebc
+0010d5d8	FUN_0010d5d8
+REFERENCES_TO_TARGET
+00129528	transport_dispatch_candidate	UNCONDITIONAL_CALL
+INSTRUCTION_WINDOW
+001296d8	stmdb sp!,{r4,r5,r6,lr}
+001296dc	mov r4,r0
+001296e0	ldr r0,[r1,#0x0]
+001296e4	mov r5,r1
+001296e8	tst r0,#0x80000000
+001296ec	mov r6,#0x0
+001296f0	and r1,r0,#0xff
+001296f4	beq 0x00129724
+001296f8	str r1,[r4,#0xc]
+001296fc	str r6,[r4,#0x8]
+00129700	ldr r0,[r5,#0x0]
+00129704	mov r2,#0x1b4
+00129708	mov r0,r0, lsl #0x1
+0012970c	mov r0,r0, lsr #0x9
+00129710	str r0,[r4,#0x4]
+00129714	add r1,r5,#0x4
+00129718	add r0,r4,#0x10
+0012971c	bl 0x0010d5d8
+00129720	b 0x0012979c
+00129724	ldr r2,[r4,#0xc]
+DECOMPILE_BEGIN
+
+bool segmented_command_receive_candidate(uint *param_1,uint *param_2)
+
+{
+  uint uVar1;
+  uint uVar2;
+  uint uVar3;
+  bool bVar4;
+  
+  uVar1 = *param_2;
+  if ((uVar1 & 0x80000000) == 0) {
+    uVar3 = param_1[3];
+    if (uVar3 == (uVar1 & 0xff)) {
+      uVar2 = param_1[2];
+      bVar4 = uVar2 != (uVar1 & 0x7fffffff) >> 8;
+      if (bVar4) {
+        uVar3 = ((uVar1 & 0x7fffffff) >> 8) - 1;
+      }
+      if (!bVar4 || uVar3 == uVar2) {
+        if ((uVar1 & 0x7fffffff) >> 8 < 0x32) {
+          FUN_0010d5d8(param_1 + ((uVar1 & 0x7fffffff) >> 8) * 0x6d + 4,param_2 + 1,0x1b4);
+        }
+        param_1[2] = (*param_2 & 0x7fffffff) >> 8;
+      }
+    }
+    else {
+      FUN_00103ebc("---->receiving cmd error %02x %02x\n",uVar1 & 0xff);
+      param_1[3] = 0;
+    }
+  }
+  else {
+    param_1[3] = uVar1 & 0xff;
+    param_1[2] = 0;
+    param_1[1] = (*param_2 & 0x7fffffff) >> 8;
+    FUN_0010d5d8(param_1 + 4,param_2 + 1,0x1b4);
+  }
+  bVar4 = param_1[1] <= param_1[2] + 1;
+  if (bVar4) {
+    *param_1 = *param_1 | 1;
+  }
+  return bVar4;
+}
+
+
+DECOMPILE_END
+
+TARGET	001297e8
+FUNCTION	segmented_data_receive_candidate	001297e8	[[001297e8, 001298cf]]
+CALLERS
+CALLEES
+00103ebc	FUN_00103ebc
+0010d5d8	FUN_0010d5d8
+REFERENCES_TO_TARGET
+INSTRUCTION_WINDOW
+001297e8	stmdb sp!,{r4,r5,r6,lr}
+001297ec	mov r4,r0
+001297f0	ldr r0,[r1,#0x0]
+001297f4	mov r5,r1
+001297f8	tst r0,#0x80000000
+001297fc	mov r6,#0x0
+00129800	and r1,r0,#0xff
+00129804	beq 0x00129834
+00129808	str r1,[r4,#0xc]
+0012980c	str r6,[r4,#0x8]
+00129810	ldr r0,[r5,#0x0]
+00129814	mov r2,#0x3fc
+00129818	mov r0,r0, lsl #0x1
+0012981c	mov r0,r0, lsr #0x9
+00129820	str r0,[r4,#0x4]
+00129824	add r1,r5,#0x4
+00129828	add r0,r4,#0x10
+0012982c	bl 0x0010d5d8
+00129830	b 0x001298a8
+00129834	ldr r2,[r4,#0xc]
+DECOMPILE_BEGIN
+
+bool segmented_data_receive_candidate(uint *param_1,uint *param_2)
+
+{
+  uint uVar1;
+  uint uVar2;
+  uint uVar3;
+  bool bVar4;
+  
+  uVar1 = *param_2;
+  if ((uVar1 & 0x80000000) == 0) {
+    uVar3 = param_1[3];
+    if (uVar3 == (uVar1 & 0xff)) {
+      uVar2 = param_1[2];
+      bVar4 = uVar2 != (uVar1 & 0x7fffffff) >> 8;
+      if (bVar4) {
+        uVar3 = ((uVar1 & 0x7fffffff) >> 8) - 1;
+      }
+      if (!bVar4 || uVar3 == uVar2) {
+        if ((uVar1 & 0x7fffffff) >> 8 < 200) {
+          FUN_0010d5d8(param_1 + ((uVar1 & 0x7fffffff) >> 8) * 0xff + 4,param_2 + 1,0x3fc);
+        }
+        param_1[2] = (*param_2 & 0x7fffffff) >> 8;
+      }
+    }
+    else {
+      FUN_00103ebc("---->receiving data error %02x %02x\n",uVar1 & 0xff);
+      param_1[3] = 0;
+    }
+  }
+  else {
+    param_1[3] = uVar1 & 0xff;
+    param_1[2] = 0;
+    param_1[1] = (*param_2 & 0x7fffffff) >> 8;
+    FUN_0010d5d8(param_1 + 4,param_2 + 1,0x3fc);
+  }
+  bVar4 = param_1[1] <= param_1[2] + 1;
+  if (bVar4) {
+    *param_1 = *param_1 | 1;
+  }
+  return bVar4;
+}
+
+
+DECOMPILE_END
+
+TARGET	001298f8
+FUNCTION	response_packet_builder_candidate	001298f8	[[001298f8, 00129ad3]]
+CALLERS
+001275c8	device_command_dispatch_candidate	UNCONDITIONAL_CALL
+00127178	device_command_dispatch_candidate	UNCONDITIONAL_CALL
+0012968c	transport_dispatch_candidate	UNCONDITIONAL_CALL
+CALLEES
+0010dcf8	FUN_0010dcf8
+0010d430	FUN_0010d430
+0012a2cc	FUN_0012a2cc
+00103d14	FUN_00103d14
+0010d5d8	FUN_0010d5d8
+0010d6a8	FUN_0010d6a8
+REFERENCES_TO_TARGET
+001275c8	device_command_dispatch_candidate	UNCONDITIONAL_CALL
+00127178	device_command_dispatch_candidate	UNCONDITIONAL_CALL
+0012968c	transport_dispatch_candidate	UNCONDITIONAL_CALL
+INSTRUCTION_WINDOW
+001298f8	stmdb sp!,{r4,r5,r6,r7,r8,r9,r10,r11,lr}
+001298fc	sub sp,sp,#0x1c4
+00129900	mov r8,r0
+00129904	mov r0,#0x0
+00129908	mov r6,r1
+0012990c	str r0,[sp,#0x1bc]
+00129910	ldr r4,[sp,#0x1e8]
+00129914	mov r5,r3
+00129918	mov r7,r2
+0012991c	mov r1,#0x1b8
+00129920	add r0,sp,#0x4
+00129924	bl 0x0010d6a8
+00129928	cmp r4,#0x1b4
+0012992c	bhi 0x00129aa8
+00129930	add r0,r7,r4
+00129934	add r0,r0,#0x100
+00129938	mov r1,#0x1b4
+0012993c	add r0,r0,#0xb3
+00129940	bl 0x0010dcf8
+00129944	strb r8,[sp,#0x4]
+DECOMPILE_BEGIN
+
+undefined4
+response_packet_builder_candidate
+          (undefined1 param_1,int param_2,uint param_3,undefined4 param_4,uint param_5)
+
+{
+  undefined2 uVar1;
+  undefined2 uVar2;
+  undefined2 uVar3;
+  uint uVar4;
+  uint uVar5;
+  int iVar6;
+  uint uVar7;
+  char *pcVar8;
+  uint local_1e4;
+  undefined1 auStack_1e0 [436];
+  undefined4 local_2c;
+  
+  local_2c = 0;
+  FUN_0010d6a8(&local_1e4,0x1b8);
+  if (param_5 < 0x1b5) {
+    uVar5 = FUN_0010dcf8(param_3 + param_5 + 0x1b3,0x1b4);
+    uVar4 = DAT_00129ad4;
+    local_1e4 = CONCAT31(local_1e4._1_3_,param_1);
+    if (uVar5 == 0) {
+      uVar5 = 1;
+    }
+    local_1e4 = (uVar5 & 0x7fffff) << 8 | local_1e4 & DAT_00129ad4 | 0x80000000;
+    FUN_0010d6a8(auStack_1e0,0x1b4);
+    if (param_5 != 0) {
+      FUN_0010d430(auStack_1e0,param_4,param_5);
+    }
+    uVar5 = 0x1b4 - param_5;
+    if (param_3 <= 0x1b4 - param_5) {
+      uVar5 = param_3;
+    }
+    FUN_0010d430(auStack_1e0 + param_5,param_2,uVar5);
+    iVar6 = FUN_0012a2cc(DAT_00129ad8);
+    if (iVar6 == 0) {
+      uVar1 = *(undefined2 *)(DAT_00129ad8 + 0x10);
+      uVar2 = *(undefined2 *)(DAT_00129ad8 + 0x12);
+      uVar3 = *(undefined2 *)(DAT_00129ad8 + 0x14);
+      pcVar8 = "-----> no enough space1:%08x %d %d %d\n";
+LAB_00129aa4:
+      FUN_00103d14(pcVar8,DAT_00129ad8,uVar3,uVar2,uVar1);
+    }
+    else {
+      FUN_0010d5d8(iVar6,&local_1e4,0x1b8);
+      param_2 = param_2 + uVar5;
+      uVar7 = 1;
+      for (param_3 = param_3 - uVar5; param_3 != 0; param_3 = param_3 - uVar5) {
+        local_1e4 = CONCAT31(local_1e4._1_3_,param_1);
+        local_1e4 = (uVar7 & 0x7fffff) << 8 | local_1e4 & uVar4 & 0x7fffffff;
+        FUN_0010d6a8(auStack_1e0,0x1b4);
+        uVar5 = param_3;
+        if (0x1b4 < param_3) {
+          uVar5 = 0x1b4;
+        }
+        FUN_0010d430(auStack_1e0,param_2,uVar5);
+        iVar6 = FUN_0012a2cc(DAT_00129ad8);
+        if (iVar6 == 0) {
+          uVar1 = *(undefined2 *)(DAT_00129ad8 + 0x10);
+          uVar2 = *(undefined2 *)(DAT_00129ad8 + 0x12);
+          uVar3 = *(undefined2 *)(DAT_00129ad8 + 0x14);
+          pcVar8 = "-----> no enough space0:%08x %d %d %d\n";
+          goto LAB_00129aa4;
+        }
+        FUN_0010d5d8(iVar6,&local_1e4,0x1b8);
+        param_2 = param_2 + uVar5;
+        uVar7 = ((local_1e4 & 0x7fffffff) >> 8) + 1;
+      }
+    }
+  }
+  return local_2c;
+}
+
+
+DECOMPILE_END
+
+TARGET	00129d84
+FUNCTION	protocol_task_setup_candidate	00129d84	[[00129d84, 00129f7b]]
+CALLERS
+001001dc	FUN_001001bc	COMPUTED_CALL
+CALLEES
+0012b014	FUN_0012b014
+0012b084	FUN_0012b084
+0012b164	FUN_0012b164
+0012b7f0	FUN_0012b7f0
+0012b728	FUN_0012b728
+001029dc	FUN_001029dc
+00102928	FUN_00102928
+00102878	FUN_00102878
+0012ac3c	FUN_0012ac3c
+001028d0	FUN_001028d0
+00102954	FUN_00102954
+0012b3bc	FUN_0012b3bc
+00102980	FUN_00102980
+REFERENCES_TO_TARGET
+001001dc	FUN_001001bc	COMPUTED_CALL
+INSTRUCTION_WINDOW
+00129d84	stmdb sp!,{r2,r3,r4,lr}
+00129d88	ldr r0,[0x129f7c]
+00129d8c	mov r2,#0x1e
+00129d90	mov r1,#0x10
+00129d94	bl 0x0012b014
+00129d98	ldr r0,[0x129f80]
+00129d9c	mov r1,#0x200
+00129da0	bl 0x0012b084
+00129da4	ldr r0,[0x129f84]
+00129da8	mov r2,#0x14
+00129dac	mov r1,#0x20
+00129db0	bl 0x0012b728
+00129db4	mov r4,#0x0
+00129db8	ldr r1,[0x129f88]
+00129dbc	ldr r0,[0x129f8c]
+00129dc0	mov r3,r4
+00129dc4	mov r2,r4
+00129dc8	str r4,[sp,#0x0]
+00129dcc	str r4,[sp,#0x4]
+00129dd0	bl 0x0012ac3c
+DECOMPILE_BEGIN
+
+void protocol_task_setup_candidate
+               (undefined4 param_1,undefined4 param_2,undefined4 param_3,undefined4 param_4)
+
+{
+  int *piVar1;
+  undefined4 uVar2;
+  
+  FUN_0012b014(DAT_00129f7c,0x10,0x1e,param_4,param_3,param_4);
+  FUN_0012b084(DAT_00129f80,0x200);
+  FUN_0012b728(DAT_00129f84,0x20,0x14);
+  FUN_0012ac3c(DAT_00129f8c,DAT_00129f88,0,0,0,0);
+  FUN_0012ac3c(DAT_00129f94,DAT_00129f90,0,0,0,0);
+  FUN_0012ac3c(DAT_00129f8c,DAT_00129f98,0,0,0,0);
+  FUN_0012ac3c(DAT_00129f8c,DAT_00129f9c,0,0,0,0);
+  FUN_0012ac3c(DAT_00129f8c,DAT_00129fa0,0,0,0,0);
+  FUN_0012ac3c(DAT_00129f8c,DAT_00129fa4,0,0,0,0);
+  uVar2 = FUN_0012ac3c(DAT_00129f8c,DAT_00129fa8,0,0,0,0);
+  *DAT_00129fac = uVar2;
+  FUN_0012ac3c(DAT_00129f8c,DAT_00129fb0,0,0,0,0);
+  FUN_0012ac3c(DAT_00129f8c,DAT_00129fb4,0,0,0,0);
+  uVar2 = FUN_0012ac3c(DAT_00129f8c,DAT_00129fb8,0,0,0,0);
+  *DAT_00129fbc = uVar2;
+  uVar2 = FUN_0012ac3c(DAT_00129f8c,DAT_00129fc0,0,0,0,0);
+  *DAT_00129fc4 = uVar2;
+  FUN_0012b3bc(DAT_00129f8c,DAT_00129fc8,0,0,0,0xffffffff);
+  FUN_00102980(1,DAT_00129fcc);
+  FUN_001029dc(2);
+  FUN_00102928();
+  FUN_00102954();
+  piVar1 = DAT_00129fd0;
+  do {
+    if (*piVar1 == 0) {
+      FUN_00102878();
+    }
+    else {
+      FUN_001028d0();
+    }
+    FUN_0012b164();
+    FUN_0012b7f0();
+    FUN_0012b3bc(DAT_00129f8c,0x38,0,0,0,0xffffffff);
+  } while( true );
+}
+
+
+DECOMPILE_END
+
+TARGET	00129fd4
+FUNCTION	FUN_00129fd4	00129fd4	[[00129fd4, 0012a03f]]
+CALLERS
+001273d8	device_command_dispatch_candidate	UNCONDITIONAL_CALL
+CALLEES
+0012a040	FUN_0012a040
+0010d430	FUN_0010d430
+REFERENCES_TO_TARGET
+001273d8	device_command_dispatch_candidate	UNCONDITIONAL_CALL
+INSTRUCTION_WINDOW
+00129fd4	stmdb sp!,{r0,r1,r2,r3,r4,r5,r6,r7,r8,lr}
+00129fd8	mov r4,r3
+00129fdc	mov r6,r2
+00129fe0	mov r7,r1
+00129fe4	mov r8,r0
+00129fe8	b 0x0012a034
+00129fec	cmp r4,#0x10
+00129ff0	movhi r5,#0x10
+00129ff4	movls r5,r4
+00129ff8	mov r2,r5
+00129ffc	mov r1,r7
+0012a000	mov r0,sp
+0012a004	bl 0x0010d430
+0012a008	mov r2,sp
+0012a00c	mov r1,r2
+0012a010	mov r0,r8
+0012a014	bl 0x0012a040
+0012a018	mov r2,r5
+0012a01c	mov r1,sp
+0012a020	mov r0,r6
+DECOMPILE_BEGIN
+
+undefined8 FUN_00129fd4(undefined4 param_1,int param_2,int param_3,uint param_4)
+
+{
+  uint uVar1;
+  undefined4 uStack_28;
+  int iStack_24;
+  int iStack_20;
+  uint uStack_1c;
+  
+  uStack_28 = param_1;
+  iStack_24 = param_2;
+  iStack_20 = param_3;
+  uStack_1c = param_4;
+  for (; param_4 != 0; param_4 = param_4 - uVar1) {
+    uVar1 = param_4;
+    if (0x10 < param_4) {
+      uVar1 = 0x10;
+    }
+    FUN_0010d430(&uStack_28,param_2,uVar1);
+    FUN_0012a040(param_1,&uStack_28);
+    FUN_0010d430(param_3,&uStack_28,uVar1);
+    param_3 = param_3 + uVar1;
+    param_2 = param_2 + uVar1;
+  }
+  return CONCAT44(iStack_24,uStack_28);
+}
+
+
+DECOMPILE_END
+
+TARGET	0012a0fc
+FUNCTION	FUN_0012a0fc	0012a0fc	[[0012a0fc, 0012a213]]
+CALLERS
+001273c4	device_command_dispatch_candidate	UNCONDITIONAL_CALL
+CALLEES
+0010dcf8	FUN_0010dcf8
+0010d80c	FUN_0010d80c
+REFERENCES_TO_TARGET
+001273c4	device_command_dispatch_candidate	UNCONDITIONAL_CALL
+INSTRUCTION_WINDOW
+0012a0fc	stmdb sp!,{r4,r5,r6,r7,r8,r9,r10,r11,lr}
+0012a100	mov r9,r0
+0012a104	cmp r2,#0x20
+0012a108	mov r6,r0
+0012a10c	sub sp,sp,#0x24
+0012a110	movgt r2,#0x20
+0012a114	mov r0,#0x0
+0012a118	add r3,r9,#0xb0
+0012a11c	cmp r6,r3
+0012a120	strcc r0,[r6],#0x4
+0012a124	bcc 0x0012a11c
+0012a128	add r3,r2,#0x3
+0012a12c	mov r12,r3, asr #0x1f
+0012a130	add r10,r3,r12, lsr #0x1e
+0012a134	mov r12,r10, asr #0x2
+0012a138	mov r3,sp
+0012a13c	add r3,r3,r12, lsl #0x2
+0012a140	subs r2,r2,#0x1
+0012a144	movpl r12,sp
+0012a148	str r0,[r3,#-0x4]
+DECOMPILE_BEGIN
+
+/* WARNING: Type propagation algorithm not settling */
+
+void FUN_0012a0fc(undefined4 *param_1,int param_2,int param_3)
+
+{
+  int iVar1;
+  byte *pbVar2;
+  uint *puVar3;
+  int iVar4;
+  int extraout_r1;
+  int extraout_r1_00;
+  uint uVar5;
+  int iVar6;
+  uint uVar7;
+  undefined4 *puVar8;
+  int iVar9;
+  uint uVar10;
+  int iVar11;
+  bool bVar12;
+  uint uStack_4c;
+  uint local_48 [9];
+  
+  if (0x20 < param_3) {
+    param_3 = 0x20;
+  }
+  for (puVar8 = param_1; puVar8 < param_1 + 0x2c; puVar8 = puVar8 + 1) {
+    *puVar8 = 0;
+  }
+  iVar1 = (int)(param_3 + 3 + ((uint)(param_3 + 3 >> 0x1f) >> 0x1e)) >> 2;
+  param_3 = param_3 + -1;
+  bVar12 = -1 < param_3;
+  iVar4 = iVar1;
+  if (bVar12) {
+    iVar4 = (int)local_48;
+  }
+  (&uStack_4c)[iVar1] = 0;
+  while (bVar12) {
+    puVar3 = (uint *)(iVar4 + (param_3 / 4) * 4);
+    pbVar2 = (byte *)(param_2 + param_3);
+    param_3 = param_3 + -1;
+    bVar12 = -1 < param_3;
+    *puVar3 = (uint)(*puVar3 < 8) + (uint)*pbVar2;
+  }
+  iVar6 = 0;
+  *param_1 = DAT_0012a214;
+  iVar11 = 0;
+  uVar7 = 0;
+  iVar4 = 0x2c;
+  if (0x2c < iVar1) {
+    iVar4 = iVar1;
+  }
+  uVar10 = 0;
+  for (iVar9 = 1; iVar9 <= iVar4 * 3; iVar9 = iVar9 + 1) {
+    uVar10 = param_1[iVar11] + uVar10 + uVar7;
+    uVar10 = uVar10 >> 0x1d | uVar10 * 8;
+    param_1[iVar11] = uVar10;
+    uVar5 = local_48[iVar6] + uVar10 + uVar7;
+    uVar7 = -(uVar10 + uVar7) & 0x1f;
+    uVar7 = uVar5 >> uVar7 | uVar5 << 0x20 - uVar7;
+    local_48[iVar6] = uVar7;
+    FUN_0010dcf8(iVar11 + 1,0x2c);
+    FUN_0010d80c(iVar6 + 1,iVar1);
+    iVar6 = extraout_r1_00;
+    iVar11 = extraout_r1;
+  }
+  return;
+}
+
+
+DECOMPILE_END
+
+TARGET	0012a5ac
+FUNCTION	FUN_0012a5ac	0012a5ac	[[0012a5ac, 0012a693]]
+CALLERS
+0012768c	FUN_00127660	UNCONDITIONAL_CALL
+001281b4	FUN_001281a8	UNCONDITIONAL_CALL
+CALLEES
+0010dcf8	FUN_0010dcf8
+001020f4	FUN_001020f4
+0012e02c	FUN_0012e02c
+00103d14	FUN_00103d14
+0012e0a8	FUN_0012e0a8
+0012e200	FUN_0012e200
+0012ab7c	FUN_0012ab7c
+REFERENCES_TO_TARGET
+0012768c	FUN_00127660	UNCONDITIONAL_CALL
+001281b4	FUN_001281a8	UNCONDITIONAL_CALL
+INSTRUCTION_WINDOW
+0012a5ac	stmdb sp!,{r3,r4,r5,r6,r7,lr}
+0012a5b0	ldr r5,[0x12a694]
+0012a5b4	ldrb r0,[r5,#0x0]
+0012a5b8	cmp r0,#0x0
+0012a5bc	bne 0x0012a678
+0012a5c0	mov r4,#0xb0000000
+0012a5c4	ldr r0,[r4,#0x208]
+0012a5c8	orr r0,r0,#0x40
+0012a5cc	str r0,[r4,#0x208]
+0012a5d0	ldr r0,[r4,#0x18]
+0012a5d4	orr r0,r0,#0x1000
+0012a5d8	str r0,[r4,#0x18]
+0012a5dc	ldr r0,[r4,#0x18]
+0012a5e0	bic r0,r0,#0x1000
+0012a5e4	str r0,[r4,#0x18]
+0012a5e8	mov r6,#0x0
+0012a5ec	str r6,[sp,#0x0]
+0012a5f0	ldr r0,[sp,#0x0]
+0012a5f4	add r0,r0,#0x1
+0012a5f8	cmp r0,#0x1f4
+DECOMPILE_BEGIN
+
+/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */
+
+undefined4 FUN_0012a5ac(void)
+
+{
+  char *pcVar1;
+  undefined4 *puVar2;
+  undefined4 uVar3;
+  uint uVar4;
+  int local_18;
+  
+  pcVar1 = DAT_0012a694;
+  if (*DAT_0012a694 == '\0') {
+    _DAT_b0000208 = _DAT_b0000208 | 0x40;
+    _DAT_b0000018 = _DAT_b0000018 & 0xffffefff;
+    local_18 = 0;
+    do {
+      local_18 = local_18 + 1;
+    } while (local_18 < 500);
+    uVar3 = FUN_001020f4();
+    uVar3 = FUN_0010dcf8(uVar3,1000);
+    FUN_0012ab7c(0,0,uVar3,DAT_0012a698);
+    puVar2 = DAT_0012a69c;
+    DAT_0012a69c[1] = 0;
+    _DAT_b000008c = _DAT_b000008c | 0xff000000;
+    puVar2[2] = 0;
+    *puVar2 = 4;
+    uVar4 = FUN_0012e0a8();
+    if (uVar4 == 0xffffffff) {
+      FUN_00103d14("read id error !! [0x%x]\n",DAT_0012a6b8);
+      return 0xffffffff;
+    }
+    FUN_00103d14("SPI flash id [0x%x]\n",uVar4 & 0xffff);
+    FUN_0012e200(0);
+    FUN_0012e02c();
+    *pcVar1 = '\x01';
+  }
+  return 0;
+}
+
+
+DECOMPILE_END
+
+TARGET	0012a6a0
+FUNCTION	NONE
+REFERENCES_TO_TARGET
+0012a65c	FUN_0012a5ac	PARAM
+INSTRUCTION_WINDOW
+0012a6d8	stmdb sp!,{r3,r4,r5,r6,r7,r8,r9,lr}
+0012a6dc	ldr r6,[0x12a80c]
+0012a6e0	mov r7,r0
+0012a6e4	ldr r0,[r6,#0x8]
+0012a6e8	mov r4,r2
+0012a6ec	mov r5,r1
+0012a6f0	orr r0,r0,#0x1
+0012a6f4	str r0,[r6,#0x8]
+0012a6f8	mov r0,#0x3
+0012a6fc	str r0,[r6,#0x10]
+0012a700	mov r1,#0x0
+0012a704	mov r2,#0x8
+0012a708	mov r0,r1
+0012a70c	bl 0x0012abd8
+0012a710	mov r0,#0x0
+0012a714	bl 0x0012a4a4
+0012a718	ldr r0,[0x12a810]
+0012a71c	ldrb r0,[r0,#0x1]
+0012a720	str r7,[r6,#0x10]
+0012a724	cmp r0,#0x1
+
+TARGET	0012b37c
+FUNCTION	FUN_0012b37c	0012b37c	[[0012b37c, 0012b3bb]]
+CALLERS
+00126ffc	device_command_dispatch_candidate	UNCONDITIONAL_CALL
+0012b310	FUN_0012b164	UNCONDITIONAL_CALL
+CALLEES
+0012ad64	FUN_0012ad64
+REFERENCES_TO_TARGET
+00126ffc	device_command_dispatch_candidate	UNCONDITIONAL_CALL
+0012b310	FUN_0012b164	UNCONDITIONAL_CALL
+INSTRUCTION_WINDOW
+0012b37c	stmdb sp!,{r3,r4,r5,r6,r7,r8,r9,lr}
+0012b380	ldr r8,[sp,#0x20]
+0012b384	mov r5,r3
+0012b388	mov r6,r2
+0012b38c	mov r4,r1
+0012b390	mov r7,r0
+0012b394	bl 0x0012ad64
+0012b398	movs r12,r0
+0012b39c	beq 0x0012b3b8
+0012b3a0	bic r1,r4,#0xe000
+0012b3a4	mov r3,r5
+0012b3a8	mov r2,r6
+0012b3ac	mov r0,r7
+0012b3b0	str r8,[sp,#0x0]
+0012b3b4	blx r12
+0012b3b8	ldmia sp!,{r3,r4,r5,r6,r7,r8,r9,pc}
+0012b3bc	stmdb sp!,{r4,r5,r6,r7,r8,r9,r10,r11,lr}
+0012b3c0	tst r1,#0x4000
+0012b3c4	sub sp,sp,#0x1c
+0012b3c8	ldr r7,[sp,#0x44]
+DECOMPILE_BEGIN
+
+void FUN_0012b37c(undefined4 param_1,uint param_2,undefined4 param_3,undefined4 param_4,
+                 undefined4 param_5)
+
+{
+  code *pcVar1;
+  
+  pcVar1 = (code *)FUN_0012ad64();
+  if (pcVar1 != (code *)0x0) {
+    (*pcVar1)(param_1,param_2 & 0xffff1fff,param_3,param_4,param_5);
+  }
+  return;
+}
+
+
+DECOMPILE_END
+
+TARGET	0012c340
+FUNCTION	usb_setup_request_dispatch	0012c12c	[[0012c12c, 0012c633] [0012c66c, 0012cecf]]
+CALLERS
+0012d4b4	usb_event_dispatch_candidate	UNCONDITIONAL_CALL
+CALLEES
+00103d14	FUN_00103d14
+0012c0e4	FUN_0012c0e4
+REFERENCES_TO_TARGET
+INSTRUCTION_WINDOW
+0012c340	mov r0,r0, lsr #0x8
+0012c344	cmp r0,#0x6
+0012c348	beq 0x0012c40c
+0012c34c	bgt 0x0012c36c
+0012c350	cmp r0,#0x1
+0012c354	beq 0x0012c398
+0012c358	cmp r0,#0x2
+0012c35c	beq 0x0012c3c0
+0012c360	cmp r0,#0x3
+0012c364	beq 0x0012c494
+0012c368	b 0x0012c384
+0012c36c	cmp r0,#0x7
+0012c370	beq 0x0012c42c
+0012c374	cmp r0,#0x21
+0012c378	beq 0x0012c4c0
+0012c37c	cmp r0,#0x22
+0012c380	beq 0x0012c4e0
+0012c384	strb r4,[sp,#0x0]
+0012c388	ldrb r0,[sp,#0x0]
+0012c38c	cmp r0,#0x0
+DECOMPILE_BEGIN
+
+/* WARNING: Removing unreachable block (ram,0x0012cebc) */
+
+ulonglong usb_setup_request_dispatch(uint param_1)
+
+{
+  int iVar1;
+  byte *pbVar2;
+  int iVar3;
+  int iVar4;
+  bool bVar5;
+  ulonglong uVar6;
+  uint local_38;
+  int local_34;
+  
+  pbVar2 = DAT_0012c638;
+  iVar1 = DAT_0012c634;
+  local_38 = param_1 & 0xffffff00;
+  local_34 = *(int *)(DAT_0012c634 + 0x44);
+  *DAT_0012c638 = (byte)local_34;
+  pbVar2[1] = (byte)((uint)local_34 >> 8);
+  *(short *)(pbVar2 + 2) = (short)*(undefined4 *)(iVar1 + 0x48);
+  *(short *)(pbVar2 + 4) = (short)*(undefined4 *)(iVar1 + 0x4c);
+  *(short *)(pbVar2 + 6) = (short)*(undefined4 *)(iVar1 + 0x50);
+  FUN_0012c0e4();
+  iVar3 = DAT_0012c63c;
+  *(undefined1 *)(DAT_0012c63c + 0xd7) = 0;
+  *(undefined1 *)(iVar3 + 0xd8) = 0;
+  if ((*pbVar2 & 0xe0) == 0xa0) {
+    *(undefined4 *)(iVar1 + 0x34) = 0x400;
+    if (*(short *)(pbVar2 + 6) != 0) {
+      *(undefined1 *)(iVar3 + 0xd7) = 1;
+      *(undefined1 *)(iVar3 + 0xde) = 1;
+      *(undefined4 *)(iVar1 + 0x34) = 8;
+      *(undefined4 *)(iVar1 + 0x30) = 8;
+      return CONCAT44(local_34,param_1) & 0xffffffffffffff00;
+    }
+    if (*(int *)(iVar3 + 0xa8) == 0) {
+      return CONCAT44(local_34,param_1) & 0xffffffffffffff00;
+    }
+                    /* WARNING: Could not recover jumptable at 0x0012c234. Too many branches */
+                    /* WARNING: Treating indirect jump as call */
+    uVar6 = (**(code **)(iVar3 + 0xa8))();
+    return uVar6;
+  }
+  if ((*pbVar2 & 0xe0) != 0x20) {
+                    /* WARNING: Could not recover jumptable at 0x0012c1c0. Too many branches */
+                    /* WARNING: Treating indirect jump as call */
+    if (0xb < pbVar2[1]) {
+      return CONCAT44(local_34,param_1) & 0xffffffffffffff00;
+    }
+    uVar6 = (*(code *)((uint)pbVar2[1] * 4 + 0x12c1c8))();
+    return uVar6;
+  }
+  iVar4 = *(int *)(iVar3 + DAT_0012c640);
+  bVar5 = iVar4 == 1;
+  if (bVar5) {
+    iVar4 = *(int *)(iVar3 + 0x138);
+  }
+  if (bVar5 && iVar4 == 1) {
+    local_38 = 0;
+    *(undefined4 *)(iVar1 + 0x58) = 0x7f;
+    do {
+      while( true ) {
+        local_34 = 0;
+        do {
+          local_34 = local_34 + 1;
+        } while (local_34 < 5);
+        if ((*(uint *)(iVar1 + 0x70) & 0xffff) == (*(uint *)(iVar1 + 0x70) & 0xffff)) break;
+        local_38 = 0;
+      }
+      local_38 = local_38 + 1;
+    } while ((int)local_38 < 6);
+  }
+  *(undefined1 *)(iVar3 + 0xd8) = 1;
+  if (*(ushort *)(pbVar2 + 6) != 0) {
+    *(uint *)(pbVar2 + -8) = (uint)*(ushort *)(pbVar2 + 6);
+    *(undefined4 *)(iVar1 + 0x30) = 0x40;
+    return CONCAT44(local_34,local_38);
+  }
+  if (*(int *)(iVar3 + 0xac) != 0) {
+    (**(code **)(iVar3 + 0xac))();
+  }
+  *(undefined4 *)(iVar1 + 0x2c) = 0;
+  return CONCAT44(local_34,local_38);
+}
+
+
+DECOMPILE_END
+
+TARGET	0012c398
+FUNCTION	usb_setup_request_dispatch	0012c12c	[[0012c12c, 0012c633] [0012c66c, 0012cecf]]
+CALLERS
+0012d4b4	usb_event_dispatch_candidate	UNCONDITIONAL_CALL
+CALLEES
+00103d14	FUN_00103d14
+0012c0e4	FUN_0012c0e4
+REFERENCES_TO_TARGET
+0012c354	usb_setup_request_dispatch	CONDITIONAL_JUMP
+INSTRUCTION_WINDOW
+0012c398	bl 0x0012c0e4
+0012c39c	strb r4,[r6,#0xcd]
+0012c3a0	strb r4,[r6,#0xe0]
+0012c3a4	ldrh r0,[r8,#0x6]
+0012c3a8	ldr r1,[r6,#0x40]
+0012c3ac	cmp r0,r1
+0012c3b0	ldrhi r0,[r6,#0x40]
+0012c3b4	bls 0x0012c388
+0012c3b8	strh r0,[r8,#0x6]
+0012c3bc	b 0x0012c388
+0012c3c0	bl 0x0012c0e4
+0012c3c4	strb r4,[r6,#0xce]
+0012c3c8	ldr r0,[r6,#0xe8]
+0012c3cc	ldrb r1,[r6,#0xec]
+0012c3d0	mov r1,r1, lsl #0x18
+0012c3d4	orr r0,r1,r0, lsr #0x8
+0012c3d8	cmp r0,#0x2
+0012c3dc	ldrh r0,[r8,#0x6]
+0012c3e0	beq 0x0012c3f8
+0012c3e4	ldr r1,[r6,#0x4c]
+
+TARGET	0012c3c0
+FUNCTION	usb_setup_request_dispatch	0012c12c	[[0012c12c, 0012c633] [0012c66c, 0012cecf]]
+CALLERS
+0012d4b4	usb_event_dispatch_candidate	UNCONDITIONAL_CALL
+CALLEES
+00103d14	FUN_00103d14
+0012c0e4	FUN_0012c0e4
+REFERENCES_TO_TARGET
+0012c35c	usb_setup_request_dispatch	CONDITIONAL_JUMP
+INSTRUCTION_WINDOW
+0012c3c0	bl 0x0012c0e4
+0012c3c4	strb r4,[r6,#0xce]
+0012c3c8	ldr r0,[r6,#0xe8]
+0012c3cc	ldrb r1,[r6,#0xec]
+0012c3d0	mov r1,r1, lsl #0x18
+0012c3d4	orr r0,r1,r0, lsr #0x8
+0012c3d8	cmp r0,#0x2
+0012c3dc	ldrh r0,[r8,#0x6]
+0012c3e0	beq 0x0012c3f8
+0012c3e4	ldr r1,[r6,#0x4c]
+0012c3e8	cmp r0,r1
+0012c3ec	ldrhi r0,[r6,#0x4c]
+0012c3f0	bls 0x0012c388
+0012c3f4	b 0x0012c3b8
+0012c3f8	ldr r1,[r6,#0x48]
+0012c3fc	cmp r0,r1
+0012c400	ldrhi r0,[r6,#0x48]
+0012c404	bls 0x0012c388
+0012c408	b 0x0012c3b8
+0012c40c	bl 0x0012c0e4
+
+TARGET	0012c40c
+FUNCTION	usb_setup_request_dispatch	0012c12c	[[0012c12c, 0012c633] [0012c66c, 0012cecf]]
+CALLERS
+0012d4b4	usb_event_dispatch_candidate	UNCONDITIONAL_CALL
+CALLEES
+00103d14	FUN_00103d14
+0012c0e4	FUN_0012c0e4
+REFERENCES_TO_TARGET
+0012c348	usb_setup_request_dispatch	CONDITIONAL_JUMP
+INSTRUCTION_WINDOW
+0012c40c	bl 0x0012c0e4
+0012c410	strb r4,[r6,#0xcf]
+0012c414	ldrh r0,[r8,#0x6]
+0012c418	ldr r1,[r6,#0x44]
+0012c41c	cmp r0,r1
+0012c420	ldrhi r0,[r6,#0x44]
+0012c424	bls 0x0012c388
+0012c428	b 0x0012c3b8
+0012c42c	bl 0x0012c0e4
+0012c430	strb r4,[r6,#0xd0]
+0012c434	ldr r0,[r6,#0xe8]
+0012c438	ldrb r1,[r6,#0xec]
+0012c43c	mov r1,r1, lsl #0x18
+0012c440	orr r0,r1,r0, lsr #0x8
+0012c444	cmp r0,#0x2
+0012c448	beq 0x0012c47c
+0012c44c	ldr r0,[r6,#0xe8]
+0012c450	ldrb r1,[r6,#0xec]
+0012c454	mov r1,r1, lsl #0x18
+0012c458	orr r0,r1,r0, lsr #0x8
+
+TARGET	0012c42c
+FUNCTION	usb_setup_request_dispatch	0012c12c	[[0012c12c, 0012c633] [0012c66c, 0012cecf]]
+CALLERS
+0012d4b4	usb_event_dispatch_candidate	UNCONDITIONAL_CALL
+CALLEES
+00103d14	FUN_00103d14
+0012c0e4	FUN_0012c0e4
+REFERENCES_TO_TARGET
+0012c370	usb_setup_request_dispatch	CONDITIONAL_JUMP
+INSTRUCTION_WINDOW
+0012c42c	bl 0x0012c0e4
+0012c430	strb r4,[r6,#0xd0]
+0012c434	ldr r0,[r6,#0xe8]
+0012c438	ldrb r1,[r6,#0xec]
+0012c43c	mov r1,r1, lsl #0x18
+0012c440	orr r0,r1,r0, lsr #0x8
+0012c444	cmp r0,#0x2
+0012c448	beq 0x0012c47c
+0012c44c	ldr r0,[r6,#0xe8]
+0012c450	ldrb r1,[r6,#0xec]
+0012c454	mov r1,r1, lsl #0x18
+0012c458	orr r0,r1,r0, lsr #0x8
+0012c45c	cmp r0,#0x1
+0012c460	bne 0x0012c388
+0012c464	ldrh r0,[r8,#0x6]
+0012c468	ldr r1,[r6,#0x54]
+0012c46c	cmp r0,r1
+0012c470	ldrhi r0,[r6,#0x54]
+0012c474	bls 0x0012c388
+0012c478	b 0x0012c3b8
+
+TARGET	0012c494
+FUNCTION	usb_setup_request_dispatch	0012c12c	[[0012c12c, 0012c633] [0012c66c, 0012cecf]]
+CALLERS
+0012d4b4	usb_event_dispatch_candidate	UNCONDITIONAL_CALL
+CALLEES
+00103d14	FUN_00103d14
+0012c0e4	FUN_0012c0e4
+REFERENCES_TO_TARGET
+0012c364	usb_setup_request_dispatch	CONDITIONAL_JUMP
+INSTRUCTION_WINDOW
+0012c494	bl 0x0012c0e4
+0012c498	strb r4,[r6,#0xd1]
+0012c49c	ldrb r0,[r8,#0x2]
+0012c4a0	ldrh r1,[r8,#0x6]
+0012c4a4	and r0,r0,#0x7
+0012c4a8	add r0,r6,r0, lsl #0x2
+0012c4ac	ldr r2,[r0,#0x6c]
+0012c4b0	cmp r1,r2
+0012c4b4	ldrhi r0,[r0,#0x6c]
+0012c4b8	bls 0x0012c388
+0012c4bc	b 0x0012c3b8
+0012c4c0	bl 0x0012c0e4
+0012c4c4	strb r4,[r6,#0xd4]
+0012c4c8	ldrh r0,[r8,#0x6]
+0012c4cc	ldr r1,[r6,#0x58]
+0012c4d0	cmp r0,r1
+0012c4d4	ldrhi r0,[r6,#0x58]
+0012c4d8	bls 0x0012c388
+0012c4dc	b 0x0012c3b8
+0012c4e0	bl 0x0012c0e4
+
+TARGET	0012c4c0
+FUNCTION	usb_setup_request_dispatch	0012c12c	[[0012c12c, 0012c633] [0012c66c, 0012cecf]]
+CALLERS
+0012d4b4	usb_event_dispatch_candidate	UNCONDITIONAL_CALL
+CALLEES
+00103d14	FUN_00103d14
+0012c0e4	FUN_0012c0e4
+REFERENCES_TO_TARGET
+0012c378	usb_setup_request_dispatch	CONDITIONAL_JUMP
+INSTRUCTION_WINDOW
+0012c4c0	bl 0x0012c0e4
+0012c4c4	strb r4,[r6,#0xd4]
+0012c4c8	ldrh r0,[r8,#0x6]
+0012c4cc	ldr r1,[r6,#0x58]
+0012c4d0	cmp r0,r1
+0012c4d4	ldrhi r0,[r6,#0x58]
+0012c4d8	bls 0x0012c388
+0012c4dc	b 0x0012c3b8
+0012c4e0	bl 0x0012c0e4
+0012c4e4	strb r4,[r6,#0xd5]
+0012c4e8	str r4,[r9,#0x0]
+0012c4ec	ldrh r0,[r8,#0x4]
+0012c4f0	ldrh r1,[r8,#0x6]
+0012c4f4	add r0,r6,r0, lsl #0x2
+0012c4f8	ldr r2,[r0,#0x5c]
+0012c4fc	cmp r1,r2
+0012c500	ldrhi r0,[r0,#0x5c]
+0012c504	bls 0x0012c388
+0012c508	b 0x0012c3b8
+0012c50c	str r10,[r5,#0x34]
+
+TARGET	0012c4e0
+FUNCTION	usb_setup_request_dispatch	0012c12c	[[0012c12c, 0012c633] [0012c66c, 0012cecf]]
+CALLERS
+0012d4b4	usb_event_dispatch_candidate	UNCONDITIONAL_CALL
+CALLEES
+00103d14	FUN_00103d14
+0012c0e4	FUN_0012c0e4
+REFERENCES_TO_TARGET
+0012c380	usb_setup_request_dispatch	CONDITIONAL_JUMP
+INSTRUCTION_WINDOW
+0012c4e0	bl 0x0012c0e4
+0012c4e4	strb r4,[r6,#0xd5]
+0012c4e8	str r4,[r9,#0x0]
+0012c4ec	ldrh r0,[r8,#0x4]
+0012c4f0	ldrh r1,[r8,#0x6]
+0012c4f4	add r0,r6,r0, lsl #0x2
+0012c4f8	ldr r2,[r0,#0x5c]
+0012c4fc	cmp r1,r2
+0012c500	ldrhi r0,[r0,#0x5c]
+0012c504	bls 0x0012c388
+0012c508	b 0x0012c3b8
+0012c50c	str r10,[r5,#0x34]
+0012c510	str r10,[r5,#0x30]
+0012c514	b 0x0012ceb0
+0012c518	cmp r0,#0x0
+0012c51c	ldrheq r0,[r8,#0x2]
+0012c520	tsteq r0,#0xff00
+0012c524	bne 0x0012c53c
+0012c528	ldrh r0,[r8,#0x4]
+0012c52c	cmp r0,#0x0
+
+TARGET	0012c644
+FUNCTION	NONE
+REFERENCES_TO_TARGET
+0012c318	usb_setup_request_dispatch	PARAM
+INSTRUCTION_WINDOW
+0012c66c	cmp r0,#0x80
+0012c670	ldrheq r0,[r8,#0x2]
+0012c674	cmpeq r0,#0x0
+0012c678	bne 0x0012c694
+0012c67c	ldrh r0,[r8,#0x4]
+0012c680	cmp r0,#0x0
+0012c684	ldrheq r0,[r8,#0x6]
+0012c688	cmpeq r0,#0x1
+0012c68c	moveq r0,#0x0
+0012c690	beq 0x0012c698
+0012c694	mov r0,#0x1
+0012c698	strb r0,[sp,#0x0]
+0012c69c	ldrb r0,[sp,#0x0]
+0012c6a0	cmp r0,#0x1
+0012c6a4	beq 0x0012ceb0
+0012c6a8	bl 0x0012c0e4
+0012c6ac	strb r4,[r6,#0x11f]
+0012c6b0	b 0x0012c50c
+0012c6b4	cmp r0,#0x0
+0012c6b8	str r4,[r2,#0x4]
+
+TARGET	0012ced0
+FUNCTION	usb_event_dispatch_candidate	0012ced0	[[0012ced0, 0012d607] [0012d63c, 0012d7cf]]
+CALLERS
+0012bed4	FUN_0012be1c	PARAM
+CALLEES
+0012d7d0	FUN_0012d7d0
+0012c12c	usb_setup_request_dispatch
+0012dbac	FUN_0012dbac
+00103d14	FUN_00103d14
+0012c0e4	FUN_0012c0e4
+REFERENCES_TO_TARGET
+0012bed4	FUN_0012be1c	PARAM
+INSTRUCTION_WINDOW
+0012ced0	stmdb sp!,{r4,r5,r6,r7,r8,r9,r10,r11,lr}
+0012ced4	ldr r5,[0x12d608]
+0012ced8	sub sp,sp,#0x14
+0012cedc	ldr r0,[r5,#0x0]
+0012cee0	str r0,[sp,#0x8]
+0012cee4	ldr r0,[r5,#0x8]
+0012cee8	str r0,[sp,#0xc]
+0012ceec	ldrd r0,r1,[sp,#0x8]
+0012cef0	tst r0,r1
+0012cef4	beq 0x0012d350
+0012cef8	ldr r0,[sp,#0x8]
+0012cefc	ldr r10,[0x12d60c]
+0012cf00	ldr r7,[0x12d610]
+0012cf04	tst r0,#0x1
+0012cf08	mov r9,#0x8
+0012cf0c	mov r11,#0x2
+0012cf10	mov r6,#0x1
+0012cf14	mov r8,#0x0
+0012cf18	sub r4,r10,#0x138
+0012cf1c	beq 0x0012d474
+DECOMPILE_BEGIN
+
+void usb_event_dispatch_candidate(void)
+
+{
+  char cVar1;
+  uint *puVar2;
+  int *piVar3;
+  undefined1 *puVar4;
+  uint *puVar5;
+  uint uVar6;
+  uint uVar7;
+  uint uVar8;
+  uint uVar9;
+  code *pcVar10;
+  int iVar11;
+  int3 *piVar12;
+  bool bVar13;
+  bool bVar14;
+  int local_28;
+  
+  puVar4 = DAT_0012d610;
+  piVar3 = DAT_0012d60c;
+  puVar2 = DAT_0012d608;
+  uVar6 = *DAT_0012d608;
+  if ((uVar6 & DAT_0012d608[2]) == 0) {
+    return;
+  }
+  if ((uVar6 & 1) != 0) {
+    uVar7 = DAT_0012d608[4];
+    uVar8 = DAT_0012d608[5];
+    if ((uVar7 & uVar8 & 0x100) != 0) {
+      if ((*DAT_0012d614 & 0x80000000) == 0) {
+        if (DAT_0012d60c[-0x1e] != 0) {
+          (*(code *)DAT_0012d60c[-0x1e])();
+        }
+        *(undefined1 *)((int)piVar3 + -0x12) = 0;
+        *(undefined1 *)((int)piVar3 + -0x11) = 0;
+        *(undefined1 *)(piVar3 + -4) = 0;
+        *(undefined1 *)((int)piVar3 + -0xf) = 0;
+        piVar3[1] = 0;
+        *(undefined1 *)(piVar3 + -0x16) = 0;
+        *(undefined1 *)((int)piVar3 + -0x16) = 0;
+        *(undefined1 *)((int)piVar3 + -0x15) = 0;
+        *(undefined1 *)(piVar3 + -5) = 0;
+        *(undefined1 *)((int)piVar3 + -0x13) = 0;
+        *piVar3 = 0;
+        *(undefined1 *)((int)piVar3 + -0xe) = 0;
+        *(undefined1 *)((int)piVar3 + -0xd) = 0;
+        *(undefined1 *)(piVar3 + -3) = 0;
+        *(undefined1 *)((int)piVar3 + -0xb) = 0;
+        piVar3[2] = 0;
+        FUN_0012c0e4();
+        *puVar4 = 0;
+        uVar9 = 0x220;
+      }
+      else {
+        *(undefined1 *)((int)DAT_0012d60c + -0x57) = 1;
+        *(undefined1 *)((int)piVar3 + -0x56) = 0;
+        *(undefined1 *)((int)piVar3 + -0x55) = 0;
+        *(undefined1 *)(piVar3 + -0x15) = 0;
+        *(undefined1 *)((int)piVar3 + -0x53) = 0;
+        *(undefined1 *)((int)piVar3 + -0x52) = 0;
+        *(undefined1 *)((int)piVar3 + -0x51) = 0;
+        *(undefined1 *)(piVar3 + -0x14) = 0;
+        if (piVar3[-0x1f] != 0) {
+          (*(code *)piVar3[-0x1f])();
+        }
+        *(undefined1 *)((int)piVar3 + -0x12) = 1;
+        *(undefined1 *)((int)piVar3 + -0x11) = 0;
+        *(undefined1 *)(piVar3 + -4) = 0;
+        *(undefined1 *)((int)piVar3 + -0xf) = 0;
+        piVar3[1] = 1;
+        uVar9 = 800;
+      }
+      *DAT_0012d614 = uVar9;
+      puVar2[4] = 0x100;
+    }
+    if ((uVar7 & uVar8 & 1) != 0) {
+      if (piVar3[-0x20] != 0) {
+        (*(code *)piVar3[-0x20])();
+      }
+      *puVar4 = 1;
+      puVar2[4] = 1;
+    }
+    if ((uVar7 & uVar8 & 2) != 0) {
+      *(undefined1 *)((int)piVar3 + -0x57) = 0;
+      *(undefined1 *)((int)piVar3 + -0x56) = 0;
+      *(undefined1 *)((int)piVar3 + -0x55) = 0;
+      *(undefined1 *)(piVar3 + -0x15) = 0;
+      *(undefined1 *)((int)piVar3 + -0x4f) = 0;
+      *(undefined1 *)((int)piVar3 + -0x4e) = 0;
+      *(undefined1 *)((int)piVar3 + -0x4d) = 0;
+      *(undefined1 *)(piVar3 + -0x13) = 0;
+      *(undefined1 *)((int)piVar3 + -0x53) = 0;
+      *(undefined1 *)((int)piVar3 + -0x52) = 0;
+      *(undefined1 *)((int)piVar3 + -0x51) = 0;
+      *(undefined1 *)(piVar3 + -0x14) = 0;
+      FUN_0012c0e4();
+      *(undefined1 *)(piVar3 + -0x16) = 0;
+      *(undefined1 *)((int)piVar3 + -0x5b) = 0;
+      *(undefined1 *)((int)piVar3 + -0x5a) = 1;
+      *puVar4 = 1;
+      if (piVar3[-0x21] != 0) {
+        (*(code *)piVar3[-0x21])();
+      }
+      puVar2[0x17] = 0x80;
+      uVar9 = 0;
+      do {
+        uVar9 = uVar9 + 1;
+      } while (uVar9 < 0x100);
+      puVar2[0x17] = 0;
+      *(undefined1 *)((int)piVar3 + -0x57) = 1;
+      *(undefined1 *)((int)piVar3 + -0x56) = 0;
+      *(undefined1 *)((int)piVar3 + -0x55) = 0;
+      *(undefined1 *)(piVar3 + -0x15) = 0;
+      *(undefined1 *)((int)piVar3 + -0x53) = 0;
+      *(undefined1 *)((int)piVar3 + -0x52) = 0;
+      *(undefined1 *)((int)piVar3 + -0x51) = 0;
+      *(undefined1 *)(piVar3 + -0x14) = 0;
+      if ((puVar2[6] & 4) == 0) {
+        *(undefined1 *)((int)piVar3 + -0x4f) = 1;
+        *(undefined1 *)((int)piVar3 + -0x4e) = 0;
+        *(undefined1 *)((int)piVar3 + -0x4d) = 0;
+        *(undefined1 *)(piVar3 + -0x13) = 0;
+        pcVar10 = (code *)piVar3[-0x2d];
+      }
+      else {
+        *(undefined1 *)((int)piVar3 + -0x4f) = 2;
+        *(undefined1 *)((int)piVar3 + -0x4e) = 0;
+        *(undefined1 *)((int)piVar3 + -0x4d) = 0;
+        *(undefined1 *)(piVar3 + -0x13) = 0;
+        pcVar10 = (code *)piVar3[-0x2e];
+      }
+      (*pcVar10)();
+      puVar2[0xc] = 2;
+      if (piVar3[-0x2c] != -1) {
+        puVar2[0x1d] = 0;
+        puVar2[0x1d] = 1;
+        puVar2[0x1d] = 8;
+      }
+      if (piVar3[-0x2b] != -1) {
+        puVar2[0x27] = 0;
+        puVar2[0x27] = 1;
+        puVar2[0x27] = 8;
+      }
+      if (piVar3[-0x2a] != -1) {
+        puVar2[0x31] = 0;
+        puVar2[0x31] = 1;
+        puVar2[0x31] = 8;
+      }
+      if (piVar3[-0x29] != -1) {
+        puVar2[0x3b] = 0;
+        puVar2[0x3b] = 1;
+        puVar2[0x3b] = 8;
+      }
+      puVar2[8] = 0;
+      puVar2[4] = 2;
+      puVar2[5] = DAT_0012d618;
+      puVar2[0xd] = 0xfffffffc;
+    }
+    if ((uVar7 & uVar8 & 4) != 0) {
+      *(undefined1 *)((int)piVar3 + -0x59) = 1;
+      puVar2[4] = 4;
+      *(undefined4 *)(puVar4 + 4) = 1;
+      *puVar4 = 1;
+      puVar2[5] = DAT_0012d61c;
+    }
+    if ((uVar7 & uVar8 & 8) != 0) {
+      *(undefined1 *)((int)piVar3 + -0x59) = 0;
+      *puVar4 = 1;
+      uVar9 = DAT_0012d620;
+      *(undefined4 *)(puVar4 + 4) = 0;
+      puVar2[5] = uVar9;
+      uVar9 = DAT_0012d618;
+      puVar5 = DAT_0012d614;
+      local_28 = 0;
+      do {
+        if ((*DAT_0012d614 & 0x80000000) != (*DAT_0012d614 & 0x80000000)) {
+          if ((*DAT_0012d614 & 0x80000000) == 0) {
+            puVar2[5] = DAT_0012d620;
+            *(undefined1 *)((int)piVar3 + -0x12) = 0;
+            *(undefined1 *)((int)piVar3 + -0x11) = 0;
+            *(undefined1 *)(piVar3 + -4) = 0;
+            *(undefined1 *)((int)piVar3 + -0xf) = 0;
+            piVar3[1] = 0;
+            *(undefined1 *)(piVar3 + -0x16) = 0;
+            *(undefined1 *)((int)piVar3 + -0x16) = 0;
+            *(undefined1 *)((int)piVar3 + -0x15) = 0;
+            *(undefined1 *)(piVar3 + -5) = 0;
+            *(undefined1 *)((int)piVar3 + -0x13) = 0;
+            *piVar3 = 0;
+            *(undefined1 *)((int)piVar3 + -0xe) = 0;
+            *(undefined1 *)((int)piVar3 + -0xd) = 0;
+            *(undefined1 *)(piVar3 + -3) = 0;
+            *(undefined1 *)((int)piVar3 + -0xb) = 0;
+            piVar3[2] = 0;
+            *puVar5 = 0x220;
+            *(undefined4 *)(puVar4 + 4) = 0;
+            FUN_00103d14("Unplug(S)!!\n");
+            puVar2[5] = DAT_0012d618;
+            puVar2[4] = 8;
+          }
+          else {
+            *(undefined1 *)((int)piVar3 + -0x12) = 1;
+            *(undefined1 *)((int)piVar3 + -0x11) = 0;
+            *(undefined1 *)(piVar3 + -4) = 0;
+            *(undefined1 *)((int)piVar3 + -0xf) = 0;
+            piVar3[1] = 1;
+            *puVar5 = 800;
+          }
+          puVar2[4] = 0x100;
+          return;
+        }
+        local_28 = local_28 + 1;
+      } while (local_28 < 0x80000);
+      puVar2[5] = DAT_0012d618;
+      puVar2[4] = 8;
+      if (*(int *)((int)piVar3 + (uVar9 - 0x118)) == 0) {
+        pcVar10 = (code *)0x0;
+      }
+      else {
+        pcVar10 = *(code **)(puVar4 + 8);
+      }
+      if (pcVar10 != (code *)0x0) {
+        (*pcVar10)();
+        *(undefined4 *)(puVar4 + 4) = 0;
+      }
+      puVar2[5] = DAT_0012d620;
+    }
+    if ((uVar7 & uVar8 & 0x10) != 0) {
+      *(undefined1 *)((int)piVar3 + -0x57) = 1;
+      *(undefined1 *)((int)piVar3 + -0x56) = 0;
+      *(undefined1 *)((int)piVar3 + -0x55) = 0;
+      *(undefined1 *)(piVar3 + -0x15) = 0;
+      *(undefined1 *)((int)piVar3 + -0x4f) = 2;
+      *(undefined1 *)((int)piVar3 + -0x4e) = 0;
+      *(undefined1 *)((int)piVar3 + -0x4d) = 0;
+      *(undefined1 *)(piVar3 + -0x13) = 0;
+      *(undefined1 *)((int)piVar3 + -0x53) = 0;
+      *(undefined1 *)((int)piVar3 + -0x52) = 0;
+      *(undefined1 *)((int)piVar3 + -0x51) = 0;
+      *(undefined1 *)(piVar3 + -0x14) = 0;
+      *puVar4 = 1;
+      puVar2[0xc] = 2;
+      puVar2[4] = 0x10;
+    }
+    if ((uVar7 & uVar8 & 0x20) != 0) {
+      *(undefined1 *)((int)piVar3 + -0x5b) = 1;
+      *puVar4 = 1;
+      puVar2[4] = 0x20;
+      if (piVar3[-0x22] != 0) {
+        (*(code *)piVar3[-0x22])();
+      }
+    }
+    if ((uVar7 & uVar8 & 0x40) != 0) {
+      puVar2[4] = 0x40;
+    }
+    *puVar2 = 1;
+  }
+  if ((uVar6 & 2) == 0) {
+LAB_0012d6b4:
+    if ((uVar6 & 0xfc) == 0) {
+      return;
+    }
+    *puVar4 = 1;
+    if ((uVar6 & 4) != 0) {
+      uVar7 = puVar2[0x1a];
+      puVar2[0x1a] = uVar7;
+      if (piVar3[-0x28] != 0) {
+        (*(code *)piVar3[-0x28])(puVar2[0x1b],uVar7);
+      }
+    }
+    if ((uVar6 & 8) != 0) {
+      uVar7 = puVar2[0x24];
+      puVar2[0x24] = uVar7;
+      if (piVar3[-0x27] != 0) {
+        (*(code *)piVar3[-0x27])(puVar2[0x25],uVar7);
+      }
+    }
+    if ((uVar6 & 0x10) != 0) {
+      uVar7 = puVar2[0x2e];
+      puVar2[0x2e] = uVar7;
+      if (piVar3[-0x26] != 0) {
+        (*(code *)piVar3[-0x26])(puVar2[0x2f],uVar7);
+      }
+    }
+    if ((uVar6 & 0x20) != 0) {
+      uVar6 = puVar2[0x38];
+      puVar2[0x38] = uVar6;
+      if (piVar3[-0x25] != 0) {
+        (*(code *)piVar3[-0x25])(puVar2[0x39],uVar6);
+      }
+    }
+    *puVar2 = 0xfc;
+    return;
+  }
+  uVar7 = puVar2[0xd];
+  uVar8 = puVar2[0xc];
+  *puVar4 = 1;
+  uVar8 = uVar7 & uVar8;
+  if ((uVar8 & 1) != 0) {
+    puVar2[0xd] = 1;
+    return;
+  }
+  if ((uVar8 & 2) != 0) {
+    puVar2[0xd] = 2;
+    usb_setup_request_dispatch();
+    return;
+  }
+  if ((uVar8 & 4) == 0) {
+    if ((uVar8 & 8) != 0) {
+      puVar2[0xd] = 8;
+      puVar2[0xd] = 0x20;
+      if ((uVar7 & 0x400) == 0) {
+        puVar2[0xc] = 0x22;
+        FUN_0012d7d0();
+        return;
+      }
+      puVar2[0xc] = 0x420;
+      return;
+    }
+    if ((uVar8 & 0x10) == 0) {
+      if ((uVar8 & 0x20) == 0) {
+        if ((uVar8 & 0x40) == 0) {
+          if ((uVar8 & 0x80) == 0) {
+            if ((uVar8 & 0x100) == 0) {
+              if ((uVar8 & 0x200) == 0) {
+                if ((uVar8 & 0x400) != 0) {
+                  FUN_0012dbac();
+                  puVar2[0xd] = 0x400;
+                  cVar1 = *(char *)((int)piVar3 + -0x61);
+                  bVar13 = cVar1 == '\0';
+                  if (bVar13) {
+                    cVar1 = *(char *)((int)piVar3 + -0x59);
+                  }
+                  bVar14 = bVar13 && cVar1 == '\0';
+                  if (bVar13 && cVar1 == '\0') {
+                    bVar14 = *(char *)((int)piVar3 + -0x6b) == '\0';
+                  }
+                  if (!bVar14) {
+                    *(undefined1 *)(piVar3 + -0x16) = 1;
+                  }
+                  puVar2[0xc] = 2;
+                  return;
+                }
+                if ((uVar8 & 0x800) == 0) {
+                  if ((uVar8 & 0x1000) == 0) {
+                    *puVar2 = 2;
+                    goto LAB_0012d6b4;
+                  }
+                  uVar6 = 0x1000;
+                }
+                else {
+                  uVar6 = 0x800;
+                }
+              }
+              else {
+                uVar6 = 0x200;
+              }
+            }
+            else {
+              uVar6 = 0x100;
+            }
+          }
+          else {
+            uVar6 = 0x80;
+          }
+          goto LAB_0012d4c8;
+        }
+        puVar2[0xd] = 0x40;
+        puVar2[0xb] = 0;
+        if (piVar3[-0x23] != 0) {
+          (*(code *)piVar3[-0x23])();
+        }
+        *(uint *)(puVar4 + 0xc) = *(int *)(puVar4 + 0xc) - puVar2[0xf];
+        if (*(int *)(puVar4 + 0xc) == 0) {
+          puVar2[0xc] = DAT_0012d638;
+        }
+        else {
+          puVar2[0xc] = 0x40;
+        }
+        iVar11 = *(int *)((int)piVar3 + DAT_0012d634 + -0x138);
+        bVar13 = iVar11 == 1;
+        if (bVar13) {
+          iVar11 = *piVar3;
+        }
+        if (!bVar13 || iVar11 != 1) {
+          return;
+        }
+        puVar2[0x15] = 0;
+      }
+      else {
+        puVar2[0xd] = 0x420;
+        if ((char)piVar3[-0x1c] == '\0') {
+          uVar6 = 0x400;
+          puVar2[0xd] = 0x400;
+          puVar2[0xb] = 0;
+        }
+        else {
+          puVar2[0xd] = 8;
+          uVar6 = 0x28;
+        }
+        puVar2[0xc] = uVar6;
+        if (*piVar3 != 1) {
+          return;
+        }
+        piVar12 = (int3 *)((int)piVar3 + DAT_0012d634 + -0x138);
+        if (*piVar12 == 0 && *(char *)((int)piVar12 + 3) == '\0') {
+          return;
+        }
+      }
+      puVar2[0x16] = 0;
+      return;
+    }
+    uVar6 = 0x10;
+  }
+  else {
+    uVar6 = 4;
+  }
+LAB_0012d4c8:
+  puVar2[0xd] = uVar6;
+  return;
+}
+
+
+DECOMPILE_END
+
+TARGET	0012ebb0
+FUNCTION	NONE
+REFERENCES_TO_TARGET
+INSTRUCTION_WINDOW
+
+TARGET	00130820
+FUNCTION	NONE
+REFERENCES_TO_TARGET
+INSTRUCTION_WINDOW
+

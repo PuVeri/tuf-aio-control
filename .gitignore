@@ -34,3 +34,6 @@ Desktop.ini
 # ASUS downloads and extracted binaries
 research/downloads/original/
 research/extracted/
+
+# Reproducible, binary Ghidra project databases
+research/ghidra-projects/

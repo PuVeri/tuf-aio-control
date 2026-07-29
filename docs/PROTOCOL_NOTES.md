@@ -461,3 +461,98 @@ Reportgrößen 16/440/1024 wurden in der Nutzlast nicht direkt bestätigt.
 Die Updaterwerte `0x45`, `0x86`, `0x09`, `0x02` und `88 01 00 80 ...` bleiben
 klar vom gefährlichen Boot-/Upgradeablauf getrennt. Es wurde nichts ausgeführt,
 kein USB-/HID-Gerät geöffnet und nichts an die AIO gesendet.
+
+## Statische Ghidra-Analyse 2026-07-29
+
+Ghidra 12.1 wurde mit dem portablen Temurin JDK 21.0.12+8 verwendet. Die
+Firmware wurde als Raw Binary mit `ARM:LE:32:v5t:default` und Loader-Basis
+`0x00100000` in ein getrenntes Projekt importiert. Der geladene Bereich ist
+`0x00100000..0x001313db`. Details und reproduzierbare Parameter stehen in
+[GHIDRA_ANALYSIS_PLAN.md](GHIDRA_ANALYSIS_PLAN.md); Firmwarekarte und Matrix
+stehen in:
+
+- `../research/reports/ghidra-firmware-map.md`
+- `../research/reports/dispatcher-handler-matrix.tsv`
+
+### Beobachtete Fakten
+
+- Ghidra dekodiert den Start konsistent als 32-Bit ARM Little Endian und
+  erkannte 694 Funktionen.
+- `usb_event_dispatch_candidate` bei `0x0012ced0` ruft den
+  USB-Setup-Dispatcher bei `0x0012c12c` direkt auf.
+- Die Vergleiche `0x01`, `0x02`, `0x03`, `0x06`, `0x07`, `0x21`, `0x22`
+  liegen innerhalb von `bRequest=0x06` und betreffen das High-Byte von
+  `wValue`. Sie sind Descriptor-Typen, keine Geräteprotokollbefehle.
+- Der Protokolltask bei `0x00129d84` registriert Geräte- und
+  Transportdispatcher als Callbacks.
+- Der 440-Byte-Empfangspfad verwendet ein 4-Byte-Steuerwort und `0x1b4` =
+  436 Nutzbytes. Der Antwortbauer erzeugt ebenfalls exakt `0x1b8` = 440
+  Byte.
+- Ein zweiter Empfänger verwendet ein 4-Byte-Steuerwort und `0x3fc` = 1020
+  Nutzbytes, insgesamt 1024 Byte.
+- Im Steuerwort sind Byte 0 der Befehlswert, Bit 31 das Kennzeichen des
+  ersten Pakets und Bits 8..30 Paketanzahl beziehungsweise Segmentindex.
+- Im Gerätedispatcher ist `0x87` ein Zwei-Byte-Antwortpfad mit dem konstanten
+  Wert `0x0051`. `0x1e` liest ein Halbwort; `0x80..0x85` geben kurze globale
+  oder strukturbasierte Puffer zurück.
+- `0x88` wird im Transportdispatcher gesondert behandelt und führt über
+  `0x00128bc0` zu SPI-Lesen sowie bedingtem SPI-Schreiben im Bereich
+  `0x21000`.
+
+### Belastbare Ableitungen
+
+Das 440-Byte-Format korreliert exakt mit dem bekannten 440-Byte-HID-Report,
+das 1024-Byte-Format mit dem bekannten 1024-Byte-Outputreport. Ohne direkte
+Xref auf Reportdeskriptor und Endpoint ist dies noch keine bestätigte MI- oder
+Interfacezuordnung.
+
+Für eine einpaketige leere `0x87`-Anfrage ergibt sich statisch als
+Paketkandidat:
+
+```text
+87 01 00 80 00 ... 00     (440 Byte)
+```
+
+Die vom Antwortbauer erwartbare Struktur ist:
+
+```text
+87 01 00 80 51 00 00 ... 00     (440 Byte)
+```
+
+Belegt sind Headeralgorithmus, Befehl, Antwortkonstante und Längen. Nicht
+belegt sind eine mögliche Host-seitige Report-ID, das konkrete Interface und
+die vollständige indirekte Endpoint-/Callbackkette. `0x87` bleibt deshalb ein
+statischer Versionskandidat, keine Sendefreigabe.
+
+### Hypothesen
+
+- `0x1e` könnte Status oder Diagnose liefern.
+- `0x80..0x85` könnten Status-, Identitäts-, Display- oder
+  Konfigurationswerte liefern.
+- Der 1024-Byte-Pfad könnte Daten oder Bildinhalte transportieren.
+
+Diese Bedeutungen sind nicht durch Symbole oder vollständige Datenflüsse
+bestätigt.
+
+### Ausgeschlossene Kandidaten
+
+- `0x45`: im Updater Konfigurationslöschung.
+- `0x86`: im Updater Firmwareblocktransfer; mögliche modusabhängige Semantik.
+- `0x09`: im normalen Dispatcher zustands-/displayverändernd und im Updater
+  Completion-Flag.
+- `0x02`: im Updater Abschluss/Reenumeration, trotz einfachem normalem
+  Dispatcherzweig.
+- `88 01 00 80 ...`: Befehl `0x88` mit bestätigtem SPI-Lese-/Schreibpfad.
+- `0x1f` und `0xff`: Boot-/indirekte Callbackpfade mit unvertretbar offenem
+  Risiko.
+
+### Unbekannte Punkte und Sicherheitsentscheidung
+
+MI, Endpoint, Report-ID, die globalen Bedeutungen der kurzen Antwortwerte und
+mehrere indirekte Callbackziele sind offen. Die Ghidra-Call-Graph-Suche konnte
+LCM/emWin, Boot-/JPG- und SPI-String-Eigentümer wegen indirekter Aufrufe nicht
+lückenlos mit den Dispatchern verbinden.
+
+Ein kontrollierter Einzeltest ist auf diesem Stand nicht empfohlen. Es wurde
+keine Firmware ausgeführt oder emuliert, kein USB-/HID-Gerät geöffnet und
+nichts an die AIO gesendet.

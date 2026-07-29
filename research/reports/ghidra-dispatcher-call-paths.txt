@@ -1,0 +1,60 @@
+PROGRAM	device-firmware-v51.bin
+MAX_DEPTH	12
+NOTE	Only statically resolved calls represented by Ghidra are traversed.
+
+SOURCE	00126dfc	device command dispatcher	00126dfc:device_command_dispatch_candidate
+TARGET	0010ccd0	LCM diagnostic-string owner	0010ccd0:FUN_0010ccd0
+PATH	NOT_FOUND
+TARGET	0010ee20	emWin diagnostic-string owner	0010ee20:FUN_0010ee20
+PATH	NOT_FOUND
+TARGET	001268d0	boot diagnostic-string owner	001268d0:FUN_001268d0
+PATH	NOT_FOUND
+TARGET	00127660	serial-number diagnostic-string owner	00127660:FUN_00127660
+PATH	NOT_FOUND
+TARGET	00127854	boot/JPG path owner	00127854:FUN_00127854
+PATH	NOT_FOUND
+TARGET	0012a5ac	SPI-flash diagnostic-string owner	0012a5ac:FUN_0012a5ac
+PATH	NOT_FOUND
+
+SOURCE	001293f8	transport dispatcher	001293f8:transport_dispatch_candidate
+TARGET	0010ccd0	LCM diagnostic-string owner	0010ccd0:FUN_0010ccd0
+PATH	NOT_FOUND
+TARGET	0010ee20	emWin diagnostic-string owner	0010ee20:FUN_0010ee20
+PATH	NOT_FOUND
+TARGET	001268d0	boot diagnostic-string owner	001268d0:FUN_001268d0
+PATH	NOT_FOUND
+TARGET	00127660	serial-number diagnostic-string owner	00127660:FUN_00127660
+PATH	NOT_FOUND
+TARGET	00127854	boot/JPG path owner	00127854:FUN_00127854
+PATH	NOT_FOUND
+TARGET	0012a5ac	SPI-flash diagnostic-string owner	0012a5ac:FUN_0012a5ac
+PATH	NOT_FOUND
+
+SOURCE	0012c12c	USB setup request dispatcher	0012c12c:usb_setup_request_dispatch
+TARGET	0010ccd0	LCM diagnostic-string owner	0010ccd0:FUN_0010ccd0
+PATH	NOT_FOUND
+TARGET	0010ee20	emWin diagnostic-string owner	0010ee20:FUN_0010ee20
+PATH	NOT_FOUND
+TARGET	001268d0	boot diagnostic-string owner	001268d0:FUN_001268d0
+PATH	NOT_FOUND
+TARGET	00127660	serial-number diagnostic-string owner	00127660:FUN_00127660
+PATH	NOT_FOUND
+TARGET	00127854	boot/JPG path owner	00127854:FUN_00127854
+PATH	NOT_FOUND
+TARGET	0012a5ac	SPI-flash diagnostic-string owner	0012a5ac:FUN_0012a5ac
+PATH	NOT_FOUND
+
+SOURCE	0012ced0	USB event dispatcher	0012ced0:usb_event_dispatch_candidate
+TARGET	0010ccd0	LCM diagnostic-string owner	0010ccd0:FUN_0010ccd0
+PATH	NOT_FOUND
+TARGET	0010ee20	emWin diagnostic-string owner	0010ee20:FUN_0010ee20
+PATH	NOT_FOUND
+TARGET	001268d0	boot diagnostic-string owner	001268d0:FUN_001268d0
+PATH	NOT_FOUND
+TARGET	00127660	serial-number diagnostic-string owner	00127660:FUN_00127660
+PATH	NOT_FOUND
+TARGET	00127854	boot/JPG path owner	00127854:FUN_00127854
+PATH	NOT_FOUND
+TARGET	0012a5ac	SPI-flash diagnostic-string owner	0012a5ac:FUN_0012a5ac
+PATH	NOT_FOUND
+
