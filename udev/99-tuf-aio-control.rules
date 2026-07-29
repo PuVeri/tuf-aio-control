@@ -1,0 +1,4 @@
+# ASUS TUF Gaming LC III 360 ARGB LCD (0b05:1c7b)
+# Grant the existing "input" group read-only access to matching hidraw nodes.
+SUBSYSTEM=="hidraw", KERNEL=="hidraw*", ATTRS{idVendor}=="0b05", ATTRS{idProduct}=="1c7b", GROUP="input", MODE="0640"
+

@@ -1,0 +1,88 @@
+   1fb4 system divider = %d
+   1fcc Jump to SRAM
+   3e70 82BP
+   409c u32DbgMessage = 0x%x
+   51b4 Library Pen up
+   d024 LCM_Init Start!!
+   d2a4 AhQ`
+   d2fe E`(hA
+   d308 ahi`!h@
+   d827 : 4q
+   d82f : 6q
+   d837 : 8q
+   d853 ! 6q
+   d956 `" 2q
+   d95f : 4q
+   da40 pGpGpGpG8
+   dbbd `pGp
+   dc8c SIGRTMEM: Out of heap memory
+   dcac : Heap memory corrupted
+   dd0b : 4q
+   dd13 : 6q
+   dd1b : 8q
+   dea0 Request VDMA fail.
+   e7b1  bB 
+   efd0 SEGGER emWin V5481110
+   fdae AR@ 
+  26d04 lcd_boot_proc reboot
+  26d24 lcd_boot_proc exit
+  2761c Shenzhen Xinyao Technology Co., Ltd.
+  277f8 load eeprom faild
+  2780c A247392SS000000
+  27824 load config ok
+  27834 load config faild
+  278cc c:\syst\boot
+  278dc c:\syst\wapper.jpg
+  281e8 ----->uid:%08x%08x
+  293d4 ======>sn: %s, %02x %02x %02x %02x
+  297c4 ---->receiving cmd error %02x %02x
+  298d0 ---->receiving data error %02x %02x
+  29adc -----> no enough space0:%08x %d %d %d
+  29b04 -----> no enough space1:%08x %d %d %d
+  2a6a0 SPI flash id [0x%x]
+  2a6bc read id error !! [0x%x]
+  2bc44 lcd_boot_proc restart--- 
+  2c0ac 20180315
+  2c0b8 N9H20 UDC Library (%s)
+  2c644 USBR_GET_DESCRIPTOR pkt.wLength = %d
+  2d624 Unplug(S)!!
+  2e2d4 watch_dog_isr 
+  2e346 /1 0c
+  2ec14 UUUU
+  2ed60  !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~
+  2ff53 !(0)"
+  2ff60 #*1892+$
+  2ff6d %,3:;4-&
+  2ff76 '.5<=6/7>?????????????????
+  30090      
+  300c9  @@@ 
+  30110  `    p
+  30143  @@@
+  301d0 p     p
+  30229       
+  30253 P   
+  30260 p@@@@@p
+  302d2 `   p
+  302e8 `     p
+  3032b @@H0
+  30361   @  
+  30368        
+  303ab `  p
+  303d9 @pHHp@
+  303f0 ` 0(0 p
+  3041a p   p
+  3043a      
+  30486 p 0@@
+  304a8 0H P 
+  30904 !)1:BJR[cks{
+  30928  $(-159=AEIMQUY]aeimquy}
+  309a6 									
+  30a83 				
+  30ae0     !!!!""""####$$$$%%%%&&&&''''(((())))*****++++,,,,----....////0000111122223333444455556666777788889999::::;;;;<<<<====>>>>???
+  31231 L9 *
+  31283 <H* 
+  3134f  !###
+  31356 &)&"(
+  3135c "#!6
+  3139c (K@?T
+  313cc &.9FWm

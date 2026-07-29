@@ -376,3 +376,88 @@ USB-/HID-Gerät geöffnet.
 Die Prüfung eines sicheren, rein statischen Extraktionswegs für den
 Inno-Setup-6.4.0.1-Installer ist in
 [INFOHUB_EXTRACTION_PLAN.md](INFOHUB_EXTRACTION_PLAN.md) dokumentiert.
+
+## Statische Anfragekandidaten 2026-07-29
+
+Die vertiefte Querverweisanalyse der segmentierten Schreib-/Lesefunktionen und
+der direkten `0x400`-Byte-Schreibfunktion ist in
+[`../research/reports/firmware-updater-request-candidates.md`](../research/reports/firmware-updater-request-candidates.md)
+dokumentiert.
+
+### Beobachtete Fakten
+
+- Alle gefundenen Aufrufe dieser Schreibpfade liegen im zentralen
+  Firmware-Upgradeablauf.
+- Der leere segmentierte Wert `0x45` erzeugt den bekannten Transportanfang
+  `45 81`, gefolgt von Nullen. Der untere HID-Helfer stellt ein zusätzliches
+  Nullbyte voran. Direkt davor zeigt die Anwendung „Wiping configuration“.
+- Die zugehörige Lesefunktion verlangt Transportbyte 0 gleich `0x45`, wertet
+  Byte 1 als Segmentsteuerung aus, kopiert vier Datenbytes ab Offset 2 und
+  verlangt beim `0x45`-Pfad einen von null verschiedenen DWORD-Wert.
+- `0x86` transportiert Firmwareblöcke; `0x09` transportiert die
+  Drei-DWORD-Abschlussstruktur; der leere Wert `0x02` liegt unmittelbar vor
+  einer Reenumerationswartephase.
+- Direkte Rohpakete beginnen mit `88 01 00 80`; die Variante mit folgendem
+  Byte `01` steht vor dem Boot-Warten, die genullte Variante im
+  Post-Upgrade-Abschluss.
+- Eine konkrete erfolgreiche Antwortkonstante, Versionsauswertung oder
+  transportseitige Prüfsumme wurde nicht gefunden.
+
+### Abgeleitete Zusammenhänge
+
+- Die `0x400`-Byte-Transportgröße passt zur bestätigten
+  1024-Byte-Outputgröße von Interface 1. Dies ist weiterhin keine direkt
+  belegte MI- oder Interfacezuordnung.
+- Die vier gelesenen Datenbytes verhalten sich wie ein Rückgabewert oder eine
+  Bestätigung; ihre Bedeutung ist nicht belegt.
+
+### Verworfene Hypothesen
+
+- `0x45` wird nicht als Statusabfrage eingestuft. Trotz leerem Anfragekörper
+  spricht der direkte Löschkontext gegen einen ungefährlichen Test.
+- Die Rohpakete `88 01 00 80 ...` werden nicht als Geräte- oder
+  Versionsabfrage eingestuft. Ihre ausschließliche Lage an Boot- und
+  Abschlussübergängen macht sie für einen Test ungeeignet.
+- Keiner der Werte `0x45`, `0x86`, `0x09` oder `0x02` wird ohne zusätzliche
+  Evidenz als allgemeiner Opcode benannt.
+
+### Unbekannte Punkte und Sicherheitsentscheidung
+
+MI/COL des tatsächlich ausgewählten Handles, erfolgreiche Antwortwerte und
+eine von Firmwareaktionen unabhängige Status-/Versionsabfrage bleiben
+unbekannt. Daher wurde kein sicherer Anfragekandidat bestätigt. Ein
+kontrollierter Einzeltest ist auf diesem Stand nicht vertretbar. Es wurde
+nichts an ein USB- oder HID-Gerät gesendet.
+
+## Extrahierte Gerätefirmware 2026-07-29
+
+Die bytegenaue Kopie der vom Windows-Updater übertragenen Region liegt unter
+`../research/extracted/device-firmware-v51-static/device-firmware-v51.bin`.
+Die vertiefte statische Auswertung und Rohbefunde stehen in
+[`../research/reports/device-firmware-static-analysis.md`](../research/reports/device-firmware-static-analysis.md).
+
+### Beobachtete Fakten
+
+- Dateioffset `0x1c15b0..0x1f298c` (Ende exklusiv), Länge `0x313dc` = 201692
+  Byte; SHA-256 der Kopie:
+  `c4679ec340fc5edd3dea960ee027281cf6bd81cbbf347afb40e0d0b4f40aeb9f`.
+- Der Anfang enthält ARM-Little-Endian-Vektordaten; weitere Bereiche enthalten
+  ARM- und Thumb-/Interworking-artige Muster.
+- `USBR_GET_DESCRIPTOR pkt.wLength = %d` und ein USB-Request-Dispatcher mit
+  Vergleichswerten `1, 2, 3, 6, 7, 0x21, 0x22` sind sichtbar.
+- Ein gerätespezifischer Dispatcher vergleicht unter anderem `0x18..0x1f`,
+  `0x80..0x87`, `0xfd..0xff`; ein weiterer vergleicht `0x03`, `0x06`,
+  `0x38` und `0x3b`.
+- Strings belegen `LCM_Init`, emWin, SPI-Flash, Boot-/Config-Pfade und eine
+  JPG-Dateireferenz. PNG-, JPEG- und GIF-Signaturen wurden nicht gefunden.
+
+### Ableitungen und Grenzen
+
+Mehrere `0x0140`-Werte und der externe Dateiname `320x320` stützen eine
+Auflösungshypothese; Breite, Höhe, Pixelformat, Interfacezuordnung und normale
+LCD-Befehlsbedeutungen bleiben offen. Die bekannten HID-Deskriptoren und die
+Reportgrößen 16/440/1024 wurden in der Nutzlast nicht direkt bestätigt.
+
+Die Updaterwerte `0x45`, `0x86`, `0x09`, `0x02` und `88 01 00 80 ...` bleiben
+klar vom gefährlichen Boot-/Upgradeablauf getrennt. Es wurde nichts ausgeführt,
+kein USB-/HID-Gerät geöffnet und nichts an die AIO gesendet.
