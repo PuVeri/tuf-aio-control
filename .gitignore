@@ -1,0 +1,36 @@
+# Dependencies and environments
+node_modules/
+.venv/
+venv/
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*.pyc
+
+# Temporary logs and runtime data
+*.log
+logs/*.tmp
+logs/*.temp
+logs/*.pid
+
+# Temporary and backup files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Editor and IDE metadata
+.idea/
+.vscode/
+*.code-workspace
+
+# Operating-system metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ASUS downloads and extracted binaries
+research/downloads/original/
+research/extracted/

@@ -1,0 +1,35 @@
+Static archive inventory, 2026-07-29 (Europe/Berlin)
+
+Software ZIP
+============
+Archive:
+  research/downloads/original/ASUS_InfoHub_Software_TUF_GAMING_LC_III_360_ARGB_LCD_v1.0.0.15.zip
+
+unzip -l result:
+  Length    Date        Time   Name
+  90476632  2026-01-15  17:15  ASUS-InfoHub-TUF-1.0.0.15.exe
+
+Path-safety check:
+  unzip -Z1 output was rejected if a name began with "/", contained a ".."
+  path component, or began with a Windows drive prefix. No unsafe name was
+  found. Extraction used "unzip -n" into
+  research/extracted/infohub-v1.0.0.15/ so existing files would not be
+  overwritten.
+
+Firmware RAR
+============
+Archive:
+  research/downloads/original/ASUS_InfoHub_Firmware_TUF_GAMING_LC_III_360_ARGB_LCD_v51.rar
+
+file/xxd result:
+  RAR archive data, v5; header begins "Rar!\x1a\x07\x01\x00".
+
+7z l result:
+  Cannot open the file as archive. "7z i" shows no RAR handler.
+
+Static header/string observation:
+  WW11_320x320_2.8inch_v51_TUF_20250626.exe
+
+Because no installed tool could enumerate RAR5 safely, neither a complete path
+safety check nor extraction was attempted. No package was installed to remove
+this limitation.

@@ -1,0 +1,23 @@
+Tool availability on 2026-07-29
+
+Present:
+  /usr/bin/file
+  /usr/bin/strings
+  /usr/bin/grep
+  /usr/bin/find
+  /usr/bin/sha256sum
+  /usr/bin/xxd
+  /usr/bin/objdump
+  /usr/bin/unzip
+  /usr/bin/7z (26.02; no RAR handler shown by "7z i")
+  /usr/bin/tar
+
+Missing:
+  unrar
+  bsdtar
+  cabextract
+  innoextract
+  wrestool
+  llvm-objdump
+
+No missing tool or package was installed.

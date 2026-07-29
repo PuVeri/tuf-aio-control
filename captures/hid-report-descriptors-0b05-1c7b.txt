@@ -1,0 +1,7 @@
+===== interface 00: /sys/class/hidraw/hidraw3/device/report_descriptor =====
+ 06 06 ff 09 01 a1 01 15 00 26 ff 00 75 08 96 b8
+ 01 09 01 81 02 96 b8 01 09 01 91 02 c0
+===== interface 01: /sys/class/hidraw/hidraw4/device/report_descriptor =====
+ 06 06 ff 09 01 a1 01 15 00 26 ff 00 75 08 96 10
+ 00 09 01 81 02 96 00 04 09 01 91 02 c0
+
