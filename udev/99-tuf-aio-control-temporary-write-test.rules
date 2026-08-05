@@ -1,0 +1,3 @@
+# TEMPORARY: one manually authorized command-0x87 test only; remove immediately.
+# Interface 0 is confirmed by ID_USB_INTERFACE_NUM=00. Interface 1 remains read-only.
+SUBSYSTEM=="hidraw", KERNEL=="hidraw*", ATTRS{idVendor}=="0b05", ATTRS{idProduct}=="1c7b", ENV{ID_USB_INTERFACE_NUM}=="00", GROUP:="input", MODE:="0660"

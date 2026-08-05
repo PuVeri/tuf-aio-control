@@ -40,7 +40,8 @@ reproduzierbare Beobachtung oder eine maßgebliche Spezifikation belegt ist.
 | Frühere HID-Raw-Pfade | `/dev/hidraw7`, `/dev/hidraw8` | frühere Beobachtung, nicht stabil |
 
 Die aktuelle Zuordnung zu den Interface-Nummern ist über udev- und
-sysfs-Metadaten bestätigt. Die Funktion der Interfaces ist weiterhin offen.
+sysfs-Metadaten bestätigt. Die spätere statische Ghidra-Analyse ordnet den
+440-Byte-Transport Interface 0 und den 1024-Byte-Empfang Interface 1 zu.
 
 ## Erfassung 2026-07-29
 
@@ -197,7 +198,45 @@ und 4 waren kein Suchkriterium.
 
 ## Beobachtete Pakete
 
-Noch keine Pakete dokumentiert.
+Am 2026-08-05 wurde genau ein gesondert autorisierter `0x87`-Request gesendet.
+Die Anfrage ist exakt bekannt; von der Antwort sind nur Länge und Abweichung
+von der Erwartung belegt. Die tatsächlichen Antwortbytes wurden nicht
+gespeichert.
+
+### Paketbeobachtung: `LIVE-0X87-01`
+
+| Feld | Wert |
+| --- | --- |
+| Datum/Zeit | 2026-08-05; exakte Uhrzeit nicht protokolliert |
+| Originalmitschnitt | keiner; Antwortbytes nicht gespeichert |
+| Interface/Endpunkt | Interface 0; zum Testzeitpunkt `/dev/hidraw7`; statisch `0x01` OUT / `0x82` IN |
+| Richtung | ein Request Host → Gerät, eine Antwort Gerät → Host |
+| Transfer-/Report-Typ | hidraw Output/Input, unnummerierte Reports |
+| Report-ID | keine; Linux-Write-Präfix `00` nur an der Host-API |
+| Requestlänge | 441 Byte an `hidraw.write()`, 440 Byte Nutzreport |
+| Antwortlänge | 440 Byte |
+| Gerätezustand danach | normal erkannt; keine testbedingten USB-Fehler, Resets oder Disconnects im geprüften Kernelprotokoll |
+| Wiederholungen | keine |
+| Status | beobachtet; Antwortinhalt mangels Rohbytes nicht weiter auswertbar |
+
+```text
+Gesendet an hidraw: 00 | 87 01 00 80 | 436-mal 00
+Erwartete Antwort:  87 01 00 80 51 00 | 434-mal 00
+Beobachtete Antwort: exakt 440 Byte, Inhalt abweichend, Bytes nicht gespeichert
+```
+
+**Beobachtung:** Das Programm führte genau einen vollständigen 441-Byte-Write
+aus, erhielt einen 440-Byte-Report, erkannte eine inhaltliche Abweichung,
+schloss sofort und sendete nichts nach. Die temporäre Schreibregel wurde
+anschließend entfernt; beide Interfaces besitzen wieder `0640`.
+
+**Mögliche Bedeutung:** Ohne die tatsächlichen Antwortbytes ist keine
+belastbare Aussage möglich, welches Feld abwich oder ob eine Transport-, Queue-,
+Zustands- oder Semantikannahme falsch war.
+
+**Nächste passive Prüfung:** Weitere statische Analyse vorhandener Firmware-
+und Transportartefakte. Keine Wiederholung allein zur Gewinnung der fehlenden
+Bytes.
 
 Neue Beobachtungen werden in folgender Form ergänzt:
 
@@ -232,8 +271,8 @@ Offset  Hexadezimale Bytes
 
 | ID | Hypothese | Grundlage | Gegenbeobachtungen | Geplante passive Prüfung | Status |
 | --- | --- | --- | --- | --- | --- |
-| H-001 | Interface 1 könnte wegen seines 1024-Byte-Output-Reports für umfangreichere LCD- oder Bilddaten vorgesehen sein. | Sein Output-Report ist größer als der 440-Byte-Report von Interface 0. | Es wurde noch kein Verkehr beobachtet; Reportgröße belegt keine Funktion. | Legitimen Referenzverkehr beider Interfaces passiv vergleichen. | offen |
-| H-002 | Interface 0 könnte eine symmetrische Anfrage-/Antwortstruktur verwenden. | Input und Output sind jeweils 440 Byte groß. | Es wurde noch kein Verkehr beobachtet; gleiche Größen belegen keine Semantik. | Legitimen Referenzverkehr passiv erfassen und Transaktionen zeitlich zuordnen. | offen |
+| H-001 | Interface 1 trägt den 1024-Byte-Empfangspfad; die Bedeutung als LCD-/Bilddatenpfad bleibt offen. | Direkter Call von Endpointcallback 3 zu `0x001297e8`; High-Speed-MPS `0x400`. | Befehl `0x08` und Datenbedeutung sind noch nicht vollständig aufgelöst. | Statisch den `0x08`-Folgepfad verfolgen. | Transportzuordnung bestätigt als C-009; Semantik offen |
+| H-002 | Interface 0 verwendet die symmetrische 440-Byte-Anfrage-/Antwortstruktur. | Endpointcallbacks 1/2, High-Speed-MPS `0x1b8`/`0x1b8` und 440-Byte-Antwortbauer. | Keine Gegenbeobachtung im statischen Pfad. | Keine weitere Prüfung für die Interfacezuordnung nötig. | bestätigt als C-008 |
 
 Hypothesen sind keine Implementierungsvorgaben. Sie werden bei neuen
 Beobachtungen aktualisiert, bestätigt oder ausdrücklich widerlegt.
@@ -249,9 +288,18 @@ Beobachtungen aktualisiert, bestätigt oder ausdrücklich widerlegt.
 | C-005 | Interface 1 hat einen 16-Byte-Input- und einen 1024-Byte-Output-Report ohne Report-ID. | 29-Byte-HID-Report-Deskriptor aus sysfs. | 2026-07-29 |
 | C-006 | Beide Interfaces verwenden die herstellerspezifische Usage Page `0xff06` und Usage `0x01`. | HID-Report-Deskriptoren aus sysfs. | 2026-07-29 |
 | C-007 | Aktuell sind Interface 0 und 1 `/dev/hidraw3` und `/dev/hidraw4` zugeordnet. | udev-Metadaten, gefiltert nach VID/PID. | 2026-07-29 |
+| C-008 | Der 440-Byte-Transport gehört zu Interface 0 mit `0x01` OUT und `0x82` IN. | Ghidra: High-Speed-Endpointkonfiguration, Callbacktabelle und Endpoint-1-/2-Callbacks. | 2026-07-29 |
+| C-009 | Der 1024-Byte-Empfänger bei `0x001297e8` gehört zu Interface 1 / `0x03` OUT; der 16-Byte-IN-Callback gehört zu `0x84`. | Ghidra: direkter Aufruf aus Endpointcallback 3 sowie High-Speed-Endpointkonfiguration. | 2026-07-29 |
+| C-010 | `0x35` und `0x38` sind interne Dispatcherereignisse und keine USB-Endpointnummern. | Ghidra: Registrierungen und Zustellungen im Protokolltask und Transportdispatcher. | 2026-07-29 |
+| C-011 | Linux `hidraw.write()` erwartet für den unnummerierten 440-Byte-Outputreport einen 441-Byte-Userspace-Puffer `00 + Report`; `usbhid` entfernt die Null vor dem 440-Byte-Interrupttransfer. | Linux-`hidraw`-Dokumentation und `usbhid_output_report`; Geräte- und Reportdeskriptor. | 2026-07-29 |
+| C-012 | Das mögliche führende Nullbyte ist ein Host-API-Reportnummernfeld mit Wert null, keine Firmware-Nutzlast, kein Padding und keine im Deskriptor deklarierte Report-ID. | Linux-`hidraw`-/`usbhid`-Pfad, Windows-`HIDP_CAPS`-Definition und Updater-Disassembly. | 2026-07-29 |
+| C-013 | Der befehlsspezifische `0x87`-Case liest keinen Payload und keine befehlsspezifischen Globals; er legt ausschließlich `0x0051` auf dem Stack ab und ruft den Antwortbauer mit zwei Datenbytes auf. | Ghidra-Kontrollfluss `0x00127588..0x001275c8`. | 2026-07-29 |
+| C-014 | Der vollständige `0x87`-Handlerpfad ist nicht streng schreibfrei: Ein gemeinsamer Prolog kann abhängig von Konfigurationsmodus und Initialisierungsflag RAM- sowie Peripherieregister verändern. Sein rekursiver direkter Unterbaum und der Antwortbauer erreichen keinen bekannten Flash-, SPI-, Dateisystem-, Boot-, Reset- oder persistenten Konfigurationspfad. | Ghidra: `0x00126dfc`, `0x0010dd58`, rekursiver direkter Call-Graph ab `0x0010dd58` und `0x001298f8`. | 2026-07-29 |
+| C-015 | Der nachgelagerte Fatal-/Stop-Pfad `0x0012a218` wird im 440-Byte-Sendezweig nur für ein erstes Paketbyte `0xff` erreicht. Die korrekt gebaute `0x87`-Antwort verlässt den Zweig vorher. | Ghidra: `transport_dispatch_candidate` `0x001293f8`, Prüfung vor `0x00129674..0x00129678`. | 2026-07-29 |
+| C-016 | Ein einmaliger realer `0x87`-Test auf Interface 0 sendete den festgelegten 441-Byte-hidraw-Puffer und empfing einen 440-Byte-Report, dessen Inhalt von der erwarteten Gesamtfolge abwich. Die Antwortbytes wurden nicht gespeichert; eine byteweise Aussage ist daher nicht möglich. | Bedienerbericht und Abbruchverhalten von `src/test_command_0x87.py`; kein Rohmitschnitt. | 2026-08-05 |
 
-Die Reportgrößen sind bestätigt. Inhalt, Felder und Befehlssemantik sind noch
-nicht bekannt.
+Die Reportgrößen und das Host-Framing von Interface 0 sind bestätigt.
+Weiterhin offen sind mehrere Inhalts- und Befehlssemantiken.
 
 ## Offene Fragen
 
@@ -296,9 +344,10 @@ passiver Analyse.
 Am 2026-07-29 wurden die offiziell angebotene ASUS InfoHub Software
 `1.0.0.15` und Firmware `51` ausschließlich statisch untersucht. Ergebnisse,
 Prüfsummen, Evidenzgrenzen und offene Punkte stehen in
-[STATIC_SOFTWARE_ANALYSIS.md](STATIC_SOFTWARE_ANALYSIS.md). Die Analyse ergab
-bislang keine belastbare Funktionszuordnung der beiden HID-Interfaces und keine
-bestätigten Paketfelder.
+[STATIC_SOFTWARE_ANALYSIS.md](STATIC_SOFTWARE_ANALYSIS.md). Diese damalige
+Zwischenanalyse allein ergab noch keine belastbare Funktionszuordnung der
+beiden HID-Interfaces und keine bestätigten Paketfelder; die spätere
+Firmwareanalyse unten schließt die Transportzuordnung.
 
 Am 2026-07-29 wurde außerdem ein sicherer, noch nicht ausgeführter
 [Werkzeug- und Extraktionsplan](TOOLING_PLAN.md) für `innoextract` und das
@@ -331,9 +380,10 @@ Tiefenextraktion. Details und Evidenzgrenzen stehen in
 - Für eine Wiederholung mit `usbhid-dump` wären eine menschlich freigegebene,
   temporäre Berechtigungsregel oder ein bewusst mit `sudo` ausgeführter,
   ausschließlich auf Deskriptoren begrenzter Aufruf erforderlich.
-- Der nächste weiterhin passive Erkenntnisschritt ist ein autorisierter
-  Mitschnitt legitimen Referenzverkehrs. Ohne solchen Verkehr bleibt die
-  Funktionszuordnung der beiden Interfaces unbekannt.
+- Für die Interface-/Transportzuordnung ist kein Mitschnitt mehr nötig; sie
+  wurde später statisch über Endpointcallbacks und Konfigurationsregister
+  geschlossen. Referenzverkehr wäre nur für noch offene Semantikfragen
+  relevant und bleibt an eine gesonderte Freigabe gebunden.
 
 ## Statische Updater-Funktionsanalyse 2026-07-29
 
@@ -352,7 +402,9 @@ Tiefenextraktion. Details und Evidenzgrenzen stehen in
 ### Abgeleitet
 
 - Die Nutzblockgröße stimmt mit dem 1024-Byte-Output-Report von Interface 1
-  überein. Das ist noch keine bestätigte Interfacezuordnung.
+  überein. Die spätere Firmwareanalyse bestätigt den geräteseitigen
+  1024-Byte-Pfad auf Interface 1; die Interfaceauswahl im Updater selbst ist
+  damit nicht separat belegt.
 - Der 7-Bit-Wert ist funktional eine Segmentfolge.
 
 ### Hypothesen
@@ -406,8 +458,9 @@ dokumentiert.
 ### Abgeleitete Zusammenhänge
 
 - Die `0x400`-Byte-Transportgröße passt zur bestätigten
-  1024-Byte-Outputgröße von Interface 1. Dies ist weiterhin keine direkt
-  belegte MI- oder Interfacezuordnung.
+  1024-Byte-Outputgröße von Interface 1. Die spätere Firmwareanalyse belegt
+  die geräteseitige Zuordnung direkt; eine MI-Auswahl im Windows-Updater
+  bleibt in diesem Teilbefund offen.
 - Die vier gelesenen Datenbytes verhalten sich wie ein Rückgabewert oder eine
   Bestätigung; ihre Bedeutung ist nicht belegt.
 
@@ -454,9 +507,10 @@ Die vertiefte statische Auswertung und Rohbefunde stehen in
 ### Ableitungen und Grenzen
 
 Mehrere `0x0140`-Werte und der externe Dateiname `320x320` stützen eine
-Auflösungshypothese; Breite, Höhe, Pixelformat, Interfacezuordnung und normale
-LCD-Befehlsbedeutungen bleiben offen. Die bekannten HID-Deskriptoren und die
-Reportgrößen 16/440/1024 wurden in der Nutzlast nicht direkt bestätigt.
+Auflösungshypothese; Breite, Höhe, Pixelformat und normale
+LCD-Befehlsbedeutungen bleiben offen. In diesem frühen Scan wurden die
+Reportgrößen 16/440/1024 nicht direkt bestätigt; die nachfolgende
+Ghidra-Callbackanalyse belegt sie und ihre Interfacezuordnung.
 
 Die Updaterwerte `0x45`, `0x86`, `0x09`, `0x02` und `88 01 00 80 ...` bleiben
 klar vom gefährlichen Boot-/Upgradeablauf getrennt. Es wurde nichts ausgeführt,
@@ -485,11 +539,24 @@ stehen in:
   `wValue`. Sie sind Descriptor-Typen, keine Geräteprotokollbefehle.
 - Der Protokolltask bei `0x00129d84` registriert Geräte- und
   Transportdispatcher als Callbacks.
+- Der USB-Strukturbauer bei `0x00128f8c` registriert die vier
+  Endpointcallbacks `0x0010deb8`, `0x0010df88`, `0x0010df9c` und
+  `0x0010e0a8` in der Reihenfolge Endpoint 1 bis 4.
+- Der High-Speed-Konfigurationscallback bei `0x00128e28` setzt die
+  Endpointgrößen auf `0x1b8`, `0x1b8`, `0x400` und `0x10`. Zusammen mit den
+  USB-Deskriptoren entspricht das `0x01` OUT/`0x82` IN für Interface 0 und
+  `0x03` OUT/`0x84` IN für Interface 1.
+- Derselbe Callback setzt die Reportdeskriptorzeiger für Interfaceindex 0 und
+  1 auf `0x00131330` und `0x00131350`; beide Längen sind `0x1d` = 29 Byte.
+  `GET_DESCRIPTOR 0x22` indiziert genau diese Zeiger- und Längenfelder.
 - Der 440-Byte-Empfangspfad verwendet ein 4-Byte-Steuerwort und `0x1b4` =
   436 Nutzbytes. Der Antwortbauer erzeugt ebenfalls exakt `0x1b8` = 440
   Byte.
 - Ein zweiter Empfänger verwendet ein 4-Byte-Steuerwort und `0x3fc` = 1020
   Nutzbytes, insgesamt 1024 Byte.
+- Endpointcallback 1 bei `0x0010deb8` arbeitet mit 440 Byte.
+  Endpointcallback 3 bei `0x0010df9c` ruft den 1024-Byte-Empfänger
+  `0x001297e8` direkt bei `0x0010dff4` auf.
 - Im Steuerwort sind Byte 0 der Befehlswert, Bit 31 das Kennzeichen des
   ersten Pakets und Bits 8..30 Paketanzahl beziehungsweise Segmentindex.
 - Im Gerätedispatcher ist `0x87` ein Zwei-Byte-Antwortpfad mit dem konstanten
@@ -501,10 +568,40 @@ stehen in:
 
 ### Belastbare Ableitungen
 
-Das 440-Byte-Format korreliert exakt mit dem bekannten 440-Byte-HID-Report,
-das 1024-Byte-Format mit dem bekannten 1024-Byte-Outputreport. Ohne direkte
-Xref auf Reportdeskriptor und Endpoint ist dies noch keine bestätigte MI- oder
-Interfacezuordnung.
+Die Interfacezuordnung ist nun statisch direkt belegt:
+
+| Interface | Endpoint | Firmwarecallback | Transport |
+| --- | --- | --- | --- |
+| 0 | `0x01` OUT | `0x0010deb8`, Endpoint 1 | 440-Byte-Empfang und segmentierter Empfänger `0x001296d8` |
+| 0 | `0x82` IN | `0x0010df88`, Endpoint 2 | 440-Byte-Antwortpfad |
+| 1 | `0x03` OUT | `0x0010df9c`, Endpoint 3 | direkter Aufruf des 1024-Byte-Empfängers `0x001297e8` |
+| 1 | `0x84` IN | `0x0010e0a8`, Endpoint 4 | 16-Byte-IN-Abschlusspfad; Semantik offen |
+
+`0x35` und `0x38` sind interne Ereignisse, keine USB-Endpointnummern:
+
+- Der Gerätedispatcher `0x00126dfc` ist auf dem internen Bus `0x00131528`
+  registriert und akzeptiert Ereignis `0x35`. Der Transportdispatcher stellt
+  vollständige 440-Byte-Befehle mit dem Wert `0x00008035` dorthin zu.
+- Der Transportdispatcher `0x001293f8` ist auf dem internen Bus `0x00131520`
+  registriert. Der Protokolltask stellt ihm in seiner Schleife Ereignis
+  `0x38` zu; dieser Zweig verarbeitet die 440-Byte-Queue und den
+  Antworttransfer.
+
+Die beiden beobachteten Reportdeskriptoren enthalten kein Report-ID-Item.
+Auch die Firmwarecallbacks verarbeiten exakt 440 beziehungsweise 1024 Byte
+und lesen das Steuerwort ab Byte null. Linux `hidraw.write()` verlangt
+dennoch ein separates Reportnummernbyte `00` vor dem Report und entfernt es
+im USB-HID-Treiber vor dem Interrupttransfer. Der 440-Byte-Report selbst
+beginnt daher weiterhin mit dem Steuerwort.
+
+Für `0x08` sind zwei Pfade belegt: Auf Interface 0 erreicht der Befehl über
+Endpoint 1, Ereignis `0x38`, den Segmentempfänger und Ereignis `0x35` den
+Gerätedispatcher. Dessen Case `0x08` verändert globalen Zustand und stößt
+mehrere Grafik-/Systemaufrufe an, ohne den gemeinsamen Antwortbauer
+aufzurufen. Auf Interface 1 führt Endpoint 3 über den 1024-Byte-Empfänger
+einen vollständigen Befehl `0x08` in einen gesonderten Datenqueue-/
+Zustandspfad. Eine vollständige statische Verknüpfung und die höhere
+Datenbedeutung sind nicht belegt.
 
 Für eine einpaketige leere `0x87`-Anfrage ergibt sich statisch als
 Paketkandidat:
@@ -519,10 +616,21 @@ Die vom Antwortbauer erwartbare Struktur ist:
 87 01 00 80 51 00 00 ... 00     (440 Byte)
 ```
 
-Belegt sind Headeralgorithmus, Befehl, Antwortkonstante und Längen. Nicht
-belegt sind eine mögliche Host-seitige Report-ID, das konkrete Interface und
-die vollständige indirekte Endpoint-/Callbackkette. `0x87` bleibt deshalb ein
-statischer Versionskandidat, keine Sendefreigabe.
+Belegt sind Headeralgorithmus, Befehl, Antwortkonstante, Länge und Route:
+Interface 0, `0x01` OUT für die Anfrage und `0x82` IN für die Antwort.
+Firmwareseitig existiert kein zusätzliches Report-ID-Byte. An
+`hidraw.write()` ist stattdessen `00` plus dieser 440-Byte-Kandidat, insgesamt
+441 Byte, zu übergeben; `hidraw.read()` liefert den unnummerierten
+440-Byte-Report ohne Nullpräfix. `0x87` ist damit transporttechnisch
+vollständig gerahmt, bleibt aber ein Versionskandidat und ausdrücklich keine
+Sendefreigabe.
+
+Die abschließende statische Sicherheitsbewertung stuft `0x87` als
+**wahrscheinlich rein lesend** ein. Der eigentliche Case ist konstant und
+antwortorientiert; die stärkere Aussage „nachweislich rein lesend“ scheitert
+am zustandsabhängigen gemeinsamen Peripherieprolog. Paket, Timeout,
+Abbruchkriterien und minimale Recovery stehen in
+`../research/reports/command-0x87-safety-review.md`.
 
 ### Hypothesen
 
@@ -548,11 +656,27 @@ bestätigt.
 
 ### Unbekannte Punkte und Sicherheitsentscheidung
 
-MI, Endpoint, Report-ID, die globalen Bedeutungen der kurzen Antwortwerte und
-mehrere indirekte Callbackziele sind offen. Die Ghidra-Call-Graph-Suche konnte
-LCM/emWin, Boot-/JPG- und SPI-String-Eigentümer wegen indirekter Aufrufe nicht
-lückenlos mit den Dispatchern verbinden.
+Offen bleiben die Semantik des 16-Byte-IN-Pfads von Interface 1, die höheren
+Bedeutungen und die Verbindung der beiden `0x08`-Pfade, die Bedeutungen der
+kurzen Antwortwerte sowie mehrere indirekte Callbackziele. Die
+Ghidra-Call-Graph-Suche konnte LCM/emWin, Boot-/JPG- und SPI-String-Eigentümer
+wegen indirekter Aufrufe nicht lückenlos mit den Dispatchern verbinden.
 
-Ein kontrollierter Einzeltest ist auf diesem Stand nicht empfohlen. Es wurde
-keine Firmware ausgeführt oder emuliert, kein USB-/HID-Gerät geöffnet und
-nichts an die AIO gesendet.
+Zum Stand dieser statischen Analyse vom 2026-07-29 war ein kontrollierter
+Einzeltest noch nicht freigegeben. In dieser Analyse wurde keine Firmware
+ausgeführt oder emuliert, kein USB-/HID-Gerät geöffnet und nichts an die AIO
+gesendet.
+
+## Realer Einmaltest `0x87` am 2026-08-05
+
+Der später gesondert autorisierte Test ist unter
+`../research/reports/command-0x87-live-test-01.md` vollständig dokumentiert.
+Sein Ergebnis bestätigt die 440-Byte-Antwortlänge, aber nicht die statisch
+erwartete Antwortfolge. Da die Antwortbytes nicht gespeichert wurden, bleiben
+Art und Position der Abweichung unbekannt.
+
+Der Test wurde nicht wiederholt. Das Gerät wurde sofort geschlossen, die
+temporäre Schreibregel entfernt und für beide Interfaces wieder `0640`
+bestätigt. Die AIO blieb normal erkennbar; im geprüften Kernelprotokoll gab es
+keine testbedingten USB-Fehler, Resets oder Disconnects. Dieses Ergebnis
+erteilt keine Wiederholungsfreigabe.

@@ -5,7 +5,11 @@ USB bRequest 0x06 / Descriptor-Typ 0x03	0x0012c494	String-Descriptor-Tabelle und
 USB bRequest 0x06 / Descriptor-Typ 0x06	0x0012c40c	Device-Qualifier-Descriptor und wLength	USB-Control-Antwortzustand	USB-Deskriptor	niedrig im Standard-USB-Kontext	Descriptor-Typ und Längenquelle beobachtet; Descriptorname aus USB-Standard abgeleitet
 USB bRequest 0x06 / Descriptor-Typ 0x07	0x0012c42c	Other-Speed-Config-Quelle und wLength	USB-Control-Antwortzustand	USB-Deskriptor	niedrig im Standard-USB-Kontext	Descriptor-Typ und zwei geschwindigkeitsabhängige Quellen beobachtet
 USB bRequest 0x06 / Descriptor-Typ 0x21	0x0012c4c0	0x21-Descriptorquelle und wLength	USB-Control-Antwortzustand	HID-Descriptor	niedrig im Standard-USB-Kontext	Descriptor-Typ und Längenquelle beobachtet; HID-Bedeutung aus USB/HID-Standard abgeleitet
-USB bRequest 0x06 / Descriptor-Typ 0x22	0x0012c4e0	indizierte 0x22-Descriptorquelle und wLength	USB-Control-Antwortzustand	HID-Reportdeskriptor	niedrig im Standard-USB-Kontext	Descriptor-Typ, wValue-Index und Längenquelle beobachtet; Bedeutung aus HID-Standard abgeleitet
+USB bRequest 0x06 / Descriptor-Typ 0x22	0x0012c4e0	indizierte Reportdeskriptorzeiger bei Struktur +0x1c/+0x20 und Längen bei +0x5c/+0x60	USB-Control-Antwortzustand	HID-Reportdeskriptor	niedrig im Standard-USB-Kontext	High-Speed-Zeiger 0x00131330/0x00131350 und je 0x1d Byte direkt in Ghidra verfolgt; wIndex wählt Interface 0/1
+USB Endpoint 1 / 0x01 OUT	0x0010deb8	440-Byte-Endpointpuffer; Spezialfall Befehlsbyte 0xff	interner Event 0x35 und Empfangszustand	Interface 0 / 440-Byte-Empfang	hoch/offen	Callbackslot +0x98; High-Speed-MPS 0x1b8; gewöhnlicher segmentierter Pfad wird durch internes Ereignis 0x38 verarbeitet
+USB Endpoint 2 / 0x82 IN	0x0010df88	440-Byte-Antworttransfer	Transferzustand	Interface 0 / 440-Byte-Antwort	hoch/offen	Callbackslot +0x9c; High-Speed-MPS 0x1b8; kurzer Completion-Callback
+USB Endpoint 3 / 0x03 OUT	0x0010df9c	1024-Byte-Endpointpuffer	1024-Byte-Segmentzustand; bei 0xff interner Event 0x35	Interface 1 / 1024-Byte-Empfang	hoch/offen	Callbackslot +0xa0; High-Speed-MPS 0x400; direkter Call zu 0x001297e8 bei 0x0010dff4
+USB Endpoint 4 / 0x84 IN	0x0010e0a8	16-Byte-Transfer	Transferzustand	Interface 1 / 16-Byte-IN-Pfad	offen	Callbackslot +0xa4; High-Speed-MPS 0x10; kurzer Completion-Callback, Semantik offen
 0x00	0x00126dfc	kein Nutzdatenzugriff sichtbar	keine Antwort sichtbar	Geräteprotokoll	offen	Ghidra-Decompiler gibt 0 zurück
 0x01..0x07	0x00126dfc	keine Nutzdaten sichtbar	leere 440-Byte-Antwort über gemeinsamen Paketbauer	Geräteprotokoll	hoch/offen	Controlflow zum gemeinsamen Leerantwortpfad; 0x02 bleibt wegen Updaterkontext ausgeschlossen
 0x08	0x00126dfc	Anzeige-/Systemzustand	mehrere globale Zustände	Grafik/System	hoch	direkte Aufrufe und Zustandsänderungen im Decompiler
@@ -28,7 +32,7 @@ USB bRequest 0x06 / Descriptor-Typ 0x22	0x0012c4e0	indizierte 0x22-Descriptorque
 0x1b	0x00126dfc	Payload und Konfigurationsstruktur	Konfiguration und persistenznaher Pfad	Konfiguration/Storage	hoch	direkte Strukturmutation und FUN_00126814
 0x1c	0x00126dfc	Payload und Konfigurationslänge	Konfigurationspuffer und persistenznaher Pfad	Konfiguration/Storage	hoch	direkte Kopie und FUN_00126814
 0x1d	0x00126dfc	4-Byte-Payload	Konfigurations-DWORD	Konfiguration	hoch	direkte Mutation
-0x1e	0x00126dfc	globales Halbwort	2-Byte-Antwort	Status/Diagnose möglich	niedrig bis offen	nur Lesen plus gemeinsamer Antwortbauer im Handler sichtbar; Semantik und Interface offen
+0x1e	0x00126dfc	globales Halbwort	2-Byte-Antwort	Status/Diagnose möglich	niedrig bis offen	nur Lesen plus gemeinsamer Antwortbauer im Handler sichtbar; Semantik offen, Transport über Interface 0 bestätigt
 0x1f	0x00126dfc	1-Byte-Payload	Modusbyte; kann Bootcallback anlegen	Boot/Modus	hoch	direkte Mutation und Referenz auf FUN_001268d0
 0x80	0x00126dfc	globaler 8-Byte-Puffer	8-Byte-Antwort	Status/Identität möglich	niedrig bis offen	nur Quelle plus gemeinsamer Antwortbauer im Handler sichtbar
 0x81	0x00126dfc	Strukturbyte	1-Byte-Antwort	Status möglich	niedrig bis offen	nur Quelle plus gemeinsamer Antwortbauer im Handler sichtbar
@@ -37,14 +41,14 @@ USB bRequest 0x06 / Descriptor-Typ 0x22	0x0012c4e0	indizierte 0x22-Descriptorque
 0x84	0x00126dfc	erstes Konfigurationsbyte	1-Byte-Antwort	Display-/Konfigurationszustand möglich	niedrig bis offen	nur Quelle plus gemeinsamer Antwortbauer im Handler sichtbar
 0x85	0x00126dfc	0x20 Konfigurationsbytes	0x20-Byte-Antwort	Gerätekennung/Konfiguration möglich	offen	nur Quelle plus gemeinsamer Antwortbauer im Handler sichtbar; sensible Daten möglich
 0x86	0x00126dfc	variabler Konfigurations-/Transferpuffer	variable Antwort	Firmware/Transfer	kritisch	normaler Antwortzweig sichtbar, aber Updater belegt Firmwareblocktransfer; modusabhängig
-0x87	0x00126dfc	Konstante 0x0051	2-Byte-Antwort	Version möglich	niedrig bis offen	stärkster statischer Versionskandidat; gemeinsamer Antwortbauer, Interface/Report-ID offen
+0x87	0x00126dfc	Konstante 0x0051	2-Byte-Nutzantwort in 440-Byte-Report	Version möglich	niedrig bis offen	stärkster statischer Versionskandidat; Interface 0, EP 0x01 OUT und EP 0x82 IN statisch zugeordnet; keine firmwareseitige Report-ID, Host-API-Präfix offen
 0x88	0x00128bc0	SPI-Bereich 0x21000	bedingt SPI-Bereich 0x21000	SPI-Flash	kritisch	Sonderzweig des Transportdispatchers; direkter Calltree zu FUN_0012a6d8 und FUN_0012a814
 0xfd	0x00126dfc	keine Nutzdaten	leere Antwort	Geräteprotokoll	hoch/offen	Antwortbau bestätigt; Semantik unbekannt
 0xfe	0x00126dfc	0x3c-Byte-Payload	Identitäts-/Konfigurationsdaten und persistenznaher Pfad	Identität/Storage	hoch	Herstellertext, Vergleich, Mutation und FUN_00126814 sichtbar
 0xff	0x00126dfc	Payload-DWORD	indirekter Callback	Ereignissystem	hoch/unklar	nur bei Payload-DWORD 1; unaufgelöster indirekter Zielpfad
 Transportereignis 0x03	0x001293f8	Transportkonstanten	440-Byte-Queue und zwei 0x32000-Puffer	Transport	hoch/offen	Initialisierungspfad beobachtet
 Transportereignis 0x06	0x001293f8	kein Zugriff sichtbar	keiner sichtbar	Transport	niedrig/offen	direkter Rückgabepfad; keine Statusantwort
-Transportereignis 0x38	0x001293f8	440-Byte-Empfangsqueue	440-Byte-Sendequeue und Callbackzustellung	Transport	hoch/offen	segmentierter Empfang, Sonderfall 0x88 und Antworttransfer beobachtet
+Transportereignis 0x38	0x001293f8	440-Byte-Empfangsqueue von Interface 0 / EP 0x01 OUT	440-Byte-Antwortpfad zu Interface 0 / EP 0x82 IN und interner Event 0x35	Interner Transporttick	hoch/offen	von 0x00129d84 wiederholt auf internem Bus 0x00131520 gepostet; kein rohes USB-Ereignis
 Transportereignis 0x3b	0x001293f8	Callbackparameter	Antwortpaket mit Befehl 0xff	Transport	hoch/offen	direkter Call zum Antwortbauer; Semantik unbekannt
 Updater 0x45	Windows-Updater 0x402d17	keine Anfragedaten	Gerätekonfiguration	Konfigurationslöschung	kritisch	direkt nach UI-Text Wiping configuration
 Updater 0x09	Windows-Updater 0x402f40	Abschlussstruktur	Upgrade-Completion-Flag	Firmwareupgrade	kritisch	durch Updaterablauf belegt

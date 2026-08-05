@@ -1,60 +1,160 @@
 PROGRAM	device-firmware-v51.bin
-MAX_DEPTH	12
-NOTE	Only statically resolved calls represented by Ghidra are traversed.
+ANALYSIS_DATE	2026-07-29
+SCOPE	Static Ghidra analysis only; no emulation, USB/HID access, or device communication.
+GHIDRA	Ghidra 12.1; ARM:LE:32:v5t:default; load base 0x00100000
 
-SOURCE	00126dfc	device command dispatcher	00126dfc:device_command_dispatch_candidate
-TARGET	0010ccd0	LCM diagnostic-string owner	0010ccd0:FUN_0010ccd0
-PATH	NOT_FOUND
-TARGET	0010ee20	emWin diagnostic-string owner	0010ee20:FUN_0010ee20
-PATH	NOT_FOUND
-TARGET	001268d0	boot diagnostic-string owner	001268d0:FUN_001268d0
-PATH	NOT_FOUND
-TARGET	00127660	serial-number diagnostic-string owner	00127660:FUN_00127660
-PATH	NOT_FOUND
-TARGET	00127854	boot/JPG path owner	00127854:FUN_00127854
-PATH	NOT_FOUND
-TARGET	0012a5ac	SPI-flash diagnostic-string owner	0012a5ac:FUN_0012a5ac
-PATH	NOT_FOUND
+RESULT
+The high-speed USB configuration, endpoint callback table, callback bodies,
+and protocol task form a direct static chain:
 
-SOURCE	001293f8	transport dispatcher	001293f8:transport_dispatch_candidate
-TARGET	0010ccd0	LCM diagnostic-string owner	0010ccd0:FUN_0010ccd0
-PATH	NOT_FOUND
-TARGET	0010ee20	emWin diagnostic-string owner	0010ee20:FUN_0010ee20
-PATH	NOT_FOUND
-TARGET	001268d0	boot diagnostic-string owner	001268d0:FUN_001268d0
-PATH	NOT_FOUND
-TARGET	00127660	serial-number diagnostic-string owner	00127660:FUN_00127660
-PATH	NOT_FOUND
-TARGET	00127854	boot/JPG path owner	00127854:FUN_00127854
-PATH	NOT_FOUND
-TARGET	0012a5ac	SPI-flash diagnostic-string owner	0012a5ac:FUN_0012a5ac
-PATH	NOT_FOUND
+  HID interface 0
+    EP 0x01 OUT, 440 bytes
+      -> endpoint-1 callback 0x0010deb8
+      -> 440-byte receive queue
+      -> internal event 0x38
+      -> transport dispatcher 0x001293f8
+      -> segmented 440-byte receiver 0x001296d8
+      -> internal event 0x35
+      -> device dispatcher 0x00126dfc
+    EP 0x82 IN, 440 bytes
+      <- 440-byte response builder 0x001298f8
+      <- transport dispatcher response transfer
+      -> endpoint-2 completion callback 0x0010df88
 
-SOURCE	0012c12c	USB setup request dispatcher	0012c12c:usb_setup_request_dispatch
-TARGET	0010ccd0	LCM diagnostic-string owner	0010ccd0:FUN_0010ccd0
-PATH	NOT_FOUND
-TARGET	0010ee20	emWin diagnostic-string owner	0010ee20:FUN_0010ee20
-PATH	NOT_FOUND
-TARGET	001268d0	boot diagnostic-string owner	001268d0:FUN_001268d0
-PATH	NOT_FOUND
-TARGET	00127660	serial-number diagnostic-string owner	00127660:FUN_00127660
-PATH	NOT_FOUND
-TARGET	00127854	boot/JPG path owner	00127854:FUN_00127854
-PATH	NOT_FOUND
-TARGET	0012a5ac	SPI-flash diagnostic-string owner	0012a5ac:FUN_0012a5ac
-PATH	NOT_FOUND
+  HID interface 1
+    EP 0x03 OUT, 1024 bytes
+      -> endpoint-3 callback 0x0010df9c
+      -> segmented 1024-byte receiver 0x001297e8
+    EP 0x84 IN, 16 bytes
+      -> endpoint-4 completion callback 0x0010e0a8
 
-SOURCE	0012ced0	USB event dispatcher	0012ced0:usb_event_dispatch_candidate
-TARGET	0010ccd0	LCM diagnostic-string owner	0010ccd0:FUN_0010ccd0
-PATH	NOT_FOUND
-TARGET	0010ee20	emWin diagnostic-string owner	0010ee20:FUN_0010ee20
-PATH	NOT_FOUND
-TARGET	001268d0	boot diagnostic-string owner	001268d0:FUN_001268d0
-PATH	NOT_FOUND
-TARGET	00127660	serial-number diagnostic-string owner	00127660:FUN_00127660
-PATH	NOT_FOUND
-TARGET	00127854	boot/JPG path owner	00127854:FUN_00127854
-PATH	NOT_FOUND
-TARGET	0012a5ac	SPI-flash diagnostic-string owner	0012a5ac:FUN_0012a5ac
-PATH	NOT_FOUND
+The 440-byte path is therefore assigned to interface 0 and the 1024-byte
+receive path to interface 1. This conclusion is based on direct callback and
+controller-configuration references, not only matching sizes.
 
+HID_DESCRIPTOR_TABLE
+Builder 0x00128f8c fills the USB descriptor/callback structure at 0x00451b40.
+
+  structure offset  value / role
+  +0x1c            report descriptor pointer for interface index 0
+  +0x20            report descriptor pointer for interface index 1
+  +0x5c            report descriptor length for interface index 0
+  +0x60            report descriptor length for interface index 1
+  +0x80            high-speed configuration callback 0x00128e28
+  +0x84            full-speed configuration callback 0x00128ce4
+  +0x98            endpoint-1 callback 0x0010deb8
+  +0x9c            endpoint-2 callback 0x0010df88
+  +0xa0            endpoint-3 callback 0x0010df9c
+  +0xa4            endpoint-4 callback 0x0010e0a8
+  +0xac            endpoint-state callback 0x00128ca0
+
+High-speed callback 0x00128e28 writes:
+
+  interface index 0 report pointer  0x00131330
+  interface index 0 report length   0x1d = 29
+  interface index 1 report pointer  0x00131350
+  interface index 1 report length   0x1d = 29
+
+Full-speed fallback 0x00128ce4 uses the shared pointer 0x00131370 for both
+indices and also stores 0x1d for both lengths. USB GET_DESCRIPTOR type 0x22
+at 0x0012c4e0 indexes these pointer/length slots using wIndex.
+
+The observed 29-byte descriptors contain no Report-ID item. The endpoint
+callbacks and segment receivers operate on exactly 440 or 1024 bytes, with
+the transport control word starting at byte zero. No additional on-wire
+Report-ID byte is visible in the firmware path.
+
+ENDPOINT_CONFIGURATION
+The high-speed callback 0x00128e28 configures four consecutive controller
+endpoint blocks at base 0xb1008000:
+
+  endpoint callback slot  size value  known USB endpoint  interface
+  endpoint 1              0x1b8       0x01 OUT            0
+  endpoint 2              0x1b8       0x82 IN             0
+  endpoint 3              0x400       0x03 OUT            1
+  endpoint 4              0x10        0x84 IN             1
+
+The size values occur at controller offsets +0x78, +0xa0, +0xc8, and +0xf0.
+They match the statically recorded USB/HID descriptors exactly. The
+full-speed fallback writes 0x40 for these transfer-size slots; it is not the
+configuration represented by the recorded high-speed descriptors.
+
+ENDPOINT_CALLBACKS
+0x0010deb8, endpoint 1:
+  - obtains a 0x1b8-byte buffer;
+  - arms controller endpoint selector 1 for 0x1b8 bytes;
+  - handles the special low-byte command 0xff through internal event 0x35;
+  - leaves ordinary segmented commands for the transport event path.
+
+0x0010df88, endpoint 2:
+  - is the short completion callback for the paired 440-byte IN path;
+  - clears its transfer state.
+
+0x0010df9c, endpoint 3:
+  - arms controller endpoint selector 3 for 0x400 bytes;
+  - directly calls 0x001297e8;
+  - the callee copies 0x3fc bytes after a four-byte control word;
+  - completed command 0xff is forwarded through internal event 0x35;
+  - completed command 0x08 is moved into the associated data queue/state.
+
+0x0010e0a8, endpoint 4:
+  - is the short completion callback for the 16-byte IN path;
+  - clears its transfer state.
+
+EVENT_0x35
+Device dispatcher 0x00126dfc accepts event 0x35. Protocol task 0x00129d84
+registers it on internal bus object 0x00131528. Transport dispatcher
+0x001293f8 posts value 0x00008035 to that bus after a complete 440-byte
+request; endpoint callbacks also use this event for special 0xff handling.
+The 0x8000 bit is an internal event-system flag. Event 0x35 is not a raw USB
+endpoint number.
+
+EVENT_0x38
+Protocol task 0x00129d84 registers transport dispatcher 0x001293f8 on
+internal bus object 0x00131520 and repeatedly posts event 0x38 to that bus.
+The 0x38 branch consumes the 440-byte receive queue, calls 0x001296d8,
+delivers complete commands as event 0x35, and services 440-byte responses.
+Event 0x38 is an internal transport tick/dispatch event, not a raw USB event.
+
+REQUESTED_FUNCTION_CALLERS
+0x001293f8
+  function pointer stored at 0x00129fb0
+  registered by 0x00129d84 at instruction 0x00129e88
+
+0x001296d8
+  direct call from 0x001293f8 at 0x00129528
+
+0x001297e8
+  direct call from endpoint-3 callback 0x0010df9c at 0x0010dff4
+
+0x00129d84
+  reached from startup function 0x001001bc by computed call at 0x001001dc
+
+REPORT_ID_AND_HOST_API_BOUNDARY
+The firmware contains no declared Report ID and parses its four-byte control
+word from the first byte received from the endpoint. A possible leading zero
+required only by a host HID API is outside the device-side transfer and cannot
+be proven or disproven by this firmware alone. Such an API prefix, if needed,
+must not be counted among the 440 on-wire bytes.
+
+0x87_IMPACT
+The 0x87 candidate is statically closer to a future controlled test:
+
+  request route   interface 0 -> EP 0x01 OUT -> 440-byte dispatcher
+  response route  440-byte response builder -> EP 0x82 IN -> interface 0
+  wire payload    exactly 440 bytes, no firmware-visible Report-ID byte
+
+This removes the interface/endpoint ambiguity but is not a send authorization.
+The host-API prefix convention and the safety/abort plan remain unresolved.
+
+OPEN_POINTS
+- Whether the selected Linux HID API requires a separate leading report-number
+  byte even though the on-wire report has no Report ID.
+- The semantic meaning of the 16-byte interface-1 IN path.
+- The normal higher-level meaning of interface-1 command 0x08 data.
+- Runtime reconstruction of the descriptor bytes behind 0x00131330,
+  0x00131350, and the full-speed fallback 0x00131370 from the flat image.
+
+SAFETY
+No firmware was executed or emulated. No USB/HID device was opened. No data,
+feature report, output report, or control transfer was sent to the AIO.
