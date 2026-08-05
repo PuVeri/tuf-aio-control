@@ -220,8 +220,8 @@ gespeichert.
 | Status | beobachtet; Antwortinhalt mangels Rohbytes nicht weiter auswertbar |
 
 ```text
-Gesendet an hidraw: 00 | 87 01 00 80 | 436-mal 00
-Erwartete Antwort:  87 01 00 80 51 00 | 434-mal 00
+Gesendet an hidraw:     00 | 87 01 00 80 | 436-mal 00
+v51-spezifisch erwartet: 87 01 00 80 51 00 | 434-mal 00
 Beobachtete Antwort: exakt 440 Byte, Inhalt abweichend, Bytes nicht gespeichert
 ```
 
@@ -231,8 +231,12 @@ schloss sofort und sendete nichts nach. Die temporäre Schreibregel wurde
 anschließend entfernt; beide Interfaces besitzen wieder `0640`.
 
 **Mögliche Bedeutung:** Ohne die tatsächlichen Antwortbytes ist keine
-belastbare Aussage möglich, welches Feld abwich oder ob eine Transport-, Queue-,
-Zustands- oder Semantikannahme falsch war.
+belastbare Aussage möglich, welches Feld abwich. Der zuvor gesicherte
+USB-Deskriptor meldet `bcdDevice 0.49`, während die analysierte v51-Firmware im
+`0x87`-Pfad `0x0051` enthält. Ein firmwareversionsabhängiger Antwortwert ist
+damit die stärkste Hypothese. Ein nach dem Öffnen eingetroffener alter oder
+unabhängiger Report bleibt wegen der fehlenden Pre-Write-Queueprüfung ebenfalls
+möglich, ist aber nicht beobachtet.
 
 **Nächste passive Prüfung:** Weitere statische Analyse vorhandener Firmware-
 und Transportartefakte. Keine Wiederholung allein zur Gewinnung der fehlenden
@@ -273,6 +277,8 @@ Offset  Hexadezimale Bytes
 | --- | --- | --- | --- | --- | --- |
 | H-001 | Interface 1 trägt den 1024-Byte-Empfangspfad; die Bedeutung als LCD-/Bilddatenpfad bleibt offen. | Direkter Call von Endpointcallback 3 zu `0x001297e8`; High-Speed-MPS `0x400`. | Befehl `0x08` und Datenbedeutung sind noch nicht vollständig aufgelöst. | Statisch den `0x08`-Folgepfad verfolgen. | Transportzuordnung bestätigt als C-009; Semantik offen |
 | H-002 | Interface 0 verwendet die symmetrische 440-Byte-Anfrage-/Antwortstruktur. | Endpointcallbacks 1/2, High-Speed-MPS `0x1b8`/`0x1b8` und 440-Byte-Antwortbauer. | Keine Gegenbeobachtung im statischen Pfad. | Keine weitere Prüfung für die Interfacezuordnung nötig. | bestätigt als C-008 |
+| H-003 | `0x87` liefert einen firmwarebuildabhängigen Versionswert; für die analysierte v51-Binärdatei ist er `0x0051`, beim mit `bcdDevice 0.49` erfassten Gerät könnte er `0x0049` sein. | v51-Dateiname und statische `0x0051`-Konstante; gesicherter USB-Deskriptor mit `bcdDevice 0.49`. | Die Live-Antwortbytes fehlen; weder `0x0049` noch die Versionssemantik wurden zur Laufzeit bestätigt. | Firmwareidentität rein lesend erneut erfassen; keine Testwiederholung allein zur Bestätigung. | starke Hypothese |
+| H-004 | Beim Einmaltest wurde ein nach `open()` eingetroffener alter oder unabhängiger Interface-0-Report vor der neuen `0x87`-Antwort gelesen. | Das Programm prüft die Queue vor dem Write nicht und liest danach den ältesten verfügbaren Report; mehrere Antworttypen teilen den 440-Byte-IN-Pfad. | Ein Linux-Altbestand von vor `open()` ist für die neue per-Open-Queue ausgeschlossen; die Live-Bytes fehlen und belegen keinen fremden Befehl. | Zeitlich begrenzete, rein lesende Ruhezustandsbeobachtung und spätere Pre-Write-Readiness-Prüfung mit Abbruch. | technisch plausibel, nicht belegt |
 
 Hypothesen sind keine Implementierungsvorgaben. Sie werden bei neuen
 Beobachtungen aktualisiert, bestätigt oder ausdrücklich widerlegt.
@@ -297,6 +303,11 @@ Beobachtungen aktualisiert, bestätigt oder ausdrücklich widerlegt.
 | C-014 | Der vollständige `0x87`-Handlerpfad ist nicht streng schreibfrei: Ein gemeinsamer Prolog kann abhängig von Konfigurationsmodus und Initialisierungsflag RAM- sowie Peripherieregister verändern. Sein rekursiver direkter Unterbaum und der Antwortbauer erreichen keinen bekannten Flash-, SPI-, Dateisystem-, Boot-, Reset- oder persistenten Konfigurationspfad. | Ghidra: `0x00126dfc`, `0x0010dd58`, rekursiver direkter Call-Graph ab `0x0010dd58` und `0x001298f8`. | 2026-07-29 |
 | C-015 | Der nachgelagerte Fatal-/Stop-Pfad `0x0012a218` wird im 440-Byte-Sendezweig nur für ein erstes Paketbyte `0xff` erreicht. Die korrekt gebaute `0x87`-Antwort verlässt den Zweig vorher. | Ghidra: `transport_dispatch_candidate` `0x001293f8`, Prüfung vor `0x00129674..0x00129678`. | 2026-07-29 |
 | C-016 | Ein einmaliger realer `0x87`-Test auf Interface 0 sendete den festgelegten 441-Byte-hidraw-Puffer und empfing einen 440-Byte-Report, dessen Inhalt von der erwarteten Gesamtfolge abwich. Die Antwortbytes wurden nicht gespeichert; eine byteweise Aussage ist daher nicht möglich. | Bedienerbericht und Abbruchverhalten von `src/test_command_0x87.py`; kein Rohmitschnitt. | 2026-08-05 |
+| C-017 | Eine neu geöffnete `hidraw`-Datei erhält eine eigene, anfangs leere Eingabequeue; `read()` liefert den ältesten darin vorhandenen Report. Vor `open()` bereits vom Host empfangene Reports werden nicht in diesen neuen per-Open-Puffer übernommen. | Linux-`hidraw.c`: nullinitialisierte `hidraw_list` in `hidraw_open()`, Einreihen in `hidraw_report_event()`, Lesen und Fortschalten von `tail` in `hidraw_read()`. | 2026-08-05 |
+| C-018 | `test_command_0x87.py` prüft nach `open()` die Geräteidentität, aber nicht die Eingabebereitschaft vor dem Write. Nach dem Write liest es genau einmal den ersten verfügbaren Report. | Statischer Kontrollfluss von `_run_once()`: `open` → `_validate_open_target` → ein `write` → ein `select` → ein `read`. | 2026-08-05 |
+| C-019 | Für die analysierte v51-Firmware ist die kurze `0x87`-Antwort fest positioniert: Headermaske `0x800000ff`, ein Paket, `0x0051` an Offset 4/5 und Nullbytes bis Offset 439. Der gemeinsame Prolog verändert diese Builderargumente nicht. | Ghidra `0x00127588..0x001275c8` und `0x001298f8`; gezielte Literalprüfung bei `0x00129ad4`. | 2026-08-05 |
+| C-020 | Der 440-Byte-Antwortbauer und sein Queueobjekt werden von mehreren Befehlsantworten sowie einem transportseitigen `0xff`-Pfad gemeinsam verwendet; diese Reporttypen laufen über den Interface-0-IN-Pfad. | Ghidra-Call-Sites `0x00127178`, `0x001275c8`, `0x0012968c`, Queuezeiger `0x003b5ee0` und Endpointzuordnung aus `ghidra-dispatcher-call-paths.txt`. | 2026-08-05 |
+| C-021 | Der am 2026-07-29 gesicherte USB-Gerätedeskriptor meldet `bcdDevice 0.49`. | `captures/usb-descriptor-0b05-1c7b.txt`. | 2026-08-05 |
 
 Die Reportgrößen und das Host-Framing von Interface 0 sind bestätigt.
 Weiterhin offen sind mehrere Inhalts- und Befehlssemantiken.
@@ -610,13 +621,14 @@ Paketkandidat:
 87 01 00 80 00 ... 00     (440 Byte)
 ```
 
-Die vom Antwortbauer erwartbare Struktur ist:
+Die vom Antwortbauer der analysierten v51-Firmware erwartbare Struktur ist:
 
 ```text
 87 01 00 80 51 00 00 ... 00     (440 Byte)
 ```
 
-Belegt sind Headeralgorithmus, Befehl, Antwortkonstante, Länge und Route:
+Für die analysierte v51-Binärdatei belegt sind Headeralgorithmus, Befehl,
+Antwortkonstante, Länge und Route:
 Interface 0, `0x01` OUT für die Anfrage und `0x82` IN für die Antwort.
 Firmwareseitig existiert kein zusätzliches Report-ID-Byte. An
 `hidraw.write()` ist stattdessen `00` plus dieser 440-Byte-Kandidat, insgesamt
@@ -671,12 +683,31 @@ gesendet.
 
 Der später gesondert autorisierte Test ist unter
 `../research/reports/command-0x87-live-test-01.md` vollständig dokumentiert.
-Sein Ergebnis bestätigt die 440-Byte-Antwortlänge, aber nicht die statisch
-erwartete Antwortfolge. Da die Antwortbytes nicht gespeichert wurden, bleiben
-Art und Position der Abweichung unbekannt.
+Sein Ergebnis bestätigt die 440-Byte-Antwortlänge, aber nicht die statisch für
+v51 erwartete Antwortfolge. Da die Antwortbytes nicht gespeichert wurden,
+bleiben Art und Position der Abweichung unbekannt.
+
+Die anschließende rein statische Ursachenanalyse steht in
+`../research/reports/command-0x87-unexpected-response-analysis.md`. Sie
+bestätigt, dass der v51-Builder `0x0051` fest an Offset 4/5 platziert und den
+Header für die kurze Antwort nicht zustandsabhängig verändert. Der gemeinsame
+Prolog erzeugt keine alternative `0x87`-Antwort.
+
+Die exakte Erwartung war jedoch nicht als versionsübergreifende Invariante
+belegt: Der vorhandene Gerätedeskriptor meldet `bcdDevice 0.49`, während nur die
+v51-Binärdatei analysiert wurde. Ein versionsabhängiger Wert ist deshalb die
+stärkste Erklärung. Zusätzlich bleibt ein nach `open()` eingetroffener alter
+oder unabhängiger Report möglich. Die Einmaltest-Implementierung prüft die Queue
+vor dem Write nicht und liest danach den ältesten verfügbaren Report. Ein
+Hostqueue-Altbestand aus der Zeit vor `open()` ist dagegen durch die per-Open-
+Queue von Linux ausgeschlossen.
 
 Der Test wurde nicht wiederholt. Das Gerät wurde sofort geschlossen, die
 temporäre Schreibregel entfernt und für beide Interfaces wieder `0640`
 bestätigt. Die AIO blieb normal erkennbar; im geprüften Kernelprotokoll gab es
 keine testbedingten USB-Fehler, Resets oder Disconnects. Dieses Ergebnis
-erteilt keine Wiederholungsfreigabe.
+erteilt keine Wiederholungsfreigabe. Vor jeder späteren Neubewertung sind
+Firmwareidentität und ein möglicher spontaner Reportstrom von Interface 0 rein
+lesend zu prüfen; ein endgültiger Testdeskriptor müsste vor dem Write auf
+Eingabebereitschaft geprüft werden und bei jedem vorhandenen Report ohne Write
+schließen.

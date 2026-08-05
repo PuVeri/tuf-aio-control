@@ -52,6 +52,10 @@ freigegeben.
   Paket; Bits 8..30 enthalten Paketanzahl beziehungsweise Segmentindex.
 - Der Antwortbauer erzeugt segmentierte 440-Byte-Pakete. In diesem Pfad wurde
   keine Transportprüfsumme erkannt.
+- Linux führt für jeden neu geöffneten `hidraw`-Dateideskriptor eine eigene,
+  zunächst leere Inputqueue. Ein Read liefert den ältesten seit diesem Öffnen
+  für den Deskriptor eingereihten Report.
+- Der gesicherte USB-Gerätedeskriptor meldet `bcdDevice 0.49`.
 - USB `GET_DESCRIPTOR` wird separat vom Geräteprotokoll verarbeitet. Die
   Werte `0x01`, `0x02`, `0x03`, `0x06`, `0x07`, `0x21` und `0x22` sind dort
   Descriptor-Typen und keine Gerätebefehle.
@@ -73,25 +77,40 @@ freigegeben.
 
 ## Stärkster aktueller Kandidat: `0x87`
 
-`0x87` erzeugt eine Zwei-Byte-Antwort mit dem konstanten Wert `0x0051`.
-Der statisch abgeleitete Ein-Paket-Kandidat lautet:
+In der analysierten v51-Firmware erzeugt `0x87` eine Zwei-Byte-Antwort mit dem
+konstanten Wert `0x0051`. Der dafür statisch abgeleitete Ein-Paket-Kandidat
+lautet:
 
 ```text
 Anfrage, 440 Byte:  87 01 00 80 00 ... 00
 Antwort, 440 Byte:  87 01 00 80 51 00 00 ... 00
 ```
 
-Headeralgorithmus, Befehlswert, Antwortkonstante und Länge sind belegt.
+Headeralgorithmus, Befehlswert, Antwortkonstante und Länge sind für diese
+v51-Binärdatei belegt.
 Die Bedeutung als Versionsabfrage ist eine starke, aber noch nicht endgültig
 bestätigte Ableitung. Die Route ist nun ebenfalls belegt: Interface 0,
 `0x01` OUT für die Anfrage und `0x82` IN für die Antwort. Das Paket ist keine
 Sendefreigabe.
 
 Im realen Einmaltest wurde zwar eine Antwort mit exakt 440 Byte empfangen, ihr
-Inhalt wich jedoch von der statisch erwarteten Gesamtfolge ab. Die Antwortbytes
-wurden nicht gespeichert und können deshalb nicht nachträglich ausgewertet
-werden. Die statische Erwartung ist damit für diesen Lauf nicht praktisch
-bestätigt; die konkrete Abweichung bleibt unbekannt.
+Inhalt wich jedoch von der für v51 statisch erwarteten Gesamtfolge ab. Die
+Antwortbytes wurden nicht gespeichert und können deshalb nicht nachträglich
+ausgewertet werden. Die konkrete Abweichung bleibt unbekannt.
+
+Die stärkste statische Erklärung ist ein anderer Firmwarestand: Der vorhandene
+Gerätedeskriptor meldet `bcdDevice 0.49`, während die untersuchte Binärdatei aus
+dem v51-Paket stammt und `0x0051` enthält. Ein Antwortwert `0x0049` ist deshalb
+plausibel, aber mangels Antwortbytes nicht bestätigt. Die Folge
+`87 01 00 80 51 00 | 434 × 00` ist eine v51-spezifische Erwartung, keine
+belegte versionsübergreifende Invariante.
+
+Ein alter oder unabhängiger Report ist ebenfalls möglich, aber nicht belegt.
+Das Einmaltestprogramm prüft nach dem Öffnen die Inputqueue nicht und liest nach
+dem Write genau den ältesten verfügbaren Report. Ein bereits vor `open()` vom
+Host empfangener Report kann nicht in der neuen per-Open-Queue liegen; ein noch
+geräte-/firmwareseitig ausstehender oder nach `open()` unabhängig eingetroffener
+Report kann dagegen zuerst gelesen werden.
 
 Die abschließende statische Sicherheitsklasse lautet **wahrscheinlich rein
 lesend**. Der `0x87`-Case selbst liest keinen Payload und baut ausschließlich
@@ -108,7 +127,7 @@ Reset- oder persistenten Konfigurationspfad. Details stehen in
   Interface-Nummer 0 bestimmt.
 - Einmaliger Linux-Write: 441 Byte
   `00 | 87 01 00 80 | 436 × 00`.
-- Erwarteter Read: 440 Byte
+- Für die analysierte v51-Firmware erwarteter Read: 440 Byte
   `87 01 00 80 51 00 | 434 × 00`.
 - Genau ein Writeversuch, keine Wiederholung; Antwortdeadline 3 Sekunden.
 - Bei partiellem Write, Fehler, Timeout, Disconnect oder abweichender Antwort
@@ -124,6 +143,9 @@ Reset- oder persistenten Konfigurationspfad. Details stehen in
   falsch ausgewähltes Interface fallen nicht unter die Bewertung.
 - Die konkrete 440-Byte-Antwort des ersten realen Tests ist nicht erhalten.
   Ein erneuter Test allein zur Gewinnung dieser Bytes ist nicht zulässig.
+- Die Firmwareversion des Geräts war zum Testzeitpunkt nicht als v51 bestätigt.
+- Die Einmaltest-Implementierung erkennt einen nach `open()` bereits wartenden
+  Inputreport vor dem Write nicht.
 
 ## Ergebnis des realen Einmaltests 01
 
@@ -159,18 +181,22 @@ Der vollständige Bericht liegt unter
 
 ## Letzter abgeschlossener Arbeitsschritt
 
-Der einmalige reale `0x87`-Test und der vollständige Rückbau der temporären
-Schreibrechte wurden dokumentiert. Die Diagnose für einen etwaigen zukünftigen,
-neu autorisierten Test gibt unerwartete Antworten nach dem Schließen vollständig
-als Hexdump und Bytevergleich aus, ohne sie dauerhaft zu speichern.
+Die unerwartete Antwort des einmaligen realen `0x87`-Tests wurde ausschließlich
+statisch nachanalysiert. Der v51-Antwortbauer ist bytegenau bestätigt; als
+stärkste Erklärung gilt ein Firmwarestand-Unterschied, während ein alter oder
+unabhängiger Queue-Report technisch möglich, aber nicht belegt ist. Details
+stehen in
+`../research/reports/command-0x87-unexpected-response-analysis.md`.
 
 ## Nächster klarer Arbeitsschritt
 
 Keine Wiederholung des Tests allein zur Gewinnung der fehlenden Antwortbytes.
-Weitere Arbeit bleibt zunächst offline und untersucht statisch, welche
-Transport-, Queue- oder Zustandsannahme die Abweichung erklären könnte. Jeder
-weitere reale HID-Write wäre ein neuer Test und benötigte eine eigene
-Sicherheitsbewertung und ausdrückliche Freigabe.
+Vor einer späteren Neubewertung sind Firmwareidentität und spontaner
+Interface-0-Input rein lesend zu erfassen. Eine künftige Einmaltest-
+Implementierung müsste nach dem endgültigen `open()` und vor dem Write eine
+begrenzte Readiness-/Quiet-Window-Prüfung durchführen und bei jedem vorhandenen
+Report ohne Write schließen. Jeder weitere reale HID-Write wäre ein neuer Test
+und benötigte eine eigene Sicherheitsbewertung und ausdrückliche Freigabe.
 
 ## Sicherheitsgrenze
 
