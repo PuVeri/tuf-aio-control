@@ -308,6 +308,10 @@ Beobachtungen aktualisiert, bestätigt oder ausdrücklich widerlegt.
 | C-019 | Für die analysierte v51-Firmware ist die kurze `0x87`-Antwort fest positioniert: Headermaske `0x800000ff`, ein Paket, `0x0051` an Offset 4/5 und Nullbytes bis Offset 439. Der gemeinsame Prolog verändert diese Builderargumente nicht. | Ghidra `0x00127588..0x001275c8` und `0x001298f8`; gezielte Literalprüfung bei `0x00129ad4`. | 2026-08-05 |
 | C-020 | Der 440-Byte-Antwortbauer und sein Queueobjekt werden von mehreren Befehlsantworten sowie einem transportseitigen `0xff`-Pfad gemeinsam verwendet; diese Reporttypen laufen über den Interface-0-IN-Pfad. | Ghidra-Call-Sites `0x00127178`, `0x001275c8`, `0x0012968c`, Queuezeiger `0x003b5ee0` und Endpointzuordnung aus `ghidra-dispatcher-call-paths.txt`. | 2026-08-05 |
 | C-021 | Der am 2026-07-29 gesicherte USB-Gerätedeskriptor meldet `bcdDevice 0.49`. | `captures/usb-descriptor-0b05-1c7b.txt`. | 2026-08-05 |
+| C-022 | Der aktuelle offizielle ASUS-Firmwarekatalog für das Zielmodell enthält genau einen Eintrag: v51 vom 2025-07-10; Beschreibung und Versionshinweise sind leer. | ASUS-Produktsupport und dessen `GetPDBIOS`-Antwort, abgerufen am 2026-09-01. | 2026-09-01 |
+| C-023 | Eine offizielle ASUS-InfoHub-FAQ zeigt in ihrer Einstellungsabbildung für das Zielmodell den Wert `Firmware version 50`. | ASUS-FAQ 1055446, Abbildung `20250701144727892_13.png`. | 2026-09-01 |
+| C-024 | Der v51-Updater ruft `HidD_GetAttributes` auf und übernimmt das WORD `VersionNumber` an `HIDD_ATTRIBUTES`-Offset `+8` in seine interne Gerätebeschreibung. Im untersuchten Auswahl-/Upgradepfad wurde kein Vergleich dieses Wertes mit `0x49`, `0x51` oder dem Firmwareinhalt gefunden. | Statische x86-Disassembly bei `0x40bdbd`, `0x40bdec`, `0x40bdf2` und `0x40be4c`; Microsoft-Definition von `HIDD_ATTRIBUTES`. | 2026-09-01 |
+| C-025 | Die v51-ARM-Nutzlast enthält am Dateioffset `0x2eba0` eine headerartige Region mit dem 32-Bit-Wert `0x51`, unmittelbar gefolgt von VID `0x0b05` und PID `0x1c7b`. Die genaue Feldsemantik ist nicht bestätigt. | Statische Byteprüfung der ARM-Nutzlast mit SHA-256 `c4679ec340fc5edd3dea960ee027281cf6bd81cbbf347afb40e0d0b4f40aeb9f`. | 2026-09-01 |
 
 Die Reportgrößen und das Host-Framing von Interface 0 sind bestätigt.
 Weiterhin offen sind mehrere Inhalts- und Befehlssemantiken.
@@ -701,6 +705,40 @@ oder unabhängiger Report möglich. Die Einmaltest-Implementierung prüft die Qu
 vor dem Write nicht und liest danach den ältesten verfügbaren Report. Ein
 Hostqueue-Altbestand aus der Zeit vor `open()` ist dagegen durch die per-Open-
 Queue von Linux ausgeschlossen.
+
+## Untersuchung zu Firmware v49 am 2026-09-01
+
+Die offizielle ASUS-Produktsupportseite und ihre Katalog-API führen aktuell
+nur v51. Die Beschreibung ist leer; ältere Downloads, Release Notes und eine
+Zuordnung zwischen `bcdDevice` und Firmwareversion wurden dort nicht gefunden.
+Naheliegende offizielle CDN-Namen für v49 und v50 liefern derzeit HTTP 404;
+der Internet-Archive-Index lieferte für den Produktordner keinen Treffer. Das
+belegt nur den gegenwärtigen Suchzustand, nicht die historische
+Nichtexistenz.
+
+Eine offizielle InfoHub-FAQ zeigt `Firmware version 50`. Ein öffentlicher
+Nutzerbericht zum exakten Modell nennt eine frühere Anzeige 49, doch sein
+Screenshot zeigt das Firmwarefeld leer. Weder GitHub- und USB-ID-Suchen noch
+öffentliche Firmwarearchive ergaben eine v49-Datei oder Prüfsumme.
+
+Die vorhandenen v51-Daten stützen eine Versionsbeziehung: `0x87` liefert fest
+`0x0051`, eine headerartige Nutzlastregion korreliert `0x51` mit VID/PID, und
+der Updater liest die HID-Herstellerrevision `VersionNumber`. Im untersuchten
+Updaterpfad fehlt jedoch ein Vergleich oder eine Umrechnung, die
+`bcdDevice 0.49` mit der InfoHub-Firmwareversion 49 gleichsetzt. Nach USB ist
+`bcdDevice` zunächst nur eine herstellerdefinierte BCD-Geräterevision.
+
+Deshalb bleibt H-003 eine starke Hypothese: Das reale Gerät läuft
+wahrscheinlich mit Firmware 49, und ein v49-`0x87`-Handler könnte `0x0049`
+liefern. Bestätigt ist dies ohne v49-Binärdatei, erhaltene Live-Antwortbytes
+oder offizielle Zuordnung nicht. Ein v49/v51-Handlervergleich war nicht
+möglich.
+
+Quellen, Suchpfade, Prüfsummen und die genaue Trennung zwischen Beleg und
+Ableitung sind in
+`../research/reports/firmware-v49-investigation.md` dokumentiert. Die
+Untersuchung umfasste keine Geräte-Schreibzugriffe, Firmwareübertragung oder
+Ausführung von ASUS-Dateien.
 
 Der Test wurde nicht wiederholt. Das Gerät wurde sofort geschlossen, die
 temporäre Schreibregel entfernt und für beide Interfaces wieder `0640`

@@ -1,6 +1,6 @@
 # Aktueller Projektstand
 
-Stand: 2026-08-05
+Stand: 2026-09-01
 
 ## Aktuelles Projektziel
 
@@ -9,6 +9,12 @@ Ziel ist eine native Linux-Steuerung für das LCD der ASUS TUF Gaming LC III
 passiv rekonstruiert. Am 2026-08-05 fand genau ein gesondert freigegebener,
 eng begrenzter realer `0x87`-Test statt. Weitere HID-Schreibtests sind nicht
 freigegeben.
+
+Die Projektgrenze ist ausdrücklich auf das LCD beschränkt. **OpenRGB bleibt
+für die gesamte RGB-Beleuchtung der AIO zuständig; `tuf-aio-control` steuert
+keine LEDs und soll diese Funktion nicht duplizieren.** Das entspricht auch
+der funktionalen Trennung in ASUS InfoHub, das ASUS primär für die
+Displaykonfiguration beschreibt.
 
 ## Bestätigte Hardware- und Protokollfakten
 
@@ -105,6 +111,20 @@ plausibel, aber mangels Antwortbytes nicht bestätigt. Die Folge
 `87 01 00 80 51 00 | 434 × 00` ist eine v51-spezifische Erwartung, keine
 belegte versionsübergreifende Invariante.
 
+Eine gezielte Quellen- und Binäruntersuchung am 2026-09-01 fand keine
+Firmware-v49-Datei und keine offizielle ASUS-Zuordnung von `bcdDevice` zur
+Firmwareversion. Der aktuelle ASUS-Katalog enthält nur v51; eine offizielle
+InfoHub-FAQ zeigt als älteren Stand `Firmware version 50`. Der v51-Updater
+liest zwar das HID-Attribut `VersionNumber` aus, im untersuchten Auswahl- und
+Upgradepfad wurde aber keine Zuordnung dieses Wertes zu 49 oder 51 gefunden.
+Ein öffentlicher Nutzerbericht zum exakten Modell nennt eine frühere Anzeige
+49, belegt die Zahl jedoch nicht durch einen sichtbaren Screenshot.
+
+Damit bleibt „installierte Firmware wahrscheinlich 49“ eine starke Ableitung,
+nicht eine bestätigte Tatsache. Der vollständige Quellen-, Prüfsummen- und
+Beweisbericht steht unter
+`../research/reports/firmware-v49-investigation.md`.
+
 Ein alter oder unabhängiger Report ist ebenfalls möglich, aber nicht belegt.
 Das Einmaltestprogramm prüft nach dem Öffnen die Inputqueue nicht und liest nach
 dem Write genau den ältesten verfügbaren Report. Ein bereits vor `open()` vom
@@ -144,6 +164,8 @@ Reset- oder persistenten Konfigurationspfad. Details stehen in
 - Die konkrete 440-Byte-Antwort des ersten realen Tests ist nicht erhalten.
   Ein erneuter Test allein zur Gewinnung dieser Bytes ist nicht zulässig.
 - Die Firmwareversion des Geräts war zum Testzeitpunkt nicht als v51 bestätigt.
+- Die Gleichsetzung `bcdDevice 0.49 = Firmware 49` ist trotz konsistenter
+  Indizien nicht bestätigt; eine v49-Binärdatei wurde nicht gefunden.
 - Die Einmaltest-Implementierung erkennt einen nach `open()` bereits wartenden
   Inputreport vor dem Write nicht.
 
