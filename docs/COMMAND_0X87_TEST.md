@@ -13,6 +13,11 @@ Das Programm implementiert keine anderen Befehle. Insbesondere sind `0x08`,
 werden durch eine interne Sicherheitsinvariante ausgeschlossen. Es gibt keine
 automatische Wiederholung und keine automatische Recovery.
 
+Vor dem einzigen möglichen Write enthält der gehärtete Kontrollfluss eine
+feste fünfsekündige rein lesende Ruhephase und eine zweite unmittelbare
+Queueprüfung. Jeder dabei empfangene Report führt garantiert zum Abbruch ohne
+Write.
+
 Die Erstellung und Offline-Prüfung des Programms ist keine Freigabe für einen
 realen HID-Test. Dieser benötigt weiterhin einen gesonderten, ausdrücklich
 freigegebenen Auftrag.
@@ -27,6 +32,9 @@ Firmware 51 ist sehr gering, aber nicht null:
   zu Timeout oder einem vorübergehenden Transportstillstand führen.
 - Andere Firmwareversionen, Boot-/Updatemodi, Firmwarefehler oder ein falsch
   ausgewähltes Interface fallen nicht unter die statische Bewertung.
+- Auch die unmittelbare Queueprüfung kann einen unabhängigen Report nicht
+  ausschließen, der erst im Race-Fenster zwischen `select()` und Write oder
+  nach dem Write eintrifft.
 - Das Programm kann persistente Schäden nicht formal ausschließen. Es sendet
   deshalb nur das unveränderliche `0x87`-Paket und bricht bei jeder Abweichung
   ohne Folgekommando ab.
@@ -52,21 +60,52 @@ somit genau 440 Byte übertragen:
 Es gibt genau einen Aufruf von `os.write()`. Ein partieller Write wird nicht
 ergänzt oder wiederholt.
 
-## Erwartete Antwort
+## Rein lesende Pre-Write-Prüfung
 
-Innerhalb von maximal drei Sekunden wird genau ein Report gelesen. Erfolg
-erfordert die bytegenaue 440-Byte-Antwort:
+Nach dem endgültigen Öffnen und der erneuten Geräteprüfung arbeitet das
+Programm in dieser Reihenfolge:
+
+1. Fünf Sekunden mit `select()` auf Input warten.
+2. Bei Lesebereitschaft genau einen vollständigen Report mit `os.read()`
+   lesen, den Deskriptor schließen, vollständig als Hexdump ausgeben und mit
+   Exit-Code 7 abbrechen.
+3. Wenn die Ruhephase ohne Report endet, unmittelbar vor dem möglichen Write
+   ein zweites `select(..., timeout=0)` ausführen.
+4. Auch bei dieser zweiten Prüfung jeden Report lesen, nach dem Schließen
+   vollständig ausgeben und ohne Write abbrechen.
+5. Nur wenn beide Prüfungen die Queue leer vorfinden, ist die einzige
+   `os.write()`-Stelle erreichbar.
+
+Der hidraw-Knoten ist dabei bereits mit `O_RDWR | O_NONBLOCK` geöffnet, weil
+derselbe per-Open-Queuekontext für den später möglicherweise autorisierten
+Write erhalten bleiben muss. Ein Schließen und erneutes Öffnen mit anderem
+Modus würde eine neue hidraw-Queue erzeugen und die Ruhephase entwerten. Der
+Pre-Write-Kontrollfluss selbst ruft jedoch ausschließlich `fstat`, passive
+sysfs-Erkennung, `select()` und gegebenenfalls `os.read()` auf; vor der einen
+festen `os.write()`-Stelle existiert keine sendende Operation.
+
+Der Report wird nur im Arbeitsspeicher gehalten und nach dem Schließen im
+Terminal ausgegeben. Es gibt weiterhin keinen Capture- oder Logdateipfad.
+
+## Strukturell gültige Antwort
+
+Innerhalb von maximal drei Sekunden wird genau ein Report gelesen. Eine
+strukturell gültige Antwort hat genau 440 Byte:
 
 ```text
-87 01 00 80 51 00 | 434-mal 00
+87 01 00 80 VV VV | 434-mal 00
 ```
 
-Eine falsche Länge gilt ebenso wie ein abweichendes Byte als unerwartete
-Antwort. Bei einer künftigen unerwarteten, nicht leeren Antwort schließt das
-Programm zuerst den Gerätedeskriptor. Danach gibt es die vollständig empfangene
-Antwort als Hexdump und jede abweichende Byteposition mit erwartetem und
-tatsächlichem Wert im Terminal aus. Diese Diagnose löst keinen weiteren Write
-aus.
+`VV VV` ist ein Little-Endian-16-Bit-Versionswert. Für die analysierte
+v51-Firmware ist `51 00` beziehungsweise `0x0051` statisch belegt. Das reale
+Gerät lieferte in Test 02 `49 00` beziehungsweise `0x0049`.
+
+Eine falsche Länge, ein abweichender Header oder ein von null verschiedenes
+Byte ab Offset 6 gilt als strukturell ungültige Antwort. In diesem Fall
+schließt das Programm zuerst den Gerätedeskriptor. Danach gibt es die
+vollständig empfangene Antwort als Hexdump und jede abweichende Byteposition
+gegenüber der v51-Referenz im Terminal aus. Ein anderer Versionswert allein ist
+kein Protokollfehler und erzeugt keinen weiteren Write.
 
 Empfangene Rohdaten werden weiterhin nicht dauerhaft gespeichert. Das Programm
 bietet bewusst keinen Capture-Parameter; Hexdump und Differenzliste erscheinen
@@ -88,6 +127,23 @@ rekonstruiert. Der vollständige Ergebnis- und Rückbaubericht steht unter
 Dieser Test darf nicht allein zur nachträglichen Gewinnung der fehlenden Bytes
 wiederholt werden. Jeder weitere reale Write wäre ein neuer, gesondert zu
 begründender und ausdrücklich zu autorisierender Test.
+
+## Ergebnis des realen Einmaltests 02
+
+Am 2026-09-01 wurde der zweite gesondert freigegebene Einmaltest dokumentiert:
+
+- fünfsekündige Ruhephase ohne Inputreport,
+- Queue unmittelbar vor dem Write leer,
+- genau ein Request `00 | 87 01 00 80 | 436 × 00`,
+- genau eine 440-Byte-Antwort
+  `87 01 00 80 49 00 | 434 × 00`,
+- gegenüber v51 genau ein Unterschied an Offset `0x0004`: `49` statt `51`,
+- anschließend Close ohne weiteren Write, Retry oder Recovery.
+
+Der vollständige Report steht unter
+`research/reports/command-0x87-live-test-02.md`. Der Test bestätigt den
+Versionswert `0x0049`, nicht die bytegenaue Identität einer bislang nicht
+gefundenen offiziellen v49-Firmwaredatei.
 
 ## Voraussetzungen
 
@@ -135,6 +191,8 @@ python3 -B src/test_command_0x87.py --i-understand-the-risk
 Das Argument ist die bewusste Bestätigung für genau diesen einen Lauf. Vor dem
 Write prüft das Programm nach dem Öffnen erneut den Zeichengeräteknoten, seine
 sysfs-Gerätenummer, VID/PID, Interface, Reportgrößen und fehlende Report-IDs.
+Danach folgen die feste fünfsekündige Ruhephase und die unmittelbare
+Pre-Write-Queueprüfung. Beide sind Abbruchschranken, keine Sendefreigabe.
 
 ## Abbruchbedingungen
 
@@ -143,12 +201,15 @@ Das Programm schließt den Deskriptor sofort und sendet nichts nach bei:
 - fehlender oder mehrdeutiger Geräte-/Interfacezuordnung,
 - veränderter HID-Reportstruktur oder Gerätenummer,
 - fehlender Lese- oder Schreibberechtigung,
+- jedem während der fünfsekündigen Ruhephase empfangenen Report,
+- jedem bei der unmittelbaren Pre-Write-Prüfung wartenden Report,
 - Fehler beim Öffnen, Schreiben, Warten oder Lesen,
 - partiellem Write,
 - Disconnect oder Ausnahmezustand,
 - Timeout nach maximal drei Sekunden,
 - Antwortlänge ungleich 440 Byte,
-- jeder inhaltlichen Abweichung von der erwarteten Antwort.
+- abweichendem `0x87`-Header,
+- einem von null verschiedenen Paddingbyte ab Offset 6.
 
 Exit-Codes:
 
@@ -158,9 +219,10 @@ Exit-Codes:
 | `1` | Zielgerät oder Interface nicht eindeutig auswählbar |
 | `2` | Berechtigungsfehler |
 | `3` | Timeout |
-| `4` | unerwartete Antwort oder falsche Antwortlänge |
+| `4` | strukturell ungültige Antwort oder falsche Antwortlänge |
 | `5` | I/O-, Disconnect- oder sonstiger Laufzeitfehler |
 | `6` | interne Sicherheitsinvariante oder erneute Zielprüfung fehlgeschlagen |
+| `7` | Report vor dem Write erkannt; vollständiger Hexdump, garantiert kein Write |
 
 ## Recoverymaßnahmen
 

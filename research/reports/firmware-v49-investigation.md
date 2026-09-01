@@ -5,15 +5,15 @@ Stand: 2026-09-01
 ## Kurzfazit
 
 - Es wurde **keine Firmware-v49-Datei** gefunden.
-- Eine Gleichsetzung von `bcdDevice 0.49` mit Firmwareversion 49 konnte
-  **nicht bestätigt** werden. Sie bleibt eine starke, technisch konsistente
-  Ableitung.
+- Das reale Gerät liefert inzwischen empirisch sowohl `bcdDevice 0.49` als
+  auch den `0x87`-Versionswert `0x0049`. Nicht bestätigt ist weiterhin die
+  bytegenaue Identität mit einer offiziellen ASUS-v49-Firmwaredatei.
 - Ein statischer Vergleich des `0x87`-Handlers zwischen v49 und v51 ist ohne
   v49-Binärdatei nicht möglich. Für v51 ist die Antwort
   `87 01 00 80 51 00 | 434 × 00` belegt.
-- Die abweichende 440-Byte-Antwort des realen Einmaltests ist mit einer
-  älteren, möglicherweise v49 genannten Firmware vereinbar, belegt diese aber
-  nicht, weil die Antwortbytes nicht erhalten sind.
+- Live-Test 02 lieferte vollständig
+  `87 01 00 80 49 00 | 434 × 00`. Die Bytes des ersten Tests bleiben dennoch
+  verloren und werden dadurch nicht rückwirkend rekonstruiert.
 
 Während dieser Untersuchung wurde keine ASUS-Datei ausgeführt, nichts an ein
 USB-/HID-Gerät gesendet, keine Firmware übertragen, keine Schreibberechtigung
@@ -188,12 +188,14 @@ und
 | Das reale Gerät meldete `bcdDevice 0.49`. | bestätigt | Gesicherter USB-Gerätedeskriptor vom 2026-07-29. |
 | ASUS verwendet eigenständige numerische Firmwarestände. | bestätigt | Offizieller Download v51; offizielle InfoHub-Abbildung mit Firmware 50. |
 | Die v51-Nutzlast gibt über `0x87` den Wert `0x0051` zurück. | bestätigt | Statischer ARM-Kontrollfluss und Antwortbauer. |
+| Das reale Gerät gibt über `0x87` den Wert `0x0049` zurück. | bestätigt | Vollständige 440-Byte-Antwort aus Live-Test 02. |
 | Der v51-Updater kann die HID-Herstellerrevision lesen. | bestätigt | `HidD_GetAttributes` und Übernahme von `VersionNumber`. |
-| Das reale Gerät läuft wahrscheinlich mit Firmware 49. | starke Ableitung | `bcdDevice 0.49`, v51-`0x87`=`0x0051`, v51-Metadatenkorrelation und öffentlicher Bericht über Anzeige 49 passen zusammen. |
-| `bcdDevice` und InfoHub-Firmwareversion sind bei diesem Modell immer identisch. | unbekannt | Keine offizielle Zuordnung, keine v49-Binärdatei, kein gesicherter v49-`0x87`-Wert und kein v51-Gerätedeskriptor vorhanden. |
+| Das reale Gerät läuft wahrscheinlich mit Firmware 49. | sehr starke Ableitung | `bcdDevice 0.49`, realer `0x87`-Wert `0x0049`, v51-`0x87`=`0x0051`, v51-Metadatenkorrelation und öffentlicher Bericht über Anzeige 49 passen zusammen. |
+| `bcdDevice` und InfoHub-Firmwareversion sind bei diesem Modell immer identisch. | unbekannt | Ein reales Wertepaar 0.49/`0x0049` ist bestätigt; eine offizielle allgemeine Zuordnung, eine v49-Binärdatei und ein v51-Gerätedeskriptor fehlen. |
 
-Die Gleichsetzung ist daher **nicht bestätigt**. Für einen statischen Beweis
-fehlt mindestens eines der folgenden Bindeglieder:
+Der geräteseitige Versionswert 49 ist bestätigt. Für die strengere
+Paket-/Binäridentität „offizielle ASUS-Firmware v49“ fehlt weiterhin
+mindestens eines der folgenden Bindeglieder:
 
 - eine glaubwürdige v49-Nutzlast mit `0x87` → `0x0049` und passender interner
   Versionsstruktur,
@@ -203,16 +205,17 @@ fehlt mindestens eines der folgenden Bindeglieder:
 
 ## 4. Vergleich von `0x87`
 
-| Merkmal | v49 | v51 |
+| Merkmal | reales Gerät, als v49 abgeleitet | v51 |
 | --- | --- | --- |
 | Binärdatei gefunden | nein | ja |
 | SHA-256 der ARM-Nutzlast | nicht verfügbar | `c4679ec340fc5edd3dea960ee027281cf6bd81cbbf347afb40e0d0b4f40aeb9f` |
 | Handler statisch analysierbar | nein | ja, `0x00127588..0x001275c8` |
-| Rückgabewert | unbekannt; `0x0049` nur Hypothese | bestätigt `0x0051` |
-| Vollständiger Ein-Paket-Report | unbekannt | `87 01 00 80 51 00 | 434 × 00` |
+| Rückgabewert | empirisch bestätigt `0x0049` | statisch bestätigt `0x0051` |
+| Vollständiger Ein-Paket-Report | `87 01 00 80 49 00 | 434 × 00` | `87 01 00 80 51 00 | 434 × 00` |
 
-Ein byteweiser oder kontrollflussbezogener v49/v51-Vergleich ist nicht
-möglich. Es wurde daher auch kein v49-SHA-256 berechnet.
+Ein empirischer Antwortvergleich ist möglich und zeigt ausschließlich Offset
+`0x0004` als unterschiedlich. Ein statischer Handlervergleich bleibt ohne
+v49-Binärdatei unmöglich; daher wurde auch kein v49-SHA-256 berechnet.
 
 ## 5. Bedeutung für den bisherigen Einmaltest
 
@@ -231,8 +234,9 @@ wurden nicht gespeichert.
   dass deren exakte Antwort nicht ohne bestätigte Firmwareidentität als
   versionsübergreifende Live-Erwartung verwendet werden darf.
 
-Der Test wird nicht wiederholt; aus dieser Untersuchung folgt keine neue
-Schreibfreigabe.
+Aus dieser ursprünglichen Untersuchung folgte keine Wiederholungsfreigabe. Der
+später separat autorisierte Test 02 ist im Nachtrag dokumentiert und erteilt
+seinerseits keine weitere Schreibfreigabe.
 
 ## 6. Offene Fragen und sichere nächste Schritte
 
@@ -250,3 +254,19 @@ erneut prüfen oder eine von einer glaubwürdigen Quelle bereitgestellte Datei
 zunächst nur anhand Herkunft und Prüfsumme bewerten. Ein Downloadfund wäre vor
 jeder Extraktion gesondert als vertrauenswürdig zu verifizieren und dürfte
 nicht ausgeführt oder übertragen werden.
+
+## Nachtrag: Live-Test 02 am 2026-09-01
+
+Ein später gesondert autorisierter zweiter Einmaltest lieferte nach leerer
+fünfsekündiger Ruhephase und leerer unmittelbarer Pre-Write-Queue vollständig:
+
+```text
+87 01 00 80 49 00 | 434 × 00
+```
+
+Damit ist der reale `0x87`-Versionswert `0x0049` empirisch bestätigt. Zusammen
+mit `bcdDevice 0.49` ist die Aussage „installierte Firmwareversion
+wahrscheinlich 49“ nun sehr stark gestützt. Die strengere Aussage, der
+installierte Binärstand sei bytegenau eine offizielle ASUS-v49-Datei, bleibt
+mangels Datei, Prüfsumme und offizieller Zuordnung abgeleitet. Der vollständige
+Lauf steht in `command-0x87-live-test-02.md`.

@@ -1,249 +1,181 @@
 # Aktueller Projektstand
 
-Stand: 2026-09-01
+Stand: 2026-09-02
 
-## Aktuelles Projektziel
+## Ziel und Grenze
 
 Ziel ist eine native Linux-Steuerung für das LCD der ASUS TUF Gaming LC III
-360 ARGB LCD. Das undokumentierte HID-Protokoll wurde zunächst statisch und
-passiv rekonstruiert. Am 2026-08-05 fand genau ein gesondert freigegebener,
-eng begrenzter realer `0x87`-Test statt. Weitere HID-Schreibtests sind nicht
-freigegeben.
+360 ARGB LCD. OpenRGB bleibt für sämtliche RGB-Beleuchtung zuständig;
+`tuf-aio-control` dupliziert diese Funktion nicht.
 
-Die Projektgrenze ist ausdrücklich auf das LCD beschränkt. **OpenRGB bleibt
-für die gesamte RGB-Beleuchtung der AIO zuständig; `tuf-aio-control` steuert
-keine LEDs und soll diese Funktion nicht duplizieren.** Das entspricht auch
-der funktionalen Trennung in ASUS InfoHub, das ASUS primär für die
-Displaykonfiguration beschreibt.
+Das undokumentierte HID-Protokoll wird vorrangig statisch und passiv
+untersucht. Zwei gesondert freigegebene, eng begrenzte reale `0x87`-Tests sind
+abgeschlossen. Weitere HID-Schreibtests sind nicht freigegeben.
 
-## Bestätigte Hardware- und Protokollfakten
+## Bestätigte Hardware- und Transportfakten
 
-- Zielgerät: ASUS TUF Gaming LC III 360 ARGB LCD.
-- USB-ID: `0b05:1c7b`.
-- Das Gerät besitzt zwei HID-Interfaces mit Usage Page `0xff06`, Usage
-  `0x01` und ohne im Reportdeskriptor deklarierte Report-IDs.
-- Interface 0: 440 Byte Input, 440 Byte Output; Interrupt-Endpunkte `0x82`
-  IN und `0x01` OUT.
-- Interface 1: 16 Byte Input, 1024 Byte Output; Interrupt-Endpunkte `0x84`
-  IN und `0x03` OUT.
-- Die Firmware ordnet den 440-Byte-Pfad eindeutig Interface 0 zu:
-  Endpointcallback 1 (`0x0010deb8`) bedient `0x01` OUT; Endpointcallback 2
-  (`0x0010df88`) gehört zum 440-Byte-IN-Pfad über `0x82`.
-- Der 1024-Byte-Empfänger `0x001297e8` wird direkt vom Endpoint-3-Callback
-  `0x0010df9c` aufgerufen und gehört damit zu Interface 1 / `0x03` OUT.
-  Endpointcallback 4 (`0x0010e0a8`) gehört zum 16-Byte-Pfad über `0x84` IN.
+- Gerät: `0b05:1c7b`; zwei HID-Interfaces, Usage Page `0xff06`, Usage `0x01`,
+  keine deklarierten Report-IDs.
+- Interface 0: 440 Byte IN/OUT, Endpunkte `0x82` IN und `0x01` OUT.
+- Interface 1: 16 Byte IN, 1024 Byte OUT, Endpunkte `0x84` IN und `0x03` OUT.
+- Firmware: 32-Bit ARM Little Endian, 201692 Byte, Ghidra-Basis `0x00100000`.
+- Endpointcallbacks: `0x0010deb8` = Interface 0 OUT, `0x0010df88` = Interface 0
+  IN, `0x0010df9c` = Interface 1 OUT, `0x0010e0a8` = Interface 1 IN.
+- Interface 0 führt über `0x001293f8 -> 0x001296d8 -> 0x00126dfc`.
+- Interface 1 führt direkt über `0x0010df9c -> 0x001297e8`.
+- Interface 0: 4 Byte Steuerwort + 436 Byte Nutzlast = 440 Byte.
+- Interface 1: 4 Byte Steuerwort + 1020 Byte Nutzlast = 1024 Byte.
+- Steuerwort: Byte 0 Befehl, Bit 31 Erstsegment, Bits 8..30 Anzahl/Index.
+- Interne Events `0x35` und `0x38` sind keine USB-Endpunkte: `0x35` stellt
+  vollständige Befehle zu, `0x38` ist der 440-Byte-Transporttick.
+- Linux `hidraw.write()` benötigt für Interface 0 ein Host-API-Nullbyte plus
+  440 Byte. Das Nullbyte gelangt nicht auf den USB-Draht.
+- Der Firmware-Antwortbauer erzeugt segmentierte 440-Byte-Pakete; in diesem
+  Pfad wurde keine Transportprüfsumme erkannt.
+- Der USB-Gerätedeskriptor des realen Geräts meldet `bcdDevice 0.49`.
 - Dynamische `/dev/hidrawX`-Nummern sind keine stabile Geräteidentität.
-- Die extrahierte Gerätefirmware ist 32-Bit ARM Little Endian, 201692 Byte
-  lang und wurde in Ghidra an Basis `0x00100000` analysiert.
-- Der 440-Byte-Transport besteht aus einem 4-Byte-Steuerwort und 436 Byte
-  Nutzdaten.
-- Ein zweiter Empfangspfad besteht aus einem 4-Byte-Steuerwort und 1020 Byte
-  Nutzdaten, insgesamt 1024 Byte.
-- Die High-Speed-Konfiguration setzt die vier Endpointgrößen direkt auf
-  440, 440, 1024 und 16 Byte. Die Reportdeskriptorzeiger für Interface 0/1
-  lauten `0x00131330`/`0x00131350`, jeweils mit Länge 29 Byte.
-- Die internen Ereignisse `0x35` und `0x38` sind keine USB-Endpointnummern:
-  `0x35` stellt vollständige Befehle dem Gerätedispatcher zu; `0x38` ist der
-  wiederholt ausgelöste 440-Byte-Transporttick.
-- Linux `hidraw.write()` erwartet für Interface 0 genau 441 Byte:
-  ein Host-API-Reportnummernbyte `00` plus den 440-Byte-Outputreport. Der
-  USB-HID-Treiber entfernt die Null vor dem 440-Byte-Transfer auf `0x01`.
-- Dieses Nullbyte ist weder Padding noch eine firmwareseitige Report-ID. Die
-  gleiche Null-ID-Konvention erklärt den `WriteFile`-Puffer des
-  Windows-Updaters.
-- Der Updater füllt beim Öffnen `HIDP_CAPS` in sein I/O-Objekt und liest für
-  `WriteFile` `OutputReportByteLength` an Caps-Offset `+0x06`; der Lesepfad
-  verwendet `InputReportByteLength` an `+0x04`.
-- Im Steuerwort enthält Byte 0 den Befehlswert. Bit 31 kennzeichnet das erste
-  Paket; Bits 8..30 enthalten Paketanzahl beziehungsweise Segmentindex.
-- Der Antwortbauer erzeugt segmentierte 440-Byte-Pakete. In diesem Pfad wurde
-  keine Transportprüfsumme erkannt.
-- Linux führt für jeden neu geöffneten `hidraw`-Dateideskriptor eine eigene,
-  zunächst leere Inputqueue. Ein Read liefert den ältesten seit diesem Öffnen
-  für den Deskriptor eingereihten Report.
-- Zwei passive `O_RDONLY`-Beobachtungen von Interface 0 am 2026-09-01 dauerten
-  zusammen 120 Sekunden und empfingen keinen Report. Ein paralleler
-  60-Sekunden-Vergleich auf Interface 1 blieb ebenfalls ohne Report.
-- OpenRGB lief dabei mit einem bereits geladenen Profil, hielt aber die beiden
-  LCD-HID-Knoten nicht offen. Seine bloße Hintergrundaktivität erzeugte keinen
-  sichtbaren Report; eine aktive RGB-Änderung wurde wegen des
-  USB-Schreibverbots nicht geprüft.
-- Der gesicherte USB-Gerätedeskriptor meldet `bcdDevice 0.49`.
-- USB `GET_DESCRIPTOR` wird separat vom Geräteprotokoll verarbeitet. Die
-  Werte `0x01`, `0x02`, `0x03`, `0x06`, `0x07`, `0x21` und `0x22` sind dort
-  Descriptor-Typen und keine Gerätebefehle.
 
-## Bestätigte gefährliche Befehle
+## Bestätigter Versionswertpfad `0x87`
 
-- `0x45`: Konfigurationslöschung im Windows-Updater.
-- `0x86`: Firmwareblocktransfer im Updater; wegen möglicher
-  modusabhängiger Semantik vollständig ausgeschlossen.
-- `0x09`: verändert im normalen Dispatcher Anzeige-/Gerätezustand und dient
-  im Updater als Completion-Flag.
-- `0x02`: Abschluss-/Reenumerationspfad im Updater; trotz einfachem Zweig im
-  normalen Dispatcher ausgeschlossen.
-- `0x88`, transportiert als `88 01 00 80 ...`: führt zu SPI-Lesen und
-  bedingtem SPI-Schreiben im Bereich `0x21000`.
-- `0x1f`: verändert Moduszustand und kann einen Bootcallback anlegen.
-- `0xff` mit Payload-DWORD 1: löst einen noch nicht vollständig aufgelösten
-  indirekten Callback aus.
-
-## Stärkster aktueller Kandidat: `0x87`
-
-In der analysierten v51-Firmware erzeugt `0x87` eine Zwei-Byte-Antwort mit dem
-konstanten Wert `0x0051`. Der dafür statisch abgeleitete Ein-Paket-Kandidat
-lautet:
+Die v51-Firmware liefert statisch eine Zwei-Byte-Nutzantwort `0x0051`:
 
 ```text
-Anfrage, 440 Byte:  87 01 00 80 00 ... 00
-Antwort, 440 Byte:  87 01 00 80 51 00 00 ... 00
+Anfrage:  87 01 00 80 | 436 × 00
+Antwort:  87 01 00 80 51 00 | 434 × 00
 ```
 
-Headeralgorithmus, Befehlswert, Antwortkonstante und Länge sind für diese
-v51-Binärdatei belegt.
-Die Bedeutung als Versionsabfrage ist eine starke, aber noch nicht endgültig
-bestätigte Ableitung. Die Route ist nun ebenfalls belegt: Interface 0,
-`0x01` OUT für die Anfrage und `0x82` IN für die Antwort. Das Paket ist keine
-Sendefreigabe.
+Der zweite reale Einmaltest bestätigte dieselbe Struktur mit `0x0049`:
 
-Im realen Einmaltest wurde zwar eine Antwort mit exakt 440 Byte empfangen, ihr
-Inhalt wich jedoch von der für v51 statisch erwarteten Gesamtfolge ab. Die
-Antwortbytes wurden nicht gespeichert und können deshalb nicht nachträglich
-ausgewertet werden. Die konkrete Abweichung bleibt unbekannt.
+```text
+87 01 00 80 49 00 | 434 × 00
+```
 
-Die stärkste statische Erklärung ist ein anderer Firmwarestand: Der vorhandene
-Gerätedeskriptor meldet `bcdDevice 0.49`, während die untersuchte Binärdatei aus
-dem v51-Paket stammt und `0x0051` enthält. Ein Antwortwert `0x0049` ist deshalb
-plausibel, aber mangels Antwortbytes nicht bestätigt. Die Folge
-`87 01 00 80 51 00 | 434 × 00` ist eine v51-spezifische Erwartung, keine
-belegte versionsübergreifende Invariante.
+Damit sind `0x0049` über `0x87` und `bcdDevice 0.49` am realen Gerät
+bestätigt; v51 liefert statisch `0x0051`. Eine bytegenaue Zuordnung des realen
+Geräts zu einem offiziellen v49-Paket bleibt mangels v49-Binärdatei
+abgeleitet. Details: `research/reports/firmware-v49-investigation.md`.
 
-Eine gezielte Quellen- und Binäruntersuchung am 2026-09-01 fand keine
-Firmware-v49-Datei und keine offizielle ASUS-Zuordnung von `bcdDevice` zur
-Firmwareversion. Der aktuelle ASUS-Katalog enthält nur v51; eine offizielle
-InfoHub-FAQ zeigt als älteren Stand `Firmware version 50`. Der v51-Updater
-liest zwar das HID-Attribut `VersionNumber` aus, im untersuchten Auswahl- und
-Upgradepfad wurde aber keine Zuordnung dieses Wertes zu 49 oder 51 gefunden.
-Ein öffentlicher Nutzerbericht zum exakten Modell nennt eine frühere Anzeige
-49, belegt die Zahl jedoch nicht durch einen sichtbaren Screenshot.
+Die statische Sicherheitsklasse von `0x87` lautet wahrscheinlich rein
+lesend. Sein Handler liest keinen Payload und baut nur die konstante Antwort;
+der gemeinsame Prolog kann flüchtigen Zustand ändern, erreicht aber keinen
+bekannten SPI-, Flash-, Datei-, Boot- oder Resetpfad.
 
-Damit bleibt „installierte Firmware wahrscheinlich 49“ eine starke Ableitung,
-nicht eine bestätigte Tatsache. Der vollständige Quellen-, Prüfsummen- und
-Beweisbericht steht unter
-`../research/reports/firmware-v49-investigation.md`.
+## Reale Tests und passive Beobachtung
 
-Ein alter oder unabhängiger Report ist ebenfalls möglich, aber nicht belegt.
-Das Einmaltestprogramm prüft nach dem Öffnen die Inputqueue nicht und liest nach
-dem Write genau den ältesten verfügbaren Report. Ein bereits vor `open()` vom
-Host empfangener Report kann nicht in der neuen per-Open-Queue liegen; ein noch
-geräte-/firmwareseitig ausstehender oder nach `open()` unabhängig eingetroffener
-Report kann dagegen zuerst gelesen werden.
-
-Die passive Folgeprüfung am 2026-09-01 fand in insgesamt 120 Sekunden auf
-Interface 0 keinen spontanen Report. Ein regelmäßig oder häufig unabhängig
-gesendeter Report ist im beobachteten normalen Zustand damit weniger
-wahrscheinlich. Seltene und zustandsabhängige Reports sowie das Race-Fenster
-zwischen einer späteren Queueprüfung und einem Write bleiben möglich. Der
-negative Befund erhöht relativ die Plausibilität einer kausalen, aber
-firmwareversionsabhängig abweichenden `0x87`-Antwort; er bestätigt sie ohne die
-verlorenen Bytes nicht. Details stehen in
-`../research/reports/interface0-passive-observation.md`.
-
-Die abschließende statische Sicherheitsklasse lautet **wahrscheinlich rein
-lesend**. Der `0x87`-Case selbst liest keinen Payload und baut ausschließlich
-die konstante Antwort `0x0051`. Der gemeinsame Dispatcherprolog kann jedoch
-in einem bestimmten Konfigurationsmodus RAM-Flags und flüchtige
-Peripherieregister verändern. Weder dieser rekursive Unterbaum noch der
-Antwortbauer erreicht einen bekannten Flash-, SPI-, Dateisystem-, Boot-,
-Reset- oder persistenten Konfigurationspfad. Details stehen in
-`../research/reports/command-0x87-safety-review.md`.
-
-## Bestätigte Testspezifikation
-
-- Ziel: Interface 0, zur Laufzeit über VID `0b05`, PID `1c7b` und
-  Interface-Nummer 0 bestimmt.
-- Einmaliger Linux-Write: 441 Byte
-  `00 | 87 01 00 80 | 436 × 00`.
-- Für die analysierte v51-Firmware erwarteter Read: 440 Byte
-  `87 01 00 80 51 00 | 434 × 00`.
-- Genau ein Writeversuch, keine Wiederholung; Antwortdeadline 3 Sekunden.
-- Bei partiellem Write, Fehler, Timeout, Disconnect oder abweichender Antwort
-  sofort schließen und nichts nachsenden.
-
-## Restrisiken
-
-- Der gemeinsame Dispatcherprolog kann flüchtige RAM- und
-  Peripheriezustände verändern.
-- Eine volle Antwortqueue oder ein dauerhaftes USB-Busy kann zu Timeout
-  beziehungsweise vorübergehendem Transportstillstand führen.
-- Andere Firmwareversionen, Boot-/Updatemodi, Firmwarefehler sowie ein
-  falsch ausgewähltes Interface fallen nicht unter die Bewertung.
-- Die konkrete 440-Byte-Antwort des ersten realen Tests ist nicht erhalten.
-  Ein erneuter Test allein zur Gewinnung dieser Bytes ist nicht zulässig.
-- Die Firmwareversion des Geräts war zum Testzeitpunkt nicht als v51 bestätigt.
-- Die Gleichsetzung `bcdDevice 0.49 = Firmware 49` ist trotz konsistenter
-  Indizien nicht bestätigt; eine v49-Binärdatei wurde nicht gefunden.
-- Die Einmaltest-Implementierung erkennt einen nach `open()` bereits wartenden
-  Inputreport vor dem Write nicht.
-- Ein Pre-Write-Queue-Check würde einen bereits wartenden Report erkennen und
-  ist für jede spätere Spezifikation erforderlich. Allein ist er wegen des
-  Race-Fensters und möglicher nach dem Write eintreffender unabhängiger Reports
-  kein Kausalitätsbeweis.
-
-## Ergebnis des realen Einmaltests 01
-
-- Datum: 2026-08-05; exakte Uhrzeit nicht protokolliert.
-- Interface 0 wurde dynamisch als `/dev/hidraw7` erkannt.
-- Genau ein 441-Byte-Request
-  `00 | 87 01 00 80 | 436 × 00` wurde gesendet.
-- Genau eine Antwort mit 440 Byte wurde empfangen.
-- Der Inhalt wich von
-  `87 01 00 80 51 00 | 434 × 00` ab.
-- Die tatsächlichen Antwortbytes wurden nicht gespeichert.
-- Das Programm schloss sofort und sendete nichts nach.
-- Die temporäre Schreibregel wurde entfernt; beide Interfaces besitzen wieder
+- Test 01 am 2026-08-05: genau ein Write und ein 440-Byte-Read; die
+  Antwortbytes wurden nicht gespeichert.
+- Test 02, dokumentiert am 2026-09-01: fünf Sekunden Ruhe, leere Inputqueue,
+  genau ein Write, strukturell korrekte Antwort `0x0049`, kein Retry.
+- Zwei passive `O_RDONLY`-Beobachtungen auf Interface 0 (zusammen 120 s) und
+  ein paralleler 60-s-Vergleich auf Interface 1 lieferten keinen Report.
+- OpenRGB hielt die LCD-HID-Knoten dabei nicht offen und erzeugte ohne aktive
+  Änderung keinen sichtbaren Report.
+- Die temporäre Schreibregel ist entfernt; beide Interfaces besitzen wieder
   `0640`.
-- Die AIO wird weiterhin normal erkannt. Im Kernelprotokoll erschienen keine
-  testbedingten USB-Fehler, Resets oder Disconnects.
 
-Der vollständige Bericht liegt unter
-`../research/reports/command-0x87-live-test-01.md`.
+## Statische LCD-/Bildanalyse 01
 
-## Offene Transportfragen
+Die Ergebnisse stehen in
+`research/reports/lcd-command-analysis-01.md`.
 
-- Welche Semantik hat der 16-Byte-IN-Pfad von Interface 1?
-- Welche höhere Bedeutung haben die über Interface 1 / `0x03` OUT
-  empfangenen 1024-Byte-Daten? `0x08` kennzeichnet dort statisch den
-  gesonderten Datenqueue-/Zustandspfad; die höhere Bedeutung bleibt offen.
-- Wie ist dieser Interface-1-`0x08`-Datenpfad mit dem zustandsändernden
-  Grafik-/Systemzweig von Befehl `0x08` auf Interface 0 verbunden?
-- Welche Bedeutung haben die globalen Antwortquellen von `0x1e` und
-  `0x80..0x85`?
-- Welche indirekten Callbackziele verbinden Transport, LCD/Grafik,
-  Dateisystem und SPI-Flash?
+- Die Queue-Beziehung ist geschlossen: Endpointcallback `0x0010df9c`
+  assembliert über `0x001297e8` zunächst separat bei `0x003bb480` und kopiert
+  vollständige `0x08`-Transfers in Queue `0x003bb430`; `0x00129b2c` liest
+  exakt aus dieser Queue.
+- Interface 1 verwendet 1024-Byte-Reports mit vier Byte Steuerwort und 1020
+  Byte Nutzlast. Das Erstsegment trägt die Segmentanzahl, Folgepakete den
+  Index; abgeschlossen wird nach `N` Segmenten ohne separate letzte Länge
+  oder beobachtete Transportprüfsumme.
+- Queue `0x003bb430` verwendet Backing-Buffer `0x003edb40` mit `0x32000`
+  Byte. Der getrennte Interface-0-Pfad verwendet Queue `0x003bb458` und
+  Backing-Buffer `0x0041fb40`.
+- `0x00129b2c` übergibt den Queue-Payload direkt als Datenzeiger an
+  Grafikrouter `0x001065c4`; die Queue-Länge wird nur auf ungleich null
+  geprüft. Descriptor, Breite, Höhe und Stride stammen aus getrenntem Zustand.
+- Grafikmodus `0x6021` ist durch Vergleich mit `0x0011acd8` als
+  16-Bit-Klassenpfad gut belegt. RGB565, Kanalreihenfolge und Byteorder bleiben
+  offen.
+- Ein ungepackter 320×320×16-Bit-Vollframe benötigt `0x32000` = 204800 Byte;
+  der Interface-1-Assembler liefert maximal 200×1020 = 204000 Byte. Wegen
+  dieser 800-Byte-Differenz ist ein vollständiger Rohframe nicht bestätigt.
+- Der Objektpfad `0x001279e8 -> 0x0010f0d0 -> 0x0010eff4 -> 0x0011acd8`
+  ist als JPEG-Pfad belegt: `0x00110a58` prüft `ff d8` sowie SOF0/1/2 und
+  extrahiert Breite und Höhe; `0x0010f16c` dekodiert JPEG-Blöcke und Farben.
+  Das beweist JPEG für gespeicherte Objekte, nicht für USB-`0x08`.
+- `+0x110` wählt zwischen zwei Ganzzahl-Zeitumrechnungen. `+0x111` steuert
+  Ablauf, Wiederholung und einen Sonderzustand `2`; fachliche Namen wie
+  Animation oder Loop bleiben unbestätigt.
 
-## Letzter abgeschlossener Arbeitsschritt
+Reproduzierbarer Read-only-Export:
+`research/ghidra-scripts/ExportLcdDataPath.java`.
 
-Die unerwartete Antwort des einmaligen realen `0x87`-Tests wurde ausschließlich
-statisch nachanalysiert. Der v51-Antwortbauer ist bytegenau bestätigt; als
-stärkste Erklärung gilt ein Firmwarestand-Unterschied, während ein alter oder
-unabhängiger Queue-Report technisch möglich, aber nicht belegt ist. Details
-stehen in
-`../research/reports/command-0x87-unexpected-response-analysis.md`.
+## Statische LCD-/Paketmodellanalyse 02
+
+Die vertiefte Rekonstruktion steht in
+`research/reports/lcd-command-analysis-02.md`. Reproduzierbarer Read-only-
+Export: `research/ghidra-scripts/ExportLcdPacketModel.java`.
+
+- `0x001314d0` ist kein Grafikdescriptor, sondern das BSS-Feld für den
+  aktuellen Framebuffer-Ringknoten. Der Knoten ist mindestens `0x10` Byte
+  groß: `+0` Folgeknoten, `+4` Display-Framebufferbasis, `+8` unbekannt und
+  `+0x0c` Frei-/Bereitzustand. Breite, Höhe, Stride und Callbacks liegen nicht
+  in diesem Knoten.
+- Der getrennte emWin-MEMDEV ist statisch typisiert: `0x18` Byte Header,
+  320×320, 16 bpp, Stride 640 und anschließend `0x32000` Pixelbyte. Seine
+  5/6/5-Umsetzung ist numerisch `R5` in Bits 0..4, `G6` in 5..10 und `B5` in
+  11..15, also BGR565 als Little-Endian-Wort. Im Image gibt es keinen
+  `REV`-/`REV16`-/`ROR #8`-Byte-Swap-Kandidaten.
+- `0x6021` erzeugt zwei Byte pro Ausgabepixel; `0x14021` erzeugt vier. Die
+  Dimensionen liest der Grafikblock aus Hardwarezustand, nicht aus dem
+  Ringknoten oder dem USB-Steuerwort. Derselbe Block wird im beschleunigten
+  JPEG-Pfad benutzt; JPEG für die USB-`0x08`-Quelle bleibt dennoch unbestätigt.
+- Das Interface-1-Steuerwort ist vollständig: Byte 0 Befehl, Bytes 1/2 und
+  die unteren sieben Bits von Byte 3 bilden das 23-Bit-Feld für Gesamtzahl
+  beziehungsweise Index; Byte 3 Bit 7 kennzeichnet nur das Erstsegment. Es
+  gibt keine separate Länge, Endmarke, Prüfsumme oder Paddingangabe.
+- `200` ist unmittelbar die exklusive Kopiergrenze für Indizes, nicht die
+  Feldgrenze. Durch die `0x32000`-Queuekapazität ist 200 zugleich die größte
+  erfolgreich weiterleitbare Gesamtzahl. Ein Index 200 kann formal Abschluss
+  auslösen, wird aber nicht kopiert; `N >= 201` scheitert danach an der
+  Queueallokation.
+- Ein zusätzliches Abschlusssegment, eine separate Restlänge und ein
+  Entfernen oder Ergänzen von Padding sind statisch ausgeschlossen. Die vier
+  USB-Controlbytes und das interne Queue-Längenwort liegen außerhalb der
+  1020-Byte-Nutzlast, werden aber nicht an den Grafikblock weitergereicht.
+- Die 800-Byte-Differenz ist daher keine rekonstruierbare Rohframe-Lücke:
+  maximal 204000 Byte USB-Quelle und der 204800-Byte-Zielframebuffer sind
+  getrennte Objekte. Das genaue, vermutlich kodierte Quellformat von
+  USB-`0x08` ist noch offen; ein roher 320×320×16-Bit-Vollframe ist als
+  Hostmodell nicht haltbar.
+- Endpoint `0x84` wird einmal bei Queueentnahme und noch vor Grafikoperation
+  `0x0c` mit 16 Byte gesendet. Nur das konstante Präfix `08 81` wird frisch
+  geschrieben. Es ist eine Start-/Annahmenachricht, kein Segment-ACK und keine
+  Abschluss- oder Fehlerantwort; Bytes 2..15 tragen keine belegte Semantik.
+
+## Gefährliche und ausgeschlossene Pfade
+
+- `0x88`: SPI-Lesen und bedingtes SPI-Schreiben bei `0x21000`.
+- `0x0a..0x0d`: Objekt-/Blocktransfer mit indirekten Backends; persistente
+  Schreibziele sind nicht ausgeschlossen.
+- `0x1b`, `0x1c`, `0xfe`: persistenznaher Konfigurationspfad `0x00126814`.
+- `0x1f`: Modusmutation und möglicher Bootcallback.
+- `0x09`: Displaymutation; im Updater zusätzlich Completion-Flag.
+- `0x86`: Firmwareblocktransfer; `0x02`: Updater-Abschluss/Reenumeration.
+- `0x45`: Konfigurationslöschung im Updater.
+- `0xff` mit Payload-DWORD 1: unaufgelöster indirekter Callback.
 
 ## Nächster klarer Arbeitsschritt
 
-Keine Wiederholung des Tests allein zur Gewinnung der fehlenden Antwortbytes.
-Vor einer späteren Neubewertung sind Firmwareidentität und spontaner
-Interface-0-Input rein lesend zu erfassen. Eine künftige Einmaltest-
-Implementierung müsste nach dem endgültigen `open()` und vor dem Write eine
-begrenzte Readiness-/Quiet-Window-Prüfung durchführen und bei jedem vorhandenen
-Report ohne Write schließen. Jeder weitere reale HID-Write wäre ein neuer Test
-und benötigte eine eigene Sicherheitsbewertung und ausdrückliche Freigabe.
+Die nächste Arbeit soll innerhalb der weiterhin passiven Grenze:
 
-## Sicherheitsgrenze
+1. einen legitimen Herstellertransfer für einfache statische 320×320-Bilder
+   passiv und zeitgleich auf Interface 0 und 1 erfassen;
+2. aus diesem Referenzverkehr das Quellformat von `0x08`, die Terminierung des
+   letzten 1020-Byte-Blocks und die Bedeutung von Status `0x81` ableiten;
+3. die Hardwareausgabe von `0x6021` mit der statisch belegten
+   Little-Endian-BGR565-MEMDEV-Belegung abgleichen und die unbekannten
+   Ringknotenfelder nur bei zusätzlichem statischem Beleg benennen;
+4. SPI-, Updater- und persistente Objektpfade ausgeschlossen halten.
 
-Weiterhin keine weiteren HID-Schreibtests: keine Output- oder Feature-Reports,
-keine USB-Control-Transfers und keine erneute Übertragung des `0x87`-Kandidaten.
-Der abgeschlossene Einmaltest erteilt keine Wiederholungsfreigabe. Ein weiterer
-Schreibtest erfordert einen neuen, ausdrücklich freigegebenen Auftrag.
+Keine Gerätekommunikation, Emulation oder Firmware-Schreibrechte. Jeder
+weitere reale HID-Write benötigt einen neuen ausdrücklich freigegebenen Auftrag.

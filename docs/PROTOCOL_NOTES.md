@@ -277,7 +277,7 @@ Offset  Hexadezimale Bytes
 | --- | --- | --- | --- | --- | --- |
 | H-001 | Interface 1 trägt den 1024-Byte-Empfangspfad; die Bedeutung als LCD-/Bilddatenpfad bleibt offen. | Direkter Call von Endpointcallback 3 zu `0x001297e8`; High-Speed-MPS `0x400`. | Befehl `0x08` und Datenbedeutung sind noch nicht vollständig aufgelöst. | Statisch den `0x08`-Folgepfad verfolgen. | Transportzuordnung bestätigt als C-009; Semantik offen |
 | H-002 | Interface 0 verwendet die symmetrische 440-Byte-Anfrage-/Antwortstruktur. | Endpointcallbacks 1/2, High-Speed-MPS `0x1b8`/`0x1b8` und 440-Byte-Antwortbauer. | Keine Gegenbeobachtung im statischen Pfad. | Keine weitere Prüfung für die Interfacezuordnung nötig. | bestätigt als C-008 |
-| H-003 | `0x87` liefert einen firmwarebuildabhängigen Versionswert; für die analysierte v51-Binärdatei ist er `0x0051`, beim mit `bcdDevice 0.49` erfassten Gerät könnte er `0x0049` sein. | v51-Dateiname und statische `0x0051`-Konstante; gesicherter USB-Deskriptor mit `bcdDevice 0.49`. | Die Live-Antwortbytes fehlen; weder `0x0049` noch die Versionssemantik wurden zur Laufzeit bestätigt. | Firmwareidentität rein lesend erneut erfassen; keine Testwiederholung allein zur Bestätigung. | starke Hypothese |
+| H-003 | `0x87` liefert einen firmwarebuildabhängigen Versionswert; für die analysierte v51-Binärdatei ist er `0x0051`, das mit `bcdDevice 0.49` erfasste reale Gerät liefert `0x0049`. | Statischer v51-Handler und vollständige 440-Byte-Antwort aus Live-Test 02. | Eine offizielle v49-Datei und ASUS-Zuordnung fehlen; die konkrete Binär-/Paketidentität des realen Geräts ist nicht belegt. | Nur noch statischer Vergleich mit einer glaubwürdigen v49-Datei oder offizielle ASUS-Zuordnung. | Versionswert-Abfrage bestätigt; Paketidentität v49 weiterhin abgeleitet |
 | H-004 | Beim Einmaltest wurde ein nach `open()` eingetroffener alter oder unabhängiger Interface-0-Report vor der neuen `0x87`-Antwort gelesen. | Das Programm prüft die Queue vor dem Write nicht und liest danach den ältesten verfügbaren Report; mehrere Antworttypen teilen den 440-Byte-IN-Pfad. | Ein Linux-Altbestand von vor `open()` ist für die neue per-Open-Queue ausgeschlossen; die Live-Bytes fehlen und belegen keinen fremden Befehl. | Zeitlich begrenzete, rein lesende Ruhezustandsbeobachtung und spätere Pre-Write-Readiness-Prüfung mit Abbruch. | technisch plausibel, nicht belegt |
 
 Hypothesen sind keine Implementierungsvorgaben. Sie werden bei neuen
@@ -289,6 +289,10 @@ unabhängiger Report ist im beobachteten Zustand damit weniger plausibel.
 H-004 bleibt wegen seltener beziehungsweise zustandsabhängiger Reports und des
 Race-Fensters zwischen einer späteren Readiness-Prüfung und einem Write
 möglich, ist durch den negativen Passivbefund aber geschwächt.
+Live-Test 02 schwächt die Erklärung für den zweiten Lauf weiter: Ruhephase und
+unmittelbare Queueprüfung waren leer, anschließend traf die exakt strukturierte
+`0x0049`-Antwort ein. Für Test 01 bleibt sie mangels erhaltener Bytes technisch
+möglich.
 
 ## Bestätigte Erkenntnisse
 
@@ -311,7 +315,7 @@ möglich, ist durch den negativen Passivbefund aber geschwächt.
 | C-015 | Der nachgelagerte Fatal-/Stop-Pfad `0x0012a218` wird im 440-Byte-Sendezweig nur für ein erstes Paketbyte `0xff` erreicht. Die korrekt gebaute `0x87`-Antwort verlässt den Zweig vorher. | Ghidra: `transport_dispatch_candidate` `0x001293f8`, Prüfung vor `0x00129674..0x00129678`. | 2026-07-29 |
 | C-016 | Ein einmaliger realer `0x87`-Test auf Interface 0 sendete den festgelegten 441-Byte-hidraw-Puffer und empfing einen 440-Byte-Report, dessen Inhalt von der erwarteten Gesamtfolge abwich. Die Antwortbytes wurden nicht gespeichert; eine byteweise Aussage ist daher nicht möglich. | Bedienerbericht und Abbruchverhalten von `src/test_command_0x87.py`; kein Rohmitschnitt. | 2026-08-05 |
 | C-017 | Eine neu geöffnete `hidraw`-Datei erhält eine eigene, anfangs leere Eingabequeue; `read()` liefert den ältesten darin vorhandenen Report. Vor `open()` bereits vom Host empfangene Reports werden nicht in diesen neuen per-Open-Puffer übernommen. | Linux-`hidraw.c`: nullinitialisierte `hidraw_list` in `hidraw_open()`, Einreihen in `hidraw_report_event()`, Lesen und Fortschalten von `tail` in `hidraw_read()`. | 2026-08-05 |
-| C-018 | `test_command_0x87.py` prüft nach `open()` die Geräteidentität, aber nicht die Eingabebereitschaft vor dem Write. Nach dem Write liest es genau einmal den ersten verfügbaren Report. | Statischer Kontrollfluss von `_run_once()`: `open` → `_validate_open_target` → ein `write` → ein `select` → ein `read`. | 2026-08-05 |
+| C-018 | Die beim Einmaltest am 2026-08-05 verwendete Version von `test_command_0x87.py` prüfte nach `open()` die Geräteidentität, aber nicht die Eingabebereitschaft vor dem Write. Nach dem Write las sie genau einmal den ersten verfügbaren Report. | Damaliger statischer Kontrollfluss von `_run_once()`: `open` → `_validate_open_target` → ein `write` → ein `select` → ein `read`. | 2026-08-05 |
 | C-019 | Für die analysierte v51-Firmware ist die kurze `0x87`-Antwort fest positioniert: Headermaske `0x800000ff`, ein Paket, `0x0051` an Offset 4/5 und Nullbytes bis Offset 439. Der gemeinsame Prolog verändert diese Builderargumente nicht. | Ghidra `0x00127588..0x001275c8` und `0x001298f8`; gezielte Literalprüfung bei `0x00129ad4`. | 2026-08-05 |
 | C-020 | Der 440-Byte-Antwortbauer und sein Queueobjekt werden von mehreren Befehlsantworten sowie einem transportseitigen `0xff`-Pfad gemeinsam verwendet; diese Reporttypen laufen über den Interface-0-IN-Pfad. | Ghidra-Call-Sites `0x00127178`, `0x001275c8`, `0x0012968c`, Queuezeiger `0x003b5ee0` und Endpointzuordnung aus `ghidra-dispatcher-call-paths.txt`. | 2026-08-05 |
 | C-021 | Der am 2026-07-29 gesicherte USB-Gerätedeskriptor meldet `bcdDevice 0.49`. | `captures/usb-descriptor-0b05-1c7b.txt`. | 2026-08-05 |
@@ -322,6 +326,10 @@ möglich, ist durch den negativen Passivbefund aber geschwächt.
 | C-026 | Zwei ausschließlich lesende Interface-0-Läufe von jeweils 60 Sekunden empfingen insgesamt keinen 440-Byte-Report. Es wurden daher weder `0x87`, `0x08` noch andere Header beobachtet. | `src/read_input.py --interface 0 --duration 60`, zweimal ohne `--capture`; Bericht `research/reports/interface0-passive-observation.md`. | 2026-09-01 |
 | C-027 | Ein paralleler rein lesender 60-Sekunden-Vergleich auf Interface 1 empfing keinen 16-Byte-Report. | `src/read_input.py --interface 1 --duration 60`, ohne `--capture`. | 2026-09-01 |
 | C-028 | OpenRGB lief während der Beobachtungen mit dem Profil `cyber blue`, hielt bei der Handleprüfung aber weder `/dev/hidraw7` noch `/dev/hidraw8` offen. Seine bloße Hintergrundaktivität korrelierte in den Beobachtungsfenstern mit keinem Report auf Interface 0 oder 1. | Prozess- und `lsof`-Prüfung sowie C-026/C-027. Eine aktive RGB-Änderung wurde nicht durchgeführt. | 2026-09-01 |
+| C-029 | Die gehärtete Version von `test_command_0x87.py` führt nach dem endgültigen `open()` eine feste fünfsekündige rein lesende Ruhephase und unmittelbar vor dem einzigen `os.write()` eine Nullzeit-Queueprüfung aus. Jeder dabei gelesene Report löst über einen Ausnahme-/`finally`-Pfad zuerst `close()` und danach vollständigen Terminal-Hexdump aus; der Write ist auf diesem Pfad nicht erreichbar. | Statischer Kontrollfluss von `_run_once()`, `_read_report_if_ready()` und `main()`; genau eine Quelltextstelle mit `os.write()`. | 2026-09-01 |
+| C-030 | Live-Test 02 durchlief eine fünfsekündige Ruhephase ohne Input und eine unmittelbar vor dem Write leere Queue, sendete genau einmal `00 | 87 01 00 80 | 436 × 00` und empfing genau `87 01 00 80 49 00 | 434 × 00` mit 440 Byte. Danach wurde ohne weiteren Write geschlossen. | Bestätigtes Bedienerergebnis; `research/reports/command-0x87-live-test-02.md`. | 2026-09-01 |
+| C-031 | `0x87` ist empirisch als Versions-/Versionswert-Abfragepfad bestätigt: Die v51-Firmware liefert statisch `0x0051`, das reale Gerät empirisch `0x0049`. Die beiden Antworten unterscheiden sich ausschließlich an Offset `0x0004`. | Ghidra-v51-Handler und vollständige Live-Test-02-Antwort. | 2026-09-01 |
+| C-032 | Für das reale Gerät stimmen der über `0x87` gelieferte Wert `0x0049` und die Ziffern der USB-Geräterevision `bcdDevice 0.49` überein. Damit ist noch nicht bytegenau bewiesen, dass der installierte Binärstand einer offiziellen ASUS-Datei mit Paketbezeichnung v49 entspricht. | C-021, C-030 und fehlender v49-Dateifund aus `firmware-v49-investigation.md`. | 2026-09-01 |
 
 Die Reportgrößen und das Host-Framing von Interface 0 sind bestätigt.
 Weiterhin offen sind mehrere Inhalts- und Befehlssemantiken.
@@ -628,17 +636,22 @@ einen vollständigen Befehl `0x08` in einen gesonderten Datenqueue-/
 Zustandspfad. Eine vollständige statische Verknüpfung und die höhere
 Datenbedeutung sind nicht belegt.
 
-Für eine einpaketige leere `0x87`-Anfrage ergibt sich statisch als
-Paketkandidat:
+Für eine einpaketige leere `0x87`-Anfrage ist statisch und empirisch belegt:
 
 ```text
 87 01 00 80 00 ... 00     (440 Byte)
 ```
 
-Die vom Antwortbauer der analysierten v51-Firmware erwartbare Struktur ist:
+Die Antwort der analysierten v51-Firmware ist statisch:
 
 ```text
 87 01 00 80 51 00 00 ... 00     (440 Byte)
+```
+
+Das reale Gerät antwortete in Live-Test 02:
+
+```text
+87 01 00 80 49 00 00 ... 00     (440 Byte)
 ```
 
 Für die analysierte v51-Binärdatei belegt sind Headeralgorithmus, Befehl,
@@ -647,9 +660,10 @@ Interface 0, `0x01` OUT für die Anfrage und `0x82` IN für die Antwort.
 Firmwareseitig existiert kein zusätzliches Report-ID-Byte. An
 `hidraw.write()` ist stattdessen `00` plus dieser 440-Byte-Kandidat, insgesamt
 441 Byte, zu übergeben; `hidraw.read()` liefert den unnummerierten
-440-Byte-Report ohne Nullpräfix. `0x87` ist damit transporttechnisch
-vollständig gerahmt, bleibt aber ein Versionskandidat und ausdrücklich keine
-Sendefreigabe.
+440-Byte-Report ohne Nullpräfix. `0x87` ist damit transporttechnisch vollständig
+gerahmt und empirisch als Versions-/Versionswert-Abfragepfad bestätigt. Das
+Halbwort an Offset 4/5 ist v51-statisch `0x0051` und auf dem realen Gerät
+empirisch `0x0049`. Diese Erkenntnis ist ausdrücklich keine Sendefreigabe.
 
 Die abschließende statische Sicherheitsbewertung stuft `0x87` als
 **wahrscheinlich rein lesend** ein. Der eigentliche Case ist konstant und
@@ -684,7 +698,7 @@ bestätigt.
 
 Offen bleiben die Semantik des 16-Byte-IN-Pfads von Interface 1, die höheren
 Bedeutungen und die Verbindung der beiden `0x08`-Pfade, die Bedeutungen der
-kurzen Antwortwerte sowie mehrere indirekte Callbackziele. Die
+anderen kurzen Antwortwerte sowie mehrere indirekte Callbackziele. Die
 Ghidra-Call-Graph-Suche konnte LCM/emWin, Boot-/JPG- und SPI-String-Eigentümer
 wegen indirekter Aufrufe nicht lückenlos mit den Dispatchern verbinden.
 
@@ -711,8 +725,8 @@ Die exakte Erwartung war jedoch nicht als versionsübergreifende Invariante
 belegt: Der vorhandene Gerätedeskriptor meldet `bcdDevice 0.49`, während nur die
 v51-Binärdatei analysiert wurde. Ein versionsabhängiger Wert ist deshalb die
 stärkste Erklärung. Zusätzlich bleibt ein nach `open()` eingetroffener alter
-oder unabhängiger Report möglich. Die Einmaltest-Implementierung prüft die Queue
-vor dem Write nicht und liest danach den ältesten verfügbaren Report. Ein
+oder unabhängiger Report möglich. Die damalige Einmaltest-Implementierung
+prüfte die Queue vor dem Write nicht und las danach den ältesten verfügbaren Report. Ein
 Hostqueue-Altbestand aus der Zeit vor `open()` ist dagegen durch die per-Open-
 Queue von Linux ausgeschlossen.
 
@@ -738,11 +752,12 @@ Updaterpfad fehlt jedoch ein Vergleich oder eine Umrechnung, die
 `bcdDevice 0.49` mit der InfoHub-Firmwareversion 49 gleichsetzt. Nach USB ist
 `bcdDevice` zunächst nur eine herstellerdefinierte BCD-Geräterevision.
 
-Deshalb bleibt H-003 eine starke Hypothese: Das reale Gerät läuft
-wahrscheinlich mit Firmware 49, und ein v49-`0x87`-Handler könnte `0x0049`
-liefern. Bestätigt ist dies ohne v49-Binärdatei, erhaltene Live-Antwortbytes
-oder offizielle Zuordnung nicht. Ein v49/v51-Handlervergleich war nicht
-möglich.
+Live-Test 02 bestätigt inzwischen den vollständigen Antwortreport mit
+`0x0049`. Damit ist H-003 hinsichtlich des Versionswert-Abfragepfads bestätigt.
+Weiterhin abgeleitet bleibt die Benennung des installierten Binärstands als
+offizielle ASUS-Firmware v49, weil eine v49-Datei und eine ausdrückliche
+ASUS-Zuordnung fehlen. Ein statischer v49/v51-Handlervergleich bleibt
+unmöglich.
 
 Quellen, Suchpfade, Prüfsummen und die genaue Trennung zwischen Beleg und
 Ableitung sind in
@@ -770,26 +785,52 @@ oder häufigen spontanen Interface-0-Reports im normalen Zustand. Seltene oder
 zustandsabhängige Reports, ein firmwareseitig ausstehender Report und das
 Race-Fenster zwischen einer späteren Readiness-Prüfung und einem Write bleiben
 möglich. Relativ dazu wird eine kausale, firmwareversionsabhängig abweichende
-`0x87`-Antwort als Erklärung des Einmaltests plausibler, ohne bestätigt zu
-sein.
+`0x87`-Antwort als Erklärung des ersten Einmaltests plausibler. Test 02
+bestätigte danach genau diese Struktur mit `0x0049`, ohne die verlorenen Bytes
+von Test 01 rückwirkend zu belegen.
 
 Für jede spätere, gesondert autorisierte Testspezifikation ist eine definierte
 Ruhephase nach `open()` plus unmittelbarer Pre-Write-Readiness-Check mit
 Abbruch bei jedem Report sinnvoll. Der Check allein beweist wegen des
 Race-Fensters keine Kausalität. Nach einem einzelnen Write müssten sämtliche
-Reports bis zur Deadline mit Zeitstempel und vollständigen Bytes erhalten
-werden; eine Wiederholung wäre nicht zulässig.
+Bytes des ersten bis zur Deadline eintreffenden Reports erhalten werden; eine
+Wiederholung wäre nicht zulässig.
 
 Der vollständige Ablauf und die Sicherheitsgrenzen stehen in
 `../research/reports/interface0-passive-observation.md`. Diese Beobachtung ist
 keine Freigabe für einen weiteren HID-Write.
 
-Der Test wurde nicht wiederholt. Das Gerät wurde sofort geschlossen, die
-temporäre Schreibregel entfernt und für beide Interfaces wieder `0640`
-bestätigt. Die AIO blieb normal erkennbar; im geprüften Kernelprotokoll gab es
-keine testbedingten USB-Fehler, Resets oder Disconnects. Dieses Ergebnis
-erteilt keine Wiederholungsfreigabe. Vor jeder späteren Neubewertung sind
-Firmwareidentität und ein möglicher spontaner Reportstrom von Interface 0 rein
-lesend zu prüfen; ein endgültiger Testdeskriptor müsste vor dem Write auf
-Eingabebereitschaft geprüft werden und bei jedem vorhandenen Report ohne Write
-schließen.
+## Härtung des Einmaltestcodes am 2026-09-01
+
+`src/test_command_0x87.py` implementiert die passive Empfehlung jetzt als
+feste fünfsekündige Ruhephase auf dem endgültig geöffneten Deskriptor und als
+zweite Nullzeit-Prüfung unmittelbar vor dem Write. Beide Prüfungen verwenden
+nur `select()` und gegebenenfalls `os.read()`. Sobald ein Report gelesen wird,
+springt der Kontrollfluss über eine Ausnahme in den `finally`-Close und gibt
+erst danach Länge und vollständigen Hexdump aus. Die einzige
+`os.write()`-Stelle liegt ausschließlich hinter beiden Leerbefunden.
+
+Nach Live-Test 02 akzeptiert der Code jede strukturell korrekte Antwort aus
+Header `87 01 00 80`, einem 16-Bit-Versionswert und 434 Nullbytes. Nur
+strukturell ungültige Antworten werden als Fehler vollständig ausgegeben und
+byteweise gegen die v51-Referenz verglichen. Es gibt weiterhin keinen Retry,
+keine automatische Recovery und keine standardmäßige Dateispeicherung. Die
+Härtung beseitigt nicht das Race-Fenster zwischen letzter Queueprüfung und
+Write und ist keine Ausführungsfreigabe.
+
+## Realer Einmaltest `0x87` – Test 02, dokumentiert am 2026-09-01
+
+Der gesondert autorisierte zweite Test ist unter
+`../research/reports/command-0x87-live-test-02.md` vollständig dokumentiert.
+Die fünfsekündige Ruhephase blieb ohne Report, und die unmittelbare
+Pre-Write-Prüfung fand die Queue leer. Nach genau einem Write traf exakt der
+440-Byte-Report `87 01 00 80 49 00 | 434 × 00` ein. Gegenüber der statischen
+v51-Antwort wich nur Offset `0x0004` ab: `0x49` statt `0x51`. Danach wurde ohne
+weiteren Write, Retry oder automatische Recovery geschlossen.
+
+Direkt bestätigt sind damit der Versionswert `0x0049`, die konstante
+Antwortstruktur und die Übereinstimmung mit den Ziffern von `bcdDevice 0.49`.
+Nicht direkt bestätigt ist die bytegenaue Identität des installierten
+Binärstands mit einer offiziellen ASUS-Firmwaredatei v49. Die abgeschlossenen
+Tests erteilen keine weitere Sendefreigabe; in dieser Dokumentationsarbeit fand
+keine Gerätekommunikation statt.
