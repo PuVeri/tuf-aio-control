@@ -61,6 +61,13 @@ Displaykonfiguration beschreibt.
 - Linux führt für jeden neu geöffneten `hidraw`-Dateideskriptor eine eigene,
   zunächst leere Inputqueue. Ein Read liefert den ältesten seit diesem Öffnen
   für den Deskriptor eingereihten Report.
+- Zwei passive `O_RDONLY`-Beobachtungen von Interface 0 am 2026-09-01 dauerten
+  zusammen 120 Sekunden und empfingen keinen Report. Ein paralleler
+  60-Sekunden-Vergleich auf Interface 1 blieb ebenfalls ohne Report.
+- OpenRGB lief dabei mit einem bereits geladenen Profil, hielt aber die beiden
+  LCD-HID-Knoten nicht offen. Seine bloße Hintergrundaktivität erzeugte keinen
+  sichtbaren Report; eine aktive RGB-Änderung wurde wegen des
+  USB-Schreibverbots nicht geprüft.
 - Der gesicherte USB-Gerätedeskriptor meldet `bcdDevice 0.49`.
 - USB `GET_DESCRIPTOR` wird separat vom Geräteprotokoll verarbeitet. Die
   Werte `0x01`, `0x02`, `0x03`, `0x06`, `0x07`, `0x21` und `0x22` sind dort
@@ -132,6 +139,16 @@ Host empfangener Report kann nicht in der neuen per-Open-Queue liegen; ein noch
 geräte-/firmwareseitig ausstehender oder nach `open()` unabhängig eingetroffener
 Report kann dagegen zuerst gelesen werden.
 
+Die passive Folgeprüfung am 2026-09-01 fand in insgesamt 120 Sekunden auf
+Interface 0 keinen spontanen Report. Ein regelmäßig oder häufig unabhängig
+gesendeter Report ist im beobachteten normalen Zustand damit weniger
+wahrscheinlich. Seltene und zustandsabhängige Reports sowie das Race-Fenster
+zwischen einer späteren Queueprüfung und einem Write bleiben möglich. Der
+negative Befund erhöht relativ die Plausibilität einer kausalen, aber
+firmwareversionsabhängig abweichenden `0x87`-Antwort; er bestätigt sie ohne die
+verlorenen Bytes nicht. Details stehen in
+`../research/reports/interface0-passive-observation.md`.
+
 Die abschließende statische Sicherheitsklasse lautet **wahrscheinlich rein
 lesend**. Der `0x87`-Case selbst liest keinen Payload und baut ausschließlich
 die konstante Antwort `0x0051`. Der gemeinsame Dispatcherprolog kann jedoch
@@ -168,6 +185,10 @@ Reset- oder persistenten Konfigurationspfad. Details stehen in
   Indizien nicht bestätigt; eine v49-Binärdatei wurde nicht gefunden.
 - Die Einmaltest-Implementierung erkennt einen nach `open()` bereits wartenden
   Inputreport vor dem Write nicht.
+- Ein Pre-Write-Queue-Check würde einen bereits wartenden Report erkennen und
+  ist für jede spätere Spezifikation erforderlich. Allein ist er wegen des
+  Race-Fensters und möglicher nach dem Write eintreffender unabhängiger Reports
+  kein Kausalitätsbeweis.
 
 ## Ergebnis des realen Einmaltests 01
 

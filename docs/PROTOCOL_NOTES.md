@@ -283,6 +283,13 @@ Offset  Hexadezimale Bytes
 Hypothesen sind keine Implementierungsvorgaben. Sie werden bei neuen
 Beobachtungen aktualisiert, bestätigt oder ausdrücklich widerlegt.
 
+**Nachbewertung H-004 am 2026-09-01:** In 120 Sekunden passiver
+Interface-0-Beobachtung trat kein Report auf. Ein regelmäßiger oder häufiger
+unabhängiger Report ist im beobachteten Zustand damit weniger plausibel.
+H-004 bleibt wegen seltener beziehungsweise zustandsabhängiger Reports und des
+Race-Fensters zwischen einer späteren Readiness-Prüfung und einem Write
+möglich, ist durch den negativen Passivbefund aber geschwächt.
+
 ## Bestätigte Erkenntnisse
 
 | ID | Erkenntnis | Evidenz | Bestätigt am |
@@ -312,6 +319,9 @@ Beobachtungen aktualisiert, bestätigt oder ausdrücklich widerlegt.
 | C-023 | Eine offizielle ASUS-InfoHub-FAQ zeigt in ihrer Einstellungsabbildung für das Zielmodell den Wert `Firmware version 50`. | ASUS-FAQ 1055446, Abbildung `20250701144727892_13.png`. | 2026-09-01 |
 | C-024 | Der v51-Updater ruft `HidD_GetAttributes` auf und übernimmt das WORD `VersionNumber` an `HIDD_ATTRIBUTES`-Offset `+8` in seine interne Gerätebeschreibung. Im untersuchten Auswahl-/Upgradepfad wurde kein Vergleich dieses Wertes mit `0x49`, `0x51` oder dem Firmwareinhalt gefunden. | Statische x86-Disassembly bei `0x40bdbd`, `0x40bdec`, `0x40bdf2` und `0x40be4c`; Microsoft-Definition von `HIDD_ATTRIBUTES`. | 2026-09-01 |
 | C-025 | Die v51-ARM-Nutzlast enthält am Dateioffset `0x2eba0` eine headerartige Region mit dem 32-Bit-Wert `0x51`, unmittelbar gefolgt von VID `0x0b05` und PID `0x1c7b`. Die genaue Feldsemantik ist nicht bestätigt. | Statische Byteprüfung der ARM-Nutzlast mit SHA-256 `c4679ec340fc5edd3dea960ee027281cf6bd81cbbf347afb40e0d0b4f40aeb9f`. | 2026-09-01 |
+| C-026 | Zwei ausschließlich lesende Interface-0-Läufe von jeweils 60 Sekunden empfingen insgesamt keinen 440-Byte-Report. Es wurden daher weder `0x87`, `0x08` noch andere Header beobachtet. | `src/read_input.py --interface 0 --duration 60`, zweimal ohne `--capture`; Bericht `research/reports/interface0-passive-observation.md`. | 2026-09-01 |
+| C-027 | Ein paralleler rein lesender 60-Sekunden-Vergleich auf Interface 1 empfing keinen 16-Byte-Report. | `src/read_input.py --interface 1 --duration 60`, ohne `--capture`. | 2026-09-01 |
+| C-028 | OpenRGB lief während der Beobachtungen mit dem Profil `cyber blue`, hielt bei der Handleprüfung aber weder `/dev/hidraw7` noch `/dev/hidraw8` offen. Seine bloße Hintergrundaktivität korrelierte in den Beobachtungsfenstern mit keinem Report auf Interface 0 oder 1. | Prozess- und `lsof`-Prüfung sowie C-026/C-027. Eine aktive RGB-Änderung wurde nicht durchgeführt. | 2026-09-01 |
 
 Die Reportgrößen und das Host-Framing von Interface 0 sind bestätigt.
 Weiterhin offen sind mehrere Inhalts- und Befehlssemantiken.
@@ -739,6 +749,40 @@ Ableitung sind in
 `../research/reports/firmware-v49-investigation.md` dokumentiert. Die
 Untersuchung umfasste keine Geräte-Schreibzugriffe, Firmwareübertragung oder
 Ausführung von ASUS-Dateien.
+
+## Passive Interface-0-Beobachtung am 2026-09-01
+
+Der vorhandene Beobachter `src/read_input.py` öffnete das dynamisch anhand
+USB-ID und Interface-Nummer ermittelte Interface 0 ausschließlich mit
+`O_RDONLY | O_NONBLOCK`. Zwei getrennte Läufe von jeweils 60 Sekunden blieben
+ohne Eingang. Im zweiten Lauf wurde Interface 1 parallel 60 Sekunden rein
+lesend beobachtet und blieb ebenfalls ohne Eingang. Es entstanden keine
+Rohcaptures; mangels Reports waren keine Zeitstempel, Längen oder Hexdumps zu
+protokollieren.
+
+OpenRGB lief währenddessen bereits mit dem Profil `cyber blue`. Die passive
+Handleprüfung zeigte keine offenen Deskriptoren des Prozesses auf den beiden
+LCD-HID-Knoten. Eine aktive RGB-Änderung wurde wegen des Verbots von USB-
+Schreiboperationen nicht ausgelöst; ihr Einfluss bleibt daher unbekannt.
+
+Der Befund widerlegt H-004 nicht, schwächt aber die Annahme eines regelmäßigen
+oder häufigen spontanen Interface-0-Reports im normalen Zustand. Seltene oder
+zustandsabhängige Reports, ein firmwareseitig ausstehender Report und das
+Race-Fenster zwischen einer späteren Readiness-Prüfung und einem Write bleiben
+möglich. Relativ dazu wird eine kausale, firmwareversionsabhängig abweichende
+`0x87`-Antwort als Erklärung des Einmaltests plausibler, ohne bestätigt zu
+sein.
+
+Für jede spätere, gesondert autorisierte Testspezifikation ist eine definierte
+Ruhephase nach `open()` plus unmittelbarer Pre-Write-Readiness-Check mit
+Abbruch bei jedem Report sinnvoll. Der Check allein beweist wegen des
+Race-Fensters keine Kausalität. Nach einem einzelnen Write müssten sämtliche
+Reports bis zur Deadline mit Zeitstempel und vollständigen Bytes erhalten
+werden; eine Wiederholung wäre nicht zulässig.
+
+Der vollständige Ablauf und die Sicherheitsgrenzen stehen in
+`../research/reports/interface0-passive-observation.md`. Diese Beobachtung ist
+keine Freigabe für einen weiteren HID-Write.
 
 Der Test wurde nicht wiederholt. Das Gerät wurde sofort geschlossen, die
 temporäre Schreibregel entfernt und für beide Interfaces wieder `0640`
