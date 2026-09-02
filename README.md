@@ -5,10 +5,10 @@ Linux-Anwendung zur Steuerung des LCDs der **ASUS TUF Gaming LC III 360 ARGB
 LCD**. Langfristig soll das Display eigene Bilder oder Animationen sowie reale
 Hardwaretemperaturen anzeigen können.
 
-Der sichere Einzelbildpfad für bereits kompatible 320×320-JPEGs ist inzwischen
-statisch geprüft und auf dem realen Gerät bestätigt. Automatische
-Bildkonvertierung, Animationen, Dauerbetrieb und Sensordarstellung sind noch
-nicht implementiert.
+Der sichere Einzelbildpfad ist statisch geprüft und auf dem realen Gerät
+bestätigt. Die Desktop-UI bereitet JPEG, PNG, WebP, BMP und den ersten
+GIF-Frame automatisch als validiertes 320×320-JPEG vor. Animationen,
+Dauerbetrieb und Sensordarstellung sind noch nicht implementiert.
 
 ## Desktop-UI starten
 
@@ -18,11 +18,15 @@ Die erste Desktop-Oberfläche verwendet PySide6 und startet mit:
 python3 -B src/tuf_aio_gui.py
 ```
 
-Die UI sendet niemals automatisch. Sie zeigt kompatible und inkompatible
-Bilder als Vorschau, soweit Qt sie lesen kann. Nur ein bereits kompatibles
-JPEG kann nach einem ausdrücklichen Klick auf `Auf Display senden` genau einmal
-übertragen werden. Die Oberfläche konvertiert keine Bilder und verändert keine
-Geräteberechtigungen.
+Verwendet werden die bereits vorhandenen lokalen Pakete PySide6 6.11.1 und
+Pillow 12.3.0 mit libjpeg-turbo; das Projekt installiert keine Pakete selbst.
+
+Die UI sendet niemals automatisch. Sie zeigt Original und finale
+320×320-Vorschau und bietet mittiges Zuschneiden oder Einpassen auf Schwarz.
+Erst nach erfolgreicher Konvertierung und erneuter ASUS-JPEG-Validierung kann
+ein ausdrücklicher Klick auf `Auf Display senden` genau einen Frame
+übertragen. GIF wird ausschließlich als Standbild aus Frame 0 verarbeitet.
+Die Oberfläche verändert keine Geräteberechtigungen.
 
 ## Projektziele
 
@@ -38,8 +42,8 @@ Die geplante Anwendung soll:
 - Zugriffsfehler und nicht unterstützte Geräte verständlich melden,
 - das ermittelte Protokoll nachvollziehbar und reproduzierbar dokumentieren.
 
-Nicht Ziel der aktuellen Phase sind automatische Bildkonvertierung,
-Animationen, Dauerbetrieb, Sensoranzeige, Autostart oder ein Hintergrunddienst.
+Nicht Ziel der aktuellen Phase sind Animationen, Dauerbetrieb, Sensoranzeige,
+Autostart oder ein Hintergrunddienst.
 
 ## Aktueller Erkenntnisstand
 
@@ -59,7 +63,7 @@ Animationen, Dauerbetrieb, Sensoranzeige, Autostart oder ein Hintergrunddienst.
 ### Noch nicht bestätigt
 
 - Animationen, mehrere Frames und langfristiger Dauerbetrieb.
-- Automatische Konvertierung beliebiger Quellbilder.
+- Weitere Eingabeformate außerhalb JPEG, PNG, WebP, BMP und GIF-Frame 0.
 - Fehler-, Timeout- und Recoveryverhalten des realen v49-Geräts.
 - Andere JPEG-Profile und Segmentzahlen als der erfolgreiche Referenztransfer.
 - Sensorerfassung und Darstellung von Hardwarewerten.
@@ -124,8 +128,9 @@ explizite Angaben zu Quelle, Einheit, Zeitstempel und Verfügbarkeit.
 
 ### Renderer
 
-Eine automatische Aufbereitung existiert noch nicht. Der aktuelle Pfad nimmt
-nur bereits kompatible 320×320-JPEGs an.
+`src/image_pipeline.py` berücksichtigt EXIF-Orientierung und Transparenz,
+skaliert per Crop oder Fit und erzeugt im Speicher ein konservatives
+320×320-JPEG. Der bestehende ASUS-Validator prüft jede Ausgabe erneut.
 
 ### Anwendung und Benutzeroberfläche
 
@@ -218,8 +223,9 @@ dieser Phase nicht erweitert.
 
 ## Status
 
-**Erste funktionsfähige Einzelbildstufe.** Der `0x08`-JPEG-Transfer und die
-wiederverwendbare Einzelbild-CLI wurden auf dem realen v49-Gerät bestätigt.
-Die Desktop-UI ist vollständig offline getestet, wurde in diesem Ticket aber
-nicht gegen das Gerät ausgeführt. Weitere Betriebsarten benötigen jeweils eine
+**Funktionsfähige Einzelbildstufe mit Offline-Bildvorbereitung.** Der
+`0x08`-JPEG-Transfer und die wiederverwendbare Einzelbild-CLI wurden auf dem
+realen v49-Gerät bestätigt. Bildpipeline und Desktop-UI sind vollständig
+offline getestet, wurden in diesem Ticket aber nicht gegen das Gerät
+ausgeführt. GIF-Animation und weitere Betriebsarten benötigen jeweils eine
 eigene Sicherheitsbewertung und Freigabe.

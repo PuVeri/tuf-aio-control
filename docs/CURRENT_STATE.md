@@ -529,26 +529,50 @@ Die Oberfläche enthält keine Controlwords, HID-Paketbildung oder eigene
 Geräteöffnung, sondern verwendet ausschließlich `lcd_transport.py`.
 
 Die dunkle, layoutbasierte Oberfläche zeigt den dynamisch erkannten
-Gerätestatus, eine Bildvorschau, Pfad, Auflösung, JPEG-Profil, Dateigröße,
-Segmentzahl, Padding und Validierungsstatus. Bereits kompatible JPEGs können
-erst nach einem expliziten Klick auf `Auf Display senden` übertragen werden.
-Inkompatible, von Qt darstellbare Bilder bleiben als Preview sichtbar, der
-Sendebutton ist dann deaktiviert und der Validierungsfehler wird angezeigt.
-Eine automatische Bildkonvertierung existiert weiterhin nicht.
+Gerätestatus, getrennte Original-/Ausgabevorschauen, Pfad, Auflösungen,
+Eingabeformat, JPEG-Profil, Dateigröße, Segmentzahl, Padding und
+Validierungsstatus. Unterstützte Quellen werden offline vorbereitet; erst
+nach einem expliziten Klick auf `Auf Display senden` kann ein Frame übertragen
+werden. Nicht verarbeitbare, von Qt darstellbare Bilder bleiben nach
+Möglichkeit als Originalpreview sichtbar, der Sendebutton ist dann deaktiviert
+und der Validierungsfehler wird angezeigt.
 
-Vor jedem Klicktransfer liest und validiert die GUI die Datei erneut und führt
-die dynamische Geräteerkennung erneut aus. Danach ruft sie
+Vor jedem Klicktransfer validiert die GUI die finalen JPEG-Bytes erneut und
+führt die dynamische Geräteerkennung erneut aus. Danach ruft sie
 `send_frame_once()` genau einmal auf; dessen VID/PID-, Interface-, Report- und
 Per-Write-Revalidierungen bleiben unverändert. Es gibt kein automatisches
 Senden, Retry, Reconnect, Polling-Write, IN-Read, Interface 0, Folgeframe,
 Animation, Autostart oder Hintergrunddienst.
 
-Die gesamte Offline-Suite umfasst jetzt 53 erfolgreiche Tests. Fünf
+## Sichere Offline-Bildvorbereitung
+
+`src/image_pipeline.py` akzeptiert JPEG/JPG, PNG, WebP, BMP und GIF. Es wendet
+EXIF-Orientierung an, setzt Transparenz auf Schwarz zusammen, konvertiert nach
+RGB und erzeugt je nach GUI-Auswahl entweder einen mittig beschnittenen Crop
+oder ein vollständig sichtbares Fit-Bild mit schwarzer Restfläche. Beide Modi
+erhalten das Seitenverhältnis und liefern exakt 320×320 ohne freie Verzerrung.
+
+Die JPEG-Ausgabe entsteht ausschließlich im Speicher mit Pillow 12.3.0 und
+libjpeg-turbo: Qualität 60, 4:2:0, `progressive=False`, `optimize=False`.
+Anschließend muss sie den unveränderten `lcd_transport.validate_jpeg()`-
+Vertrag einschließlich JFIF, SOF0, 8 Bit, Standard-Huffmantabellen, EOI ohne
+Nachlauf und `N<=200` erfüllen. Quellen über 64.000.000 Pixel werden vor der
+vollständigen Verarbeitung abgelehnt; Originaldateien werden nie verändert.
+
+GIF ist ausdrücklich nur als Standbild unterstützt. Pipeline und GUI laden
+ausschließlich Frame 0, iterieren über keine weiteren Frames und kennzeichnen
+die Quelle als `GIF · erstes Bild als Standbild`. Es existieren kein `QMovie`,
+Timer oder Mehrfachframepfad. Details stehen in
+`docs/LCD_IMAGE_PIPELINE.md`.
+
+Die gesamte Offline-Suite umfasst jetzt 66 erfolgreiche Tests. Fünf
 headless-Qt-Tests prüfen Referenzbild, inkompatible Preview, fehlendes Gerät,
 Transportfehler ohne Retry und genau einen `send_frame_once()`-Aufruf pro
-Sendeklick. Alle Geräteoperationen sind gemockt; während dieses GUI-Tickets
-fand keine Gerätekommunikation statt und die Referenzdatei wurde nicht
-gesendet.
+Sendeklick. Weitere Pipeline-Tests prüfen Landscape/Portrait in Crop und Fit,
+Quadrat, Alpha-PNG, JPEG/PNG/WebP/BMP, animiertes GIF mit ausschließlich Frame
+0, EXIF-Rotation sowie sehr kleine, große und ungültige Quellen. Alle
+Geräteoperationen sind gemockt; während dieses Tickets fand keine
+Gerätekommunikation statt und kein Bild wurde gesendet.
 
 ## Gefährliche und ausgeschlossene Pfade
 
@@ -570,8 +594,8 @@ Der freigegebene Einmaltransfer ist abgeschlossen und dokumentiert. Ein
 weiterer Frame, Animationen, Dauerbetrieb, Fehlerpfadtests oder andere
 JPEG-Profile sind weder aus dem Ergebnis ableitbar noch freigegeben. Jede
 solche Erweiterung benötigt eine neue, eigenständige Sicherheitsbewertung und
-ausdrückliche Autorisierung. Vor automatischer Bildkonvertierung müssen
-Skalierung/Crop, Farbraum, 4:2:0-Sampling, Baseline-Encoderparameter,
-Qualitäts-/Größengrenzen und die erneute Ausgangsvalidierung deterministisch
-festgelegt und offline getestet werden. Schreibrechte bleiben deaktiviert.
-Ein passiver ASUS-Referenzcapture bleibt optional zusätzliche Evidenz.
+ausdrückliche Autorisierung. Vor echter GIF-Animation müssen insbesondere
+Frame-Timing, Decoder-Lease, Framerate-/Laufzeitgrenzen, Teiltransferfehler und
+Abbruchverhalten statisch und real sicher bewertet werden. Schreibrechte
+bleiben deaktiviert. Ein passiver ASUS-Referenzcapture bleibt optional
+zusätzliche Evidenz.

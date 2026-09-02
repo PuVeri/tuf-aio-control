@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PySide6 desktop UI for one explicitly requested ASUS LCD image transfer."""
+"""PySide6 UI for one explicitly requested, prepared ASUS LCD image."""
 
 from __future__ import annotations
 
@@ -7,9 +7,10 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap, QResizeEvent
+from PySide6.QtGui import QImageReader, QPixmap, QResizeEvent
 from PySide6.QtWidgets import (
     QApplication,
+    QComboBox,
     QFileDialog,
     QFrame,
     QGridLayout,
@@ -23,19 +24,23 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+import image_pipeline
 import lcd_transport as transport
 
 
 class MainWindow(QMainWindow):
-    """Single-image UI; all protocol and device work stays in lcd_transport."""
+    """Single-image UI; conversion and transport stay in separate modules."""
 
     def __init__(self) -> None:
         super().__init__()
         self._selected_path: Path | None = None
-        self._preview_pixmap: QPixmap | None = None
+        self._prepared: image_pipeline.PreparedImage | None = None
+        self._device_ready = False
+        self._original_pixmap: QPixmap | None = None
+        self._final_pixmap: QPixmap | None = None
 
         self.setWindowTitle("TUF AIO Control")
-        self.resize(720, 780)
+        self.resize(920, 820)
         self._build_ui()
         self._apply_style()
         self.refresh_device_status()
@@ -62,61 +67,90 @@ class MainWindow(QMainWindow):
         device_text = QVBoxLayout()
         device_text.addWidget(self.device_status_label)
         device_text.addWidget(self.device_detail_label)
+        self.refresh_button = QPushButton("Gerät aktualisieren")
+        self.refresh_button.clicked.connect(self.refresh_device_status)
         device_layout.addWidget(self.device_dot)
         device_layout.addLayout(device_text, 1)
+        device_layout.addWidget(self.refresh_button)
         outer.addWidget(device_card)
 
-        preview_card = QFrame()
-        preview_card.setObjectName("previewCard")
-        preview_layout = QVBoxLayout(preview_card)
-        preview_layout.setContentsMargins(18, 18, 18, 18)
-        self.preview_label = QLabel("Noch kein Bild ausgewählt")
-        self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview_label.setMinimumSize(320, 320)
-        self.preview_label.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
-        )
-        self.preview_label.setObjectName("preview")
-        preview_layout.addWidget(self.preview_label, 1)
-        outer.addWidget(preview_card, 1)
+        previews = QFrame()
+        previews.setObjectName("previewCard")
+        preview_grid = QGridLayout(previews)
+        preview_grid.setContentsMargins(18, 18, 18, 18)
+        preview_grid.setHorizontalSpacing(18)
+        preview_grid.addWidget(self._preview_title("Original"), 0, 0)
+        preview_grid.addWidget(self._preview_title("LCD-Ausgabe 320×320"), 0, 1)
+        self.original_preview = self._preview_label("Noch kein Bild ausgewählt")
+        self.final_preview = self._preview_label("Noch keine Ausgabe erzeugt")
+        preview_grid.addWidget(self.original_preview, 1, 0)
+        preview_grid.addWidget(self.final_preview, 1, 1)
+        preview_grid.setColumnStretch(0, 1)
+        preview_grid.setColumnStretch(1, 1)
+        outer.addWidget(previews, 1)
+
+        options = QFrame()
+        options.setObjectName("card")
+        options_layout = QHBoxLayout(options)
+        options_layout.addWidget(QLabel("Skalierung:"))
+        self.scale_mode = QComboBox()
+        self.scale_mode.addItem("Zuschneiden", "crop")
+        self.scale_mode.addItem("Einpassen", "fit")
+        self.scale_mode.currentIndexChanged.connect(self._scale_mode_changed)
+        options_layout.addWidget(self.scale_mode)
+        options_layout.addStretch(1)
+        outer.addWidget(options)
 
         info_card = QFrame()
         info_card.setObjectName("card")
         info_layout = QGridLayout(info_card)
         info_layout.setHorizontalSpacing(18)
         info_layout.setVerticalSpacing(8)
-
         self.path_value = self._add_info_row(info_layout, 0, "Datei")
-        self.resolution_value = self._add_info_row(info_layout, 1, "Auflösung")
-        self.profile_value = self._add_info_row(info_layout, 2, "JPEG-Profil")
-        self.size_value = self._add_info_row(info_layout, 3, "Dateigröße")
-        self.segments_value = self._add_info_row(info_layout, 4, "Segmentzahl")
-        self.padding_value = self._add_info_row(info_layout, 5, "Padding")
-        self.validation_value = self._add_info_row(info_layout, 6, "Validierung")
-        self.path_value.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse
-        )
+        self.original_size_value = self._add_info_row(info_layout, 1, "Originalauflösung")
+        self.input_format_value = self._add_info_row(info_layout, 2, "Eingabeformat")
+        self.output_size_value = self._add_info_row(info_layout, 3, "Ausgabeauflösung")
+        self.profile_value = self._add_info_row(info_layout, 4, "JPEG-Ausgabe")
+        self.jpeg_size_value = self._add_info_row(info_layout, 5, "JPEG-Größe")
+        self.segments_value = self._add_info_row(info_layout, 6, "Segmentzahl")
+        self.padding_value = self._add_info_row(info_layout, 7, "Padding")
+        self.validation_value = self._add_info_row(info_layout, 8, "Validierung")
+        self.path_value.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.path_value.setWordWrap(True)
         outer.addWidget(info_card)
 
-        button_layout = QHBoxLayout()
-        button_layout.setSpacing(12)
+        buttons = QHBoxLayout()
+        buttons.setSpacing(12)
         self.select_button = QPushButton("Bild auswählen")
         self.select_button.clicked.connect(self.choose_image)
         self.send_button = QPushButton("Auf Display senden")
         self.send_button.setObjectName("primaryButton")
         self.send_button.setEnabled(False)
         self.send_button.clicked.connect(self.send_selected_image)
-        button_layout.addWidget(self.select_button)
-        button_layout.addWidget(self.send_button)
-        outer.addLayout(button_layout)
+        buttons.addWidget(self.select_button)
+        buttons.addWidget(self.send_button)
+        outer.addLayout(buttons)
 
-        self.status_label = QLabel("Status: Bitte ein kompatibles JPEG auswählen")
+        self.status_label = QLabel("Status: Bitte ein Bild auswählen")
         self.status_label.setObjectName("status")
         self.status_label.setWordWrap(True)
         outer.addWidget(self.status_label)
-
         self.setCentralWidget(central)
+
+    @staticmethod
+    def _preview_title(text: str) -> QLabel:
+        label = QLabel(text)
+        label.setObjectName("previewTitle")
+        return label
+
+    @staticmethod
+    def _preview_label(text: str) -> QLabel:
+        label = QLabel(text)
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.setMinimumSize(300, 300)
+        label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        label.setObjectName("preview")
+        return label
 
     @staticmethod
     def _add_info_row(layout: QGridLayout, row: int, name: str) -> QLabel:
@@ -133,64 +167,35 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(
             """
             QMainWindow, QWidget {
-                background: #111419;
-                color: #e7e9ed;
-                font-family: "Noto Sans", "DejaVu Sans", sans-serif;
-                font-size: 14px;
+                background: #111419; color: #e7e9ed;
+                font-family: "Noto Sans", "DejaVu Sans", sans-serif; font-size: 14px;
             }
-            QLabel#title {
-                font-size: 26px;
-                font-weight: 700;
-                color: #f4f5f7;
-            }
+            QLabel#title { font-size: 26px; font-weight: 700; color: #f4f5f7; }
             QFrame#card, QFrame#previewCard {
-                background: #1a1f26;
-                border: 1px solid #2b323d;
-                border-radius: 10px;
+                background: #1a1f26; border: 1px solid #2b323d; border-radius: 10px;
             }
-            QLabel#deviceDot {
-                color: #7f8996;
-                font-size: 20px;
-            }
-            QLabel#deviceStatus {
-                font-weight: 600;
-                font-size: 15px;
-            }
-            QLabel#muted, QLabel#infoKey {
-                color: #9ca5b1;
-            }
+            QLabel#deviceDot { color: #7f8996; font-size: 20px; }
+            QLabel#deviceStatus, QLabel#previewTitle { font-weight: 600; font-size: 15px; }
+            QLabel#muted, QLabel#infoKey { color: #9ca5b1; }
             QLabel#preview {
-                background: #0d1014;
-                border: 1px dashed #343c48;
-                border-radius: 7px;
-                color: #747f8c;
+                background: #0d1014; border: 1px dashed #343c48;
+                border-radius: 7px; color: #747f8c;
             }
-            QPushButton {
-                min-height: 42px;
-                padding: 0 18px;
-                border-radius: 7px;
-                border: 1px solid #3a424e;
-                background: #252b34;
-                color: #edf0f4;
-                font-weight: 600;
+            QPushButton, QComboBox {
+                min-height: 42px; padding: 0 18px; border-radius: 7px;
+                border: 1px solid #3a424e; background: #252b34;
+                color: #edf0f4; font-weight: 600;
             }
-            QPushButton:hover { background: #303844; }
+            QPushButton:hover, QComboBox:hover { background: #303844; }
             QPushButton:pressed { background: #20262e; }
-            QPushButton#primaryButton {
-                background: #c53b3f;
-                border-color: #d44a4e;
-            }
+            QPushButton#primaryButton { background: #c53b3f; border-color: #d44a4e; }
             QPushButton#primaryButton:hover { background: #d2464a; }
             QPushButton:disabled {
-                background: #20242a;
-                border-color: #2c323a;
-                color: #68717d;
+                background: #20242a; border-color: #2c323a; color: #68717d;
             }
             QLabel#status {
-                padding: 10px 12px;
-                background: #171b21;
-                border-radius: 6px;
-                color: #bdc4cd;
+                padding: 10px 12px; background: #171b21;
+                border-radius: 6px; color: #bdc4cd;
             }
             """
         )
@@ -200,25 +205,26 @@ class MainWindow(QMainWindow):
         try:
             device, detail = transport.discover_lcd_interface()
         except (OSError, RuntimeError, ValueError) as error:
+            self._device_ready = False
             self._show_device_problem(f"Geräteprüfung fehlgeschlagen: {error}")
+            self._update_send_enabled()
             return None
 
+        self._device_ready = device is not None
         if device is not None:
             self.device_dot.setStyleSheet("color: #55c987;")
             self.device_status_label.setText("Gerät: verbunden")
             self.device_detail_label.setText(
-                f"{device.vendor_id}:{device.product_id} · Interface 1 · "
-                f"{device.device_path}"
+                f"{device.vendor_id}:{device.product_id} · Interface 1 · {device.device_path}"
             )
-            return device
-
-        if "Treffer: 0" in detail:
+        elif "Treffer: 0" in detail:
             self.device_dot.setStyleSheet("color: #7f8996;")
             self.device_status_label.setText("Gerät: nicht verbunden")
             self.device_detail_label.setText("0b05:1c7b / Interface 1 nicht gefunden")
         else:
             self._show_device_problem(detail)
-        return None
+        self._update_send_enabled()
+        return device
 
     def _show_device_problem(self, detail: str) -> None:
         self.device_dot.setStyleSheet("color: #e5a64b;")
@@ -228,89 +234,132 @@ class MainWindow(QMainWindow):
     def choose_image(self) -> None:
         filename, _ = QFileDialog.getOpenFileName(
             self,
-            "JPEG für das AIO-LCD auswählen",
+            "Bild für das AIO-LCD auswählen",
             "",
-            "JPEG-Bilder (*.jpg *.jpeg);;Alle Dateien (*)",
+            "Unterstützte Bilder (*.jpg *.jpeg *.png *.webp *.bmp *.gif);;Alle Dateien (*)",
         )
         if filename:
             self.load_image(Path(filename))
 
+    def _scale_mode_changed(self) -> None:
+        if self._selected_path is not None:
+            self.load_image(self._selected_path)
+
     def load_image(self, path: Path) -> bool:
-        """Load a preview and validate sendability without opening a device."""
+        """Show frame 0 of the source and prepare one validated output JPEG."""
         resolved = path.expanduser().resolve()
         self._selected_path = resolved
         self.path_value.setText(str(resolved))
-        self._load_preview(resolved)
+        preview_size = self._load_original_preview(resolved)
+        self.original_size_value.setText(
+            f"{preview_size[0]}×{preview_size[1]}" if preview_size else "unbekannt"
+        )
+        self._prepared = None
+        self._final_pixmap = None
+        self.final_preview.setPixmap(QPixmap())
+        self.final_preview.setText("Ausgabe wird vorbereitet …")
+        self._update_send_enabled()
 
+        mode = self.scale_mode.currentData()
         try:
-            size = resolved.stat().st_size
-        except OSError:
-            size = None
-        self.size_value.setText(f"{size} Byte" if size is not None else "unbekannt")
-
-        try:
-            jpeg = transport.load_jpeg(resolved)
-            info = transport.validate_jpeg(jpeg)
-        except (transport.JpegValidationError, OSError, RuntimeError, ValueError) as error:
+            prepared = image_pipeline.prepare_image(resolved, mode=mode)
+            self._load_final_preview(prepared.jpeg_bytes)
+        except (image_pipeline.ImagePipelineError, OSError, RuntimeError, ValueError) as error:
+            self._prepared = None
+            self._final_pixmap = None
+            self.final_preview.setPixmap(QPixmap())
+            self.final_preview.setText("Keine kompatible LCD-Ausgabe")
             self._set_invalid_image(str(error))
             return False
 
-        self.resolution_value.setText(f"{info.width}×{info.height}")
-        self.profile_value.setText("SOF0 / Baseline · 8 Bit · JFIF-YCbCr 4:2:0")
-        self.segments_value.setText(str(info.segment_count))
-        self.padding_value.setText(f"{info.padding_length} Byte · ausschließlich 00")
-        self.validation_value.setText("kompatibel")
+        self._prepared = prepared
+        oriented_text = f"{prepared.oriented_size[0]}×{prepared.oriented_size[1]}"
+        if prepared.source_size != prepared.oriented_size:
+            oriented_text += (
+                f" · EXIF-ausgerichtet (Datei {prepared.source_size[0]}×"
+                f"{prepared.source_size[1]})"
+            )
+        self.original_size_value.setText(oriented_text)
+        input_text = prepared.source_format
+        if prepared.gif_first_frame_only:
+            input_text = "GIF · erstes Bild als Standbild"
+        self.input_format_value.setText(input_text)
+        self.output_size_value.setText("320×320")
+        self.profile_value.setText("SOF0 · 8 Bit · JFIF-YCbCr 4:2:0 · Qualität 60")
+        self.jpeg_size_value.setText(f"{len(prepared.jpeg_bytes)} Byte")
+        self.segments_value.setText(str(prepared.jpeg_info.segment_count))
+        self.padding_value.setText(
+            f"{prepared.jpeg_info.padding_length} Byte · ausschließlich 00"
+        )
+        self.validation_value.setText("ASUS-JPEG-Validator: PASS")
         self.validation_value.setStyleSheet("color: #55c987;")
-        self.send_button.setEnabled(True)
-        self.status_label.setText("Status: Bereit – Senden erfolgt nur nach Klick")
+        self.status_label.setText("Status: Bild vorbereitet – Senden nur nach Klick")
+        self._update_send_enabled()
         return True
 
-    def _load_preview(self, path: Path) -> None:
-        pixmap = QPixmap(str(path))
-        if pixmap.isNull():
-            self._preview_pixmap = None
-            self.preview_label.setPixmap(QPixmap())
-            self.preview_label.setText("Für diese Datei ist keine Vorschau verfügbar")
-            self.resolution_value.setText("unbekannt")
-            return
+    def _load_original_preview(self, path: Path) -> tuple[int, int] | None:
+        reader = QImageReader(str(path))
+        reader.setAutoTransform(True)
+        image = reader.read()  # For GIF this reads only frame 0; no QMovie is used.
+        if image.isNull():
+            self._original_pixmap = None
+            self.original_preview.setPixmap(QPixmap())
+            self.original_preview.setText("Keine Originalvorschau verfügbar")
+            return None
+        self._original_pixmap = QPixmap.fromImage(image)
+        self._update_scaled_preview(self.original_preview, self._original_pixmap)
+        return image.width(), image.height()
 
-        self._preview_pixmap = pixmap
-        self.resolution_value.setText(f"{pixmap.width()}×{pixmap.height()}")
-        self._update_scaled_preview()
+    def _load_final_preview(self, jpeg: bytes) -> None:
+        pixmap = QPixmap()
+        if not pixmap.loadFromData(jpeg, "JPEG"):
+            raise image_pipeline.ImagePipelineError(
+                "Das validierte JPEG konnte nicht als Vorschau geladen werden"
+            )
+        self._final_pixmap = pixmap
+        self._update_scaled_preview(self.final_preview, pixmap)
 
-    def _update_scaled_preview(self) -> None:
-        if self._preview_pixmap is None:
+    @staticmethod
+    def _update_scaled_preview(label: QLabel, pixmap: QPixmap | None) -> None:
+        if pixmap is None:
             return
-        scaled = self._preview_pixmap.scaled(
-            self.preview_label.size(),
+        scaled = pixmap.scaled(
+            label.size(),
             Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation,
         )
-        self.preview_label.setText("")
-        self.preview_label.setPixmap(scaled)
+        label.setText("")
+        label.setPixmap(scaled)
 
     def _set_invalid_image(self, reason: str) -> None:
-        self.profile_value.setText("nicht kompatibel")
+        self.input_format_value.setText("nicht sendbar")
+        self.output_size_value.setText("—")
+        self.profile_value.setText("—")
+        self.jpeg_size_value.setText("—")
         self.segments_value.setText("—")
         self.padding_value.setText("—")
         self.validation_value.setText(reason)
         self.validation_value.setStyleSheet("color: #e5a64b;")
         self.validation_value.setWordWrap(True)
-        self.send_button.setEnabled(False)
         self.status_label.setText(f"Status: Nicht sendbar – {reason}")
+        self._update_send_enabled()
+
+    def _update_send_enabled(self) -> None:
+        self.send_button.setEnabled(self._prepared is not None and self._device_ready)
 
     def send_selected_image(self) -> None:
-        """Revalidate everything and request exactly one synchronous frame."""
-        if self._selected_path is None:
-            self._show_send_error("Kein Bild ausgewählt.")
+        """Revalidate the prepared JPEG and request exactly one existing transfer."""
+        if self._prepared is None:
+            self._show_send_error("Kein validiertes Ausgabebild vorhanden.")
             return
 
+        jpeg = self._prepared.jpeg_bytes
         try:
-            jpeg = transport.load_jpeg(self._selected_path)
-            info = transport.validate_jpeg(jpeg)
-        except (transport.JpegValidationError, OSError, RuntimeError, ValueError) as error:
+            transport.validate_jpeg(jpeg)
+        except (transport.JpegValidationError, RuntimeError, ValueError) as error:
+            self._prepared = None
             self._set_invalid_image(str(error))
-            self._show_send_error(f"JPEG ist nicht mehr sendbar: {error}")
+            self._show_send_error(f"Ausgabe-JPEG ist nicht mehr sendbar: {error}")
             return
 
         device = self.refresh_device_status()
@@ -319,7 +368,8 @@ class MainWindow(QMainWindow):
             return
 
         self.status_label.setText(
-            f"Status: Sende genau einen Frame mit {info.segment_count} Segmenten …"
+            f"Status: Sende genau einen Frame mit "
+            f"{self._prepared.jpeg_info.segment_count} Segmenten …"
         )
         try:
             written = transport.send_frame_once(device, jpeg)
@@ -329,7 +379,6 @@ class MainWindow(QMainWindow):
         except (transport.LcdTransportError, OSError, RuntimeError) as error:
             self._show_send_error(f"Transfer abgebrochen: {error}")
             return
-
         self.status_label.setText(
             f"Status: Ein Frame erfolgreich gesendet ({written} Writes, kein Retry)"
         )
@@ -340,7 +389,8 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802 - Qt API
         super().resizeEvent(event)
-        self._update_scaled_preview()
+        self._update_scaled_preview(self.original_preview, self._original_pixmap)
+        self._update_scaled_preview(self.final_preview, self._final_pixmap)
 
 
 def main() -> int:

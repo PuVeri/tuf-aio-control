@@ -13,7 +13,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 REFERENCE_PATH = PROJECT_ROOT / "tests" / "fixtures" / "lcd-0x08-reference.jpg"
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from PySide6.QtGui import QColor, QImage
 from PySide6.QtWidgets import QApplication
 
 import lcd_transport
@@ -59,26 +58,24 @@ class TufAioGuiOfflineTests(unittest.TestCase):
         try:
             self.assertTrue(window.load_image(REFERENCE_PATH))
             self.assertTrue(window.send_button.isEnabled())
-            self.assertEqual(window.resolution_value.text(), "320×320")
+            self.assertEqual(window.original_size_value.text(), "320×320")
+            self.assertEqual(window.output_size_value.text(), "320×320")
             self.assertEqual(window.segments_value.text(), "3")
-            self.assertIn("824", window.padding_value.text())
-            self.assertEqual(window.validation_value.text(), "kompatibel")
+            self.assertIn("ASUS-JPEG-Validator: PASS", window.validation_value.text())
+            self.assertIsNotNone(window._original_pixmap)
+            self.assertIsNotNone(window._final_pixmap)
         finally:
             window.close()
 
-    def test_incompatible_previewable_image_disables_send(self) -> None:
+    def test_incompatible_image_disables_send(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "preview-only.png"
-            image = QImage(320, 320, QImage.Format.Format_RGB32)
-            image.fill(QColor("white"))
-            self.assertTrue(image.save(str(path), "PNG"))
+            path = Path(directory) / "invalid.png"
+            path.write_bytes(b"not an image")
 
             window = self._window()
             try:
                 self.assertFalse(window.load_image(path))
                 self.assertFalse(window.send_button.isEnabled())
-                self.assertIsNotNone(window._preview_pixmap)
-                self.assertFalse(window._preview_pixmap.isNull())
                 self.assertIn("Nicht sendbar", window.status_label.text())
             finally:
                 window.close()
