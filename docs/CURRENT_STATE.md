@@ -134,23 +134,70 @@ Export: `research/ghidra-scripts/ExportLcdPacketModel.java`.
   beziehungsweise Index; Byte 3 Bit 7 kennzeichnet nur das Erstsegment. Es
   gibt keine separate Länge, Endmarke, Prüfsumme oder Paddingangabe.
 - `200` ist unmittelbar die exklusive Kopiergrenze für Indizes, nicht die
-  Feldgrenze. Durch die `0x32000`-Queuekapazität ist 200 zugleich die größte
-  erfolgreich weiterleitbare Gesamtzahl. Ein Index 200 kann formal Abschluss
-  auslösen, wird aber nicht kopiert; `N >= 201` scheitert danach an der
-  Queueallokation.
+  Feldgrenze. `1 <= N <= 200` ist die normale speichersichere Hostgrenze. Ein
+  Index 200 kann formal Abschluss auslösen, wird aber nicht kopiert; `N=201`
+  scheitert an der Queueallokation. Analyse 03 dokumentiert zusätzlich einen
+  ausschließlich fehlerhaften 32-Bit-Überlaufrandfall bei extrem großen `N`.
 - Ein zusätzliches Abschlusssegment, eine separate Restlänge und ein
   Entfernen oder Ergänzen von Padding sind statisch ausgeschlossen. Die vier
   USB-Controlbytes und das interne Queue-Längenwort liegen außerhalb der
   1020-Byte-Nutzlast, werden aber nicht an den Grafikblock weitergereicht.
 - Die 800-Byte-Differenz ist daher keine rekonstruierbare Rohframe-Lücke:
   maximal 204000 Byte USB-Quelle und der 204800-Byte-Zielframebuffer sind
-  getrennte Objekte. Das genaue, vermutlich kodierte Quellformat von
-  USB-`0x08` ist noch offen; ein roher 320×320×16-Bit-Vollframe ist als
+  getrennte Objekte. Der nachfolgende Quellformatnachweis identifiziert die
+  `0x6021`-Quelle als JPEG; ein roher 320×320×16-Bit-Vollframe ist als
   Hostmodell nicht haltbar.
-- Endpoint `0x84` wird einmal bei Queueentnahme und noch vor Grafikoperation
-  `0x0c` mit 16 Byte gesendet. Nur das konstante Präfix `08 81` wird frisch
+- Endpoint `0x84` wird einmal nach erfolgreichem Queue-Peek und noch vor
+  Grafikoperation `0x0c` mit 16 Byte gesendet; der Queueeintrag bleibt bis zum
+  späteren Release belegt. Nur das konstante Präfix `08 81` wird frisch
   geschrieben. Es ist eine Start-/Annahmenachricht, kein Segment-ACK und keine
   Abschluss- oder Fehlerantwort; Bytes 2..15 tragen keine belegte Semantik.
+
+## Statische LCD-/JPEG-Transportanalyse 03
+
+Die vollständige Rekonstruktion steht in
+`research/reports/lcd-command-analysis-03.md`. Reproduzierbarer Read-only-
+Export: `research/ghidra-scripts/ExportLcdTransportLifecycle.java`.
+
+- Das Controlword ist bytegenau: Byte 0 ist der Befehl; Bytes 1/2 und die
+  unteren sieben Bits von Byte 3 sind das 23-Bit-Feld; Bit 7 von Byte 3 ist
+  ausschließlich das Erstsegmentbit. Im ersten Report enthält das Feld `N`,
+  danach den Index `1..N-1`.
+- `1 <= N <= 200` bezeichnet die normale und speichersichere Hostgrenze,
+  nicht Feldbreite oder vollständige Firmwarevalidierung. `N=0` wird formal
+  abgeschlossen, aber nicht alloziert. Durch 32-Bit-Überlauf können
+  `N=4210753..4210953` wieder kleine Queuelängen erzeugen; diese missbräuchliche
+  Folge aus mehr als vier Millionen Reports ist keine zulässige Hostbetriebsart.
+- Ein fehlender Block stoppt den Fortschritt ohne Timeout. Nur das jeweils
+  aktuelle Segment darf dupliziert werden und überschreibt seinen Block. Ein
+  Duplikat nach Abschluss kann denselben Transfer erneut einreihen; ein
+  legitimer Host sendet deshalb genau einmal und ohne Retry.
+- Jeder Report kopiert exakt 1020 Datenbyte. Im USB-Pfad existieren weder eine
+  letzte Restlänge noch das Entfernen oder Erzeugen von Padding. Die
+  ursprüngliche JPEG-Länge geht verloren; die Queue kennt nur `N*1020`.
+- `[0x00131940]` ist die getrennte Länge eines gespeicherten JPEG-Objekts. Sie
+  wird von `0x0010eff4` aus der Objekt-/Record-Länge gesetzt, begrenzt und
+  steuert die Kopie in dessen Acceleratorbuffer. Der USB-`0x08`-Pfad berührt
+  dieses Feld nicht.
+- Im USB-Pfad gibt es keine vorgelagerte Software-JPEG-Prüfung und keinen
+  separaten Accelerator-Kopierbuffer. Der Queuepayload wird direkt als Quelle
+  des `0x6021`-Hardwaredecoders gesetzt.
+- Der Softwaredecoder ignoriert Bytes nach einem korrekt erreichten `ff d9`.
+  Der Hardwarepfad erhält keine Quelllänge und ist deshalb stark als
+  EOI-terminiert gestützt; welche konkreten Schlussbytes er toleriert, bleibt
+  statisch offen. Nullpadding ist nicht belegt.
+- `08 81` entsteht nur in `0x00129b2c`, nachdem Queueeintrag und freier
+  Zielknoten vorhanden sind, aber vor Grafikreset und Decoderstart. Im v51-
+  Image gibt es auf Interface 1 keine alternativen Byte-1-Werte und keine
+  Busy-, Ready-, Done- oder Fehlernachricht.
+- Der Decoder meldet Erfolg und Fehler nur intern. Der USB-Consumer wartet
+  lediglich auf `active==0`, prüft das Errorbit nicht, gibt die Queue frei und
+  markiert den Zielknoten bereit. Der spätere Displaycallback schaltet die
+  Framebufferbasis um und gibt den zuvor sichtbaren Ringknoten frei.
+- Ein eigener JPEG-Live-Test ist noch nicht freigabereif. Blocker sind vor
+  allem der unbekannte Schlussblocksuffix, fehlende Done-/Fehlerevidenz, die
+  offene vollständige Hardware-JPEG-Untermenge, Interface-1-Hostframing und
+  die v51/v49-Firmwaredifferenz.
 
 ## Gefährliche und ausgeschlossene Pfade
 
@@ -168,14 +215,17 @@ Export: `research/ghidra-scripts/ExportLcdPacketModel.java`.
 
 Die nächste Arbeit soll innerhalb der weiterhin passiven Grenze:
 
-1. einen legitimen Herstellertransfer für einfache statische 320×320-Bilder
-   passiv und zeitgleich auf Interface 0 und 1 erfassen;
-2. aus diesem Referenzverkehr das Quellformat von `0x08`, die Terminierung des
-   letzten 1020-Byte-Blocks und die Bedeutung von Status `0x81` ableiten;
-3. die Hardwareausgabe von `0x6021` mit der statisch belegten
+1. einen legitimen Herstellertransfer für ein einfaches statisches
+   320×320-JPEG passiv und zeitgleich auf Interface 0 und 1 erfassen;
+2. aus diesem Referenzverkehr den Schlussblocksuffix, das Interface-1-
+   Hostframing, das tatsächliche JPEG-Profil und die v49-Semantik von `0x81`
+   ableiten;
+3. nach Möglichkeit die zum realen Versionswert `0x0049` passende Firmware
+   beschaffen und den rekonstruierten Pfad statisch vergleichen;
+4. die Hardwareausgabe von `0x6021` mit der statisch belegten
    Little-Endian-BGR565-MEMDEV-Belegung abgleichen und die unbekannten
    Ringknotenfelder nur bei zusätzlichem statischem Beleg benennen;
-4. SPI-, Updater- und persistente Objektpfade ausgeschlossen halten.
+5. SPI-, Updater- und persistente Objektpfade ausgeschlossen halten.
 
 Keine Gerätekommunikation, Emulation oder Firmware-Schreibrechte. Jeder
 weitere reale HID-Write benötigt einen neuen ausdrücklich freigegebenen Auftrag.
