@@ -247,6 +247,37 @@ Read-only-Export bleibt
   Blocker. `08 81` bestätigt nur Queueannahme/Start; ein reiner nachfolgender
   Versions-/Statusread bestätigt keinen Decoderabschluss.
 
+## Öffentlicher Protokollfamilien-Cross-Check
+
+Der eng begrenzte Quellenvergleich steht in
+`research/reports/lcd-protocol-family-crosscheck.md`.
+
+- Öffentlich dokumentierte verwandte Geräte stimmen in einer ungewöhnlich
+  spezifischen Kombination mit ASUS überein: zwei Control-/Bild-HID-Interfaces,
+  Endpunkte `0x01/0x82` und `0x03/0x84`, Reportgrößen 440/1024/16 Byte,
+  4+1020-Byte-Bildaufteilung, Befehl `0x08`, Erstwort `08 N 00 80` und die
+  Controlfamilie `0x80..0x87`. Ein gemeinsamer Protokollstamm ist damit stark
+  gestützt; OEM- oder Firmwareidentität folgt daraus nicht.
+- `ttlcd` und `th420-display` erzeugen das letzte kurze JPEG-Segment als vollen,
+  nullinitialisierten 1020-Byte-Nutzblock. Eine veröffentlichte Beschreibung
+  eines Hersteller-Captures berichtet ebenfalls Nullen nach EOI. Das ist exakt
+  mit der ASUS-Vollblockkopie und der fehlenden Restlänge kompatibel und macht
+  Nullpadding zur konservativsten, stark begründeten Kandidatenregel. Ein
+  ASUS-v49-Transfer selbst ist damit noch nicht beobachtet.
+- Beide veröffentlichten Sender verwenden Folgeindizes `1..N-1` und stimmen
+  damit mit der ASUS-v51-Firmware überein. Der abgedruckte TH420-Blogtrace zeigt
+  dagegen `2..N`; die öffentliche Evidenz ist an dieser Stelle intern
+  widersprüchlich.
+- Der framebezogene 16-Byte-Read auf EP `0x84` passt strukturell zu ASUS
+  `08 81`, beweist aber weder identische Antwortbytes noch Decoderabschluss.
+  Ein Hostread nach dem letzten OUT kann eine bereits vor Decoderstart
+  bereitgestellte Nachricht abholen. Der aktuelle TH420-Code führt diesen Read
+  im Gegensatz zu `ttlcd` und der Blogbeschreibung nicht aus.
+- Ein passiver ASUS-Referenzcapture bleibt vor einem eigenen JPEG-Write
+  erforderlich: ASUS-Suffix, v49-Folgeindizes, EP-`0x84`-Inhalt/-Timing,
+  begleitende Interface-0-/Timeoutbefehle und die reale JPEG-Untermenge sind
+  weiterhin ASUS-spezifisch offen.
+
 ## Gefährliche und ausgeschlossene Pfade
 
 - `0x88`: SPI-Lesen und bedingtes SPI-Schreiben bei `0x21000`.
