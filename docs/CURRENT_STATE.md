@@ -194,10 +194,10 @@ Export: `research/ghidra-scripts/ExportLcdTransportLifecycle.java`.
   lediglich auf `active==0`, prüft das Errorbit nicht, gibt die Queue frei und
   markiert den Zielknoten bereit. Der spätere Displaycallback schaltet die
   Framebufferbasis um und gibt den zuvor sichtbaren Ringknoten frei.
-- Ein eigener JPEG-Live-Test ist noch nicht freigabereif. Blocker sind vor
-  allem der unbekannte Schlussblocksuffix, fehlende Done-/Fehlerevidenz, die
-  offene vollständige Hardware-JPEG-Untermenge, Interface-1-Hostframing und
-  die v51/v49-Firmwaredifferenz.
+- Ein eigener JPEG-Live-Test ist noch nicht freigabereif. Hostframing und
+  Nullpadding sind inzwischen statisch aus InfoHub geschlossen. Blocker sind
+  weiterhin fehlende Done-/Fehlerevidenz, die nicht vollständig festgelegte
+  GDI+-JPEG-Untermenge und besonders die v51/v49-Firmwaredifferenz.
 
 ## Statische LCD-/JPEG-Transportanalyse 04
 
@@ -222,8 +222,10 @@ Read-only-Export bleibt
   dokumentierten Linux-Semantik folgt für `hidraw.write()` exakt
   `00 || 1024-Byte-Report`, also 1025 Byte; der Kernel entfernt das API-
   Nullbyte. Dies ist für Interface 1 nicht live getestet, aber statisch und
-  API-semantisch geschlossen. Interface-1-Reads liefern den unnummerierten
-  16-Byte-IN-Report ohne Nullpräfix.
+  API-semantisch geschlossen. InfoHub bestätigt jetzt unabhängig davon die
+  Windows-Abbildung: `WriteFile` erhält `00 || report[1024]`, also 1025
+  API-Byte. Interface-1-Reads liefern den unnummerierten 16-Byte-IN-Report ohne
+  Nullpräfix; InfoHub führt einen solchen Read jedoch nicht aus.
 - Der Firmware-Headerparser erkennt SOF0/SOF1/SOF2 und ein bis vier
   Komponenten; das ist keine Decoderfreigabe. Die offizielle N9H20-
   Dokumentation beschränkt den Hardwarecodec auf Baseline Sequential. Die
@@ -234,18 +236,16 @@ Read-only-Export bleibt
 - Die Firmware enthält kein eingebettetes JPEG-Muster und keinen
   Hostproducer. Sie kopiert sämtliche 1020 Byte des letzten Segments, kennt
   die ursprüngliche JPEG-Länge nicht und erhält beziehungsweise prüft keinen
-  konkreten Suffix. Nullpadding ist weiterhin nicht belegt und nur aus
-  Hostsoftware oder Referenzcapture bestimmbar.
-- Ein späterer passiver Capture muss beide Interfaces vollständig und mit
-  URB-Zeitstempeln erfassen: alle EP-`0x03`-Segmente und Controlwords, SOI/EOI,
-  den vollständigen letzten Block, jeden Suffixbyte, EP-`0x84`-IN-Nachrichten
-  einschließlich `08 81`, alle begleitenden Interface-0-Befehle sowie nach
-  Möglichkeit Original-JPEG und sichtbaren Commitzeitpunkt. Ein Capture zeigt
-  Herstellerpraxis, nicht allgemein die Toleranz anderer Paddingwerte.
-- Für einen eigenen JPEG-Test bleiben der ASUS-Suffix, die v49/v51-Gleichheit,
-  die reale Begleit-/Timeoutsequenz und das Fehlen eines Decoder-Done-Status
-  Blocker. `08 81` bestätigt nur Queueannahme/Start; ein reiner nachfolgender
-  Versions-/Statusread bestätigt keinen Decoderabschluss.
+  konkreten Suffix. Der inzwischen extrahierte Hostproducer belegt für ASUS
+  ausschließlich Nullbytes nach EOI bis zum Ende des letzten Blocks.
+- Ein späterer passiver Capture soll weiterhin beide Interfaces vollständig
+  und mit URB-Zeitstempeln erfassen. Suffix, Folgeindizes und fehlender
+  Host-IN-Read sind statisch geklärt; offen bleiben besonders v49/v51-
+  Gleichheit, der konkrete GDI+-JPEG-SOF-/Subsampling-Output und der sichtbare
+  Commitzeitpunkt.
+- Für einen eigenen JPEG-Test bleiben die v49/v51-Gleichheit, die konkrete
+  Codec-Untermenge und das Fehlen eines Decoder-Done-Status Blocker. `08 81`
+  bestätigt nur Queueannahme/Start; InfoHub wartet nicht auf diese Nachricht.
 
 ## Statische InfoHub-Hostextraktion
 
@@ -275,9 +275,39 @@ Größen- und SHA-256-Manifest liegt unter
   Frame-JPG-Pfade, `SaveJpgImageFile`-/GIF-/OpenCV-Exporte und ein
   320×320-bezogener Buildpfad sind belegt. HID oder SetupAPI importiert die
   DLL nicht.
-- Rohe Funde von Reportgrößen, JPEG-Markern und `0x80..0x87` bleiben ohne
-  Kontrollflussbezug absichtlich unbewertet. Eine Senderfunktion ist noch
-  nicht rekonstruiert.
+- Der Sender ist inzwischen in
+  `research/reports/asus-infohub-lcd-sender-analysis.md` vollständig statisch
+  rekonstruiert. Die reproduzierbaren read-only Exporte sind
+  `research/ghidra-scripts/ExportInfoHubLcdSender.java` und
+  `research/ghidra-scripts/ExportInfoHubXyuiJpeg.java`.
+
+## Statische InfoHub-LCD-Senderanalyse
+
+- HID1/Interface 0 und HID2/Interface 1 werden nach Windows-
+  `OutputReportByteLength` 441 beziehungsweise 1025 unterschieden, nicht nach
+  der zwar geparsten, aber bei der Auswahl unbenutzten `&mi_`-Nummer.
+- Der JPEG-Builder `ASUS InfoHub.exe:0x00416bc0` berechnet
+  `N=ceil(JPEG-Länge/1020)`, sendet `08 N 00 80` und danach
+  `08 i 00 00` für `i=1..N-1`. Er nutzt nur das Low-Byte von Anzahl/Index,
+  kopiert immer 1020 Payloadbytes und übergibt pro Segment
+  `00 || report[1024]` als 1025-Byte-Windows-HID-Puffer.
+- `XYUI::LEDModeCtrl::GetLEDData` nullt den gesamten 409.600-Byte-Zielpuffer,
+  kopiert die exakten JPEG-Bytes hinein und gibt die vorher über
+  `IStream::Stat` bestimmte Länge zurück. Daher besteht jedes Byte nach EOI
+  im letzten Vollblock konkret aus `00`.
+- Das Nutzerbild wird nicht unverändert übertragen. XYUI rendert einen neuen
+  320×320-Frame und encodiert ihn mit dem anhand `image/jpeg` ausgewählten
+  GDI+-Encoder. Einziger Encoderparameter ist Qualität 60 für Modus 1/7,
+  sonst 90. SOF-Typ und Subsampling werden nicht explizit gewählt.
+- Nach dem letzten erfolgreichen Bildsegment endet der Sender ohne Read.
+  InfoHub verwendet weder den 16-Byte-IN-Pfad noch `08 81`, hat keinen
+  Antworttimeout und lässt den weiteren Ablauf nicht von Interface-1-IN
+  abhängen.
+- Zum erfolgreichen Transfer gehört kein Interface-0-Befehl. Insbesondere
+  sendet dieser Hostpfad weder `0x19` noch ein Befehlsbyte `0x80..0x87` und
+  ändert `config+0x108` nicht. Separate Hostaktionen senden `0x10`, `0x12`
+  oder `0x1f`; `FF 01 00 00` erscheint nur nach zwei fehlgeschlagenen
+  HID2-Writes.
 
 ## Öffentlicher Protokollfamilien-Cross-Check
 
@@ -291,11 +321,10 @@ Der eng begrenzte Quellenvergleich steht in
   Controlfamilie `0x80..0x87`. Ein gemeinsamer Protokollstamm ist damit stark
   gestützt; OEM- oder Firmwareidentität folgt daraus nicht.
 - `ttlcd` und `th420-display` erzeugen das letzte kurze JPEG-Segment als vollen,
-  nullinitialisierten 1020-Byte-Nutzblock. Eine veröffentlichte Beschreibung
-  eines Hersteller-Captures berichtet ebenfalls Nullen nach EOI. Das ist exakt
-  mit der ASUS-Vollblockkopie und der fehlenden Restlänge kompatibel und macht
-  Nullpadding zur konservativsten, stark begründeten Kandidatenregel. Ein
-  ASUS-v49-Transfer selbst ist damit noch nicht beobachtet.
+  nullinitialisierten 1020-Byte-Nutzblock. InfoHub bestätigt diese Regel nun
+  unmittelbar: `GetLEDData` nullt den Gesamtpuffer vor dem Kopieren des JPEG,
+  und der Sender kopiert jeden Payload vollständig. Ein ASUS-v49-Transfer
+  selbst ist weiterhin nicht beobachtet.
 - Beide veröffentlichten Sender verwenden Folgeindizes `1..N-1` und stimmen
   damit mit der ASUS-v51-Firmware überein. Der abgedruckte TH420-Blogtrace zeigt
   dagegen `2..N`; die öffentliche Evidenz ist an dieser Stelle intern
@@ -305,10 +334,11 @@ Der eng begrenzte Quellenvergleich steht in
   Ein Hostread nach dem letzten OUT kann eine bereits vor Decoderstart
   bereitgestellte Nachricht abholen. Der aktuelle TH420-Code führt diesen Read
   im Gegensatz zu `ttlcd` und der Blogbeschreibung nicht aus.
-- Ein passiver ASUS-Referenzcapture bleibt vor einem eigenen JPEG-Write
-  erforderlich: ASUS-Suffix, v49-Folgeindizes, EP-`0x84`-Inhalt/-Timing,
-  begleitende Interface-0-/Timeoutbefehle und die reale JPEG-Untermenge sind
-  weiterhin ASUS-spezifisch offen.
+- Ein passiver ASUS-Referenzcapture bleibt vor einem eigenen JPEG-Write als
+  v49- und Sicherheitsvalidierung erforderlich. Hostseitig sind Suffix,
+  Folgeindizes, fehlender EP-`0x84`-Read und fehlende zwingende Interface-0-
+  Sequenz geschlossen; offen bleiben v49/v51-Gleichheit, der konkrete
+  GDI+-Codecoutput und der sichtbare Commitzeitpunkt.
 
 ## Gefährliche und ausgeschlossene Pfade
 
@@ -320,25 +350,18 @@ Der eng begrenzte Quellenvergleich steht in
 - `0x09`: Displaymutation; im Updater zusätzlich Completion-Flag.
 - `0x86`: Firmwareblocktransfer; `0x02`: Updater-Abschluss/Reenumeration.
 - `0x45`: Konfigurationslöschung im Updater.
-- `0xff` mit Payload-DWORD 1: unaufgelöster indirekter Callback.
+- `0xff` mit Payload-DWORD 1: InfoHub verwendet ihn als HID2-Transferfehler-
+  Benachrichtigung; die Wirkung des indirekten Gerätecallbacks bleibt
+  unaufgelöst.
 
 ## Nächster klarer Arbeitsschritt
 
-Die nächste Arbeit soll innerhalb der weiterhin passiven Grenze zunächst
-`ASUS InfoHub.exe` statisch analysieren:
-
-1. von den belegten SetupAPI-/HID-Imports und Diagnosezeichenketten zu den
-   getrennten HID1-/HID2-Handles gehen;
-2. deren `WriteFile`-/`ReadFile`-Aufrufer nach 440-, 1024- und 16-Byte-Puffern
-   trennen;
-3. im 1024-Byte-Zweig den 4+1020-Byte-Builder und erst dort Controlword,
-   Segmentindizes, EOI-Suffix und letzte Blockinitialisierung bestimmen;
-4. genau einen Schritt rückwärts zu den importierten JPEG-/Framefunktionen aus
-   `XYUI.dll` gehen und den 440-Byte-Zweig anschließend auf begleitende
-   Controlbefehle eingrenzen;
-5. einen passiven Hersteller-Capture erst danach als gezielten Vergleich für
-   statisch verbleibende Lücken planen und SPI-, Updater- sowie persistente
-   Objektpfade ausgeschlossen halten.
+Der Hostsender ist statisch rekonstruiert. Der nächste Arbeitsschritt innerhalb
+der passiven Grenze ist ein eng spezifizierter ASUS-Referenzcapture zur
+v49-/Laufzeitvalidierung. Er muss den konkreten GDI+-JPEG-Header, beide HID-
+Interfaces mit vollständigen URBs und Zeitstempeln sowie den sichtbaren
+Commitzeitpunkt erfassen. Er dient nicht mehr zur Bestimmung von Segmentierung,
+Padding oder Host-IN-Wartelogik.
 
 Keine Gerätekommunikation, Emulation oder Firmware-Schreibrechte. Jeder
 weitere reale HID-Write benötigt einen neuen ausdrücklich freigegebenen Auftrag.
