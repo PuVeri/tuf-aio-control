@@ -22,6 +22,10 @@ import ghidra.program.model.symbol.ReferenceIterator;
 public class ExportLcdTransportLifecycle extends GhidraScript {
     private static final String[][] TARGETS = {
         {"0010df9c", "Interface-1 OUT callback and queue producer"},
+        {"001268d0", "protocol-side state poller"},
+        {"00126dfc", "Interface-0 command dispatcher"},
+        {"00127854", "protocol configuration initializer"},
+        {"001279e8", "stored-object/display state task"},
         {"001297e8", "four-byte control-word consumer"},
         {"00129b2c", "assembled JPEG queue consumer"},
         {"0011508c", "Interface-1 IN sender"},
@@ -44,12 +48,15 @@ public class ExportLcdTransportLifecycle extends GhidraScript {
         {"00110a58", "JPEG SOI/SOF validator"},
         {"0011012c", "JPEG object preparation and source-range setup"},
         {"0010f16c", "software JPEG decoder"},
-        {"00124988", "JPEG marker parser"}
+        {"00124988", "JPEG marker parser"},
+        {"0012bbac", "display-state helper reading transfer gate"},
+        {"0012bd68", "display-state periodic-callback registrar"}
     };
 
     private static final long[] POINTER_VALUES = {
         0x0012eba0L, 0x003bb430L, 0x003bb480L, 0x003ed340L,
-        0x00131928L, 0x0013193cL, 0x00131940L
+        0x00130de4L, 0x001315c4L, 0x001315ccL, 0x00131928L, 0x0013193cL,
+        0x00131940L, 0x004e8348L
     };
 
     private static final long[] EXACT_SCALARS = {

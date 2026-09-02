@@ -199,6 +199,54 @@ Export: `research/ghidra-scripts/ExportLcdTransportLifecycle.java`.
   offene vollständige Hardware-JPEG-Untermenge, Interface-1-Hostframing und
   die v51/v49-Firmwaredifferenz.
 
+## Statische LCD-/JPEG-Transportanalyse 04
+
+Die statisch noch lösbaren Blocker sind in
+`research/reports/lcd-command-analysis-04.md` geschlossen. Der erweiterte
+Read-only-Export bleibt
+`research/ghidra-scripts/ExportLcdTransportLifecycle.java`.
+
+- `0x001315c4` ist ein vollständiges 32-Bit-Countdownwort, kein Bitfeld.
+  `0` ist abgelaufen/inaktiv, `0xffffffff` ein nicht dekrementierter Sentinel;
+  alle anderen Werte werden periodisch um eins reduziert. Die Quelle
+  `config+0x108` hat Bootdefault `5000` und kann über Interface-0-Unterbefehl
+  `0x19` ohne Bereichsprüfung geändert werden.
+- Ein vollständiger Interface-1-`0x08`-Transfer lädt diesen Countdown erst
+  nach der Segmentassemblierung. Solange der Hardwaredecoder aktiv ist,
+  schützt ein Wert ungleich null den Queueeintrag. Bei null wird die Queue
+  ohne Ready-Markierung freigegeben; der Hardwaredecoder wird in diesem Zweig
+  nicht sichtbar gestoppt. Der Zustand ist daher eine hostrelevante
+  Decoderquellen-Lease beziehungsweise ein Timeout, kein Display-Commit-Flag.
+- Interface 1 besitzt einen unnummerierten 1024-Byte-OUT-Report. Auf EP `0x03`
+  stehen exakt 1024 Byte, beginnend mit dem Command/Controlword. Aus der
+  dokumentierten Linux-Semantik folgt für `hidraw.write()` exakt
+  `00 || 1024-Byte-Report`, also 1025 Byte; der Kernel entfernt das API-
+  Nullbyte. Dies ist für Interface 1 nicht live getestet, aber statisch und
+  API-semantisch geschlossen. Interface-1-Reads liefern den unnummerierten
+  16-Byte-IN-Report ohne Nullpräfix.
+- Der Firmware-Headerparser erkennt SOF0/SOF1/SOF2 und ein bis vier
+  Komponenten; das ist keine Decoderfreigabe. Die offizielle N9H20-
+  Dokumentation beschränkt den Hardwarecodec auf Baseline Sequential. Die
+  konservative direkte USB-Untermenge ist deshalb SOF0/8 Bit, exakt 320×320,
+  Y/Grayscale oder JFIF-YCbCr mit 4:4:4, 4:2:2 beziehungsweise 4:2:0. SOF1,
+  SOF2, 4:4:0, RGB, CMYK/YCCK und arithmetische oder hierarchische Varianten
+  bleiben für den Hardwarepfad ausgeschlossen beziehungsweise unbelegt.
+- Die Firmware enthält kein eingebettetes JPEG-Muster und keinen
+  Hostproducer. Sie kopiert sämtliche 1020 Byte des letzten Segments, kennt
+  die ursprüngliche JPEG-Länge nicht und erhält beziehungsweise prüft keinen
+  konkreten Suffix. Nullpadding ist weiterhin nicht belegt und nur aus
+  Hostsoftware oder Referenzcapture bestimmbar.
+- Ein späterer passiver Capture muss beide Interfaces vollständig und mit
+  URB-Zeitstempeln erfassen: alle EP-`0x03`-Segmente und Controlwords, SOI/EOI,
+  den vollständigen letzten Block, jeden Suffixbyte, EP-`0x84`-IN-Nachrichten
+  einschließlich `08 81`, alle begleitenden Interface-0-Befehle sowie nach
+  Möglichkeit Original-JPEG und sichtbaren Commitzeitpunkt. Ein Capture zeigt
+  Herstellerpraxis, nicht allgemein die Toleranz anderer Paddingwerte.
+- Für einen eigenen JPEG-Test bleiben der ASUS-Suffix, die v49/v51-Gleichheit,
+  die reale Begleit-/Timeoutsequenz und das Fehlen eines Decoder-Done-Status
+  Blocker. `08 81` bestätigt nur Queueannahme/Start; ein reiner nachfolgender
+  Versions-/Statusread bestätigt keinen Decoderabschluss.
+
 ## Gefährliche und ausgeschlossene Pfade
 
 - `0x88`: SPI-Lesen und bedingtes SPI-Schreiben bei `0x21000`.
@@ -216,15 +264,17 @@ Export: `research/ghidra-scripts/ExportLcdTransportLifecycle.java`.
 Die nächste Arbeit soll innerhalb der weiterhin passiven Grenze:
 
 1. einen legitimen Herstellertransfer für ein einfaches statisches
-   320×320-JPEG passiv und zeitgleich auf Interface 0 und 1 erfassen;
-2. aus diesem Referenzverkehr den Schlussblocksuffix, das Interface-1-
-   Hostframing, das tatsächliche JPEG-Profil und die v49-Semantik von `0x81`
-   ableiten;
-3. nach Möglichkeit die zum realen Versionswert `0x0049` passende Firmware
-   beschaffen und den rekonstruierten Pfad statisch vergleichen;
-4. die Hardwareausgabe von `0x6021` mit der statisch belegten
-   Little-Endian-BGR565-MEMDEV-Belegung abgleichen und die unbekannten
-   Ringknotenfelder nur bei zusätzlichem statischem Beleg benennen;
+   320×320-JPEG gemäß dem Capture-Vertrag aus Analyse 04 passiv und zeitgleich
+   auf Interface 0 und 1 erfassen;
+2. daraus den vollständigen Schlussblocksuffix, alle Begleitbefehle,
+   Controlwords, das tatsächliche JPEG-Profil sowie sämtliche Interface-1-IN-
+   Nachrichten und ihr Timing bestimmen;
+3. nach Möglichkeit die verwendete Original-JPEG-Datei sichern und gegen den
+   bis EOI rekonstruierten Bytestrom vergleichen; für eine allgemeine
+   Paddingregel passive Transfers mit mindestens zwei Restlängen vergleichen;
+4. nach Möglichkeit die zum realen Versionswert `0x0049` passende Firmware
+   beschaffen und insbesondere Consumer, Timeout und `08 81` statisch mit v51
+   vergleichen;
 5. SPI-, Updater- und persistente Objektpfade ausgeschlossen halten.
 
 Keine Gerätekommunikation, Emulation oder Firmware-Schreibrechte. Jeder
