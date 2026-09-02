@@ -247,6 +247,38 @@ Read-only-Export bleibt
   Blocker. `08 81` bestätigt nur Queueannahme/Start; ein reiner nachfolgender
   Versions-/Statusread bestätigt keinen Decoderabschluss.
 
+## Statische InfoHub-Hostextraktion
+
+Die vollständige statische Extraktion steht in
+`research/reports/infohub-inno-extraction.md`; das versionierbare Datei-,
+Größen- und SHA-256-Manifest liegt unter
+`research/manifests/infohub-1.0.0.15-files.sha256`.
+
+- Der vorhandene 90.476.632-Byte-Installer ist Inno Setup 6.4.0.1. Sein
+  Inno-Datenbereich reicht von `0x000d7a00` bis `0x05645ca8` und enthält einen
+  unverschlüsselten LZMA1-Solid-Chunk. Zwei LZMA1-Headerblöcke beschreiben 149
+  Dateieinträge und 147 Dateilokationen.
+- Der offizielle `innoextract`-Entwicklungsstand
+  `6e9e34ed0876014fdb46e684103ef8c3605e382e` kennt exakt die
+  `6.4.0.1`-Signatur. Er wurde unverändert und ohne Systeminstallation
+  projektlokal gebaut; enthaltene Windows-Dateien oder Installer-Skripte
+  wurden nicht ausgeführt.
+- 147 eindeutige Dateien mit zusammen 248.549.932 Byte wurden nach
+  `research/extracted/infohub-1.0.0.15/` extrahiert. Der vorgelagerte
+  Inno-Prüflauf und alle 147 nachträglichen Manifestprüfungen waren
+  erfolgreich.
+- `ASUS InfoHub.exe` ist der primäre Hostkandidat: exakte
+  `VID_0B05&PID_1C7B&MI_00`-Strings, SetupAPI-/HID-Imports,
+  `CreateFile`/`ReadFile`/`WriteFile` und getrennte Diagnose für `LED HID1`
+  und `LED HID2` liegen gemeinsam vor.
+- `XYUI.dll` ist der sekundäre Bildaufbereitungskandidat: `image/jpeg`,
+  Frame-JPG-Pfade, `SaveJpgImageFile`-/GIF-/OpenCV-Exporte und ein
+  320×320-bezogener Buildpfad sind belegt. HID oder SetupAPI importiert die
+  DLL nicht.
+- Rohe Funde von Reportgrößen, JPEG-Markern und `0x80..0x87` bleiben ohne
+  Kontrollflussbezug absichtlich unbewertet. Eine Senderfunktion ist noch
+  nicht rekonstruiert.
+
 ## Öffentlicher Protokollfamilien-Cross-Check
 
 Der eng begrenzte Quellenvergleich steht in
@@ -292,21 +324,21 @@ Der eng begrenzte Quellenvergleich steht in
 
 ## Nächster klarer Arbeitsschritt
 
-Die nächste Arbeit soll innerhalb der weiterhin passiven Grenze:
+Die nächste Arbeit soll innerhalb der weiterhin passiven Grenze zunächst
+`ASUS InfoHub.exe` statisch analysieren:
 
-1. einen legitimen Herstellertransfer für ein einfaches statisches
-   320×320-JPEG gemäß dem Capture-Vertrag aus Analyse 04 passiv und zeitgleich
-   auf Interface 0 und 1 erfassen;
-2. daraus den vollständigen Schlussblocksuffix, alle Begleitbefehle,
-   Controlwords, das tatsächliche JPEG-Profil sowie sämtliche Interface-1-IN-
-   Nachrichten und ihr Timing bestimmen;
-3. nach Möglichkeit die verwendete Original-JPEG-Datei sichern und gegen den
-   bis EOI rekonstruierten Bytestrom vergleichen; für eine allgemeine
-   Paddingregel passive Transfers mit mindestens zwei Restlängen vergleichen;
-4. nach Möglichkeit die zum realen Versionswert `0x0049` passende Firmware
-   beschaffen und insbesondere Consumer, Timeout und `08 81` statisch mit v51
-   vergleichen;
-5. SPI-, Updater- und persistente Objektpfade ausgeschlossen halten.
+1. von den belegten SetupAPI-/HID-Imports und Diagnosezeichenketten zu den
+   getrennten HID1-/HID2-Handles gehen;
+2. deren `WriteFile`-/`ReadFile`-Aufrufer nach 440-, 1024- und 16-Byte-Puffern
+   trennen;
+3. im 1024-Byte-Zweig den 4+1020-Byte-Builder und erst dort Controlword,
+   Segmentindizes, EOI-Suffix und letzte Blockinitialisierung bestimmen;
+4. genau einen Schritt rückwärts zu den importierten JPEG-/Framefunktionen aus
+   `XYUI.dll` gehen und den 440-Byte-Zweig anschließend auf begleitende
+   Controlbefehle eingrenzen;
+5. einen passiven Hersteller-Capture erst danach als gezielten Vergleich für
+   statisch verbleibende Lücken planen und SPI-, Updater- sowie persistente
+   Objektpfade ausgeschlossen halten.
 
 Keine Gerätekommunikation, Emulation oder Firmware-Schreibrechte. Jeder
 weitere reale HID-Write benötigt einen neuen ausdrücklich freigegebenen Auftrag.
