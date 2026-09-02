@@ -194,10 +194,10 @@ Export: `research/ghidra-scripts/ExportLcdTransportLifecycle.java`.
   lediglich auf `active==0`, prüft das Errorbit nicht, gibt die Queue frei und
   markiert den Zielknoten bereit. Der spätere Displaycallback schaltet die
   Framebufferbasis um und gibt den zuvor sichtbaren Ringknoten frei.
-- Ein eigener JPEG-Live-Test ist noch nicht freigabereif. Hostframing und
-  Nullpadding sind inzwischen statisch aus InfoHub geschlossen. Blocker sind
-  weiterhin fehlende Done-/Fehlerevidenz, die nicht vollständig festgelegte
-  GDI+-JPEG-Untermenge und besonders die v51/v49-Firmwaredifferenz.
+- Zum damaligen Analysestand war ein eigener JPEG-Live-Test noch nicht
+  freigabereif. Hostframing, Nullpadding und die konservative JPEG-Untermenge
+  wurden danach geschlossen; die v51/v49-Differenz wurde im abschließenden
+  Readiness-Review als eng abgegrenztes Versionsrestrisiko bewertet.
 
 ## Statische LCD-/JPEG-Transportanalyse 04
 
@@ -243,9 +243,11 @@ Read-only-Export bleibt
   Host-IN-Read sind statisch geklärt; offen bleiben besonders v49/v51-
   Gleichheit, der konkrete GDI+-JPEG-SOF-/Subsampling-Output und der sichtbare
   Commitzeitpunkt.
-- Für einen eigenen JPEG-Test bleiben die v49/v51-Gleichheit, die konkrete
-  Codec-Untermenge und das Fehlen eines Decoder-Done-Status Blocker. `08 81`
-  bestätigt nur Queueannahme/Start; InfoHub wartet nicht auf diese Nachricht.
+- Zum Zeitpunkt dieser Analyse waren v49/v51-Gleichheit, Codec-Untermenge und
+  fehlender Decoder-Done-Status noch Blocker. Die Codec-Untermenge und der
+  ASUS-Hostpfad sind inzwischen ausreichend eingegrenzt; `08 81` bleibt nur
+  Queueannahme/Start und wird im ersten Test weder gelesen noch als Done-Status
+  verwendet.
 
 ## Statische InfoHub-Hostextraktion
 
@@ -334,11 +336,108 @@ Der eng begrenzte Quellenvergleich steht in
   Ein Hostread nach dem letzten OUT kann eine bereits vor Decoderstart
   bereitgestellte Nachricht abholen. Der aktuelle TH420-Code führt diesen Read
   im Gegensatz zu `ttlcd` und der Blogbeschreibung nicht aus.
-- Ein passiver ASUS-Referenzcapture bleibt vor einem eigenen JPEG-Write als
-  v49- und Sicherheitsvalidierung erforderlich. Hostseitig sind Suffix,
-  Folgeindizes, fehlender EP-`0x84`-Read und fehlende zwingende Interface-0-
-  Sequenz geschlossen; offen bleiben v49/v51-Gleichheit, der konkrete
-  GDI+-Codecoutput und der sichtbare Commitzeitpunkt.
+- Ein passiver ASUS-Referenzcapture bleibt wertvolle zusätzliche v49- und
+  Laufzeitevidenz, ist nach dem abschließenden statischen Readiness-Review aber
+  kein technischer Blocker für genau einen minimalen, gesondert freizugebenden
+  JPEG-Test. Offen bleiben die bytegenaue v49-Gleichheit und der sichtbare
+  Commitzeitpunkt.
+
+## Abschließender statischer JPEG-Test-Readiness-Review
+
+Der Abschlussbericht steht in
+`research/reports/lcd-first-jpeg-test-readiness.md`.
+
+- **GO** für die technische Spezifikation genau eines späteren minimalen
+  Interface-1-`0x08`-JPEG-Transfers; dies ist keine Freigabe für einen
+  HID-Write.
+- Der Erfolgsweg besteht aus genau `N=ceil(L/1020)` Linux-hidraw-Writes mit
+  je 1025 API-Byte, keinem Retry, keinem Interface-0-Zugriff, keinem
+  Interface-1-IN-Read, keinen weiteren Commands und keinem zweiten Frame.
+- Das JPEG wird offline eingefroren und validiert: 320×320, SOF0, 8 Bit,
+  JFIF-YCbCr 4:2:0, Standard-Huffman, Qualität 60, einfache achromatische
+  Grafik, SOI/EOI, ausschließlich Nullpadding und für den Minimaltest `N<=4`.
+- v51 erreicht im `0x08`-Pfad weder SPI-/Flash-Write, Firmwareupdate,
+  Bootloader noch persistente Konfigurationsänderung. Für das reale, sehr
+  wahrscheinlich v49-basierte Gerät bleibt dies mangels v49-Binärdatei formal
+  unbekannt; es gibt keinen positiven Hinweis auf eine persistente Kante.
+- Temporärer Fehler, USB-/Displayhänger und Replug-/Neustartbedarf sind jeweils
+  **niedrig** eingestuft; persistente Beschädigung **sehr niedrig**.
+- Eine fünfsekündige Quiet-Phase liefert ohne auszuwertenden IN-Report keinen
+  belegten Sicherheitsgewinn. Maßgeblich sind bekannter Gerätezustand,
+  Ausschluss paralleler Writer, vollständig vorvalidierte Puffer, kein Retry
+  und kein zweiter Frame.
+
+## Offline-Werkzeug für den ersten JPEG-Test
+
+`src/test_jpeg_0x08.py` und die Bedienungs-/Sicherheitsdokumentation
+`docs/JPEG_0X08_TEST.md` implementieren den geplanten Einmalpfad, ohne ihn
+ausgeführt zu haben.
+
+- Standardlauf und `--dry-run` validieren genau eine explizite JPEG-Datei,
+  bauen sämtliche Pakete offline und öffnen keinen hidraw-Knoten.
+- Der Markerparser verlangt SOI/EOI, JFIF, SOF0, 8 Bit, exakt 320×320, drei
+  Komponenten, konservatives YCbCr 4:2:0, einen Baseline-Scan, die vier
+  bytegenau geprüften Standard-Huffmantabellen, gültige 8-Bit-DQT-Tabellen 0/1
+  und `1 <= N <= 4`. SOF1/SOF2, andere SOF-Typen, zusätzliche APP-/
+  Metadatensegmente, Restartintervalle, arithmetische Codierung und Bytes nach
+  EOI werden abgelehnt. Die Eingabe muss eine reguläre Datei sein.
+- Die reinen Paketfunktionen erzeugen `08 N 00 80` und danach
+  `08 i 00 00`, füllen ausschließlich mit Nullbytes auf 1020 Payloadbyte auf
+  und stellen jedem 1024-Byte-Drahtreport genau ein hidraw-Nullbyte voran.
+- Der spätere Livepfad ist nur über `--i-understand-the-risk` erreichbar,
+  besitzt genau eine `os.write()`-Quelltextstelle und prüft vor jedem Write
+  VID/PID, Interface 1, Zeichengerät/sysfs-Zuordnung, 1024-Byte-OUT-Report und
+  fehlende Report-ID erneut. Exception oder Rückgabewert ungleich 1025 führt
+  sofort zum Close ohne weiteren Write.
+- Es existieren keine Auswahl anderer Commands, kein Interface-0-Pfad, kein
+  Read, Retry, Recovery-Command oder zweiter Frame.
+- 37 Offline-Tests prüfen unter anderem `N=1/2/4`, Padding, Controlwords,
+  1025-Byte-Framing, JPEG-Ablehnungen, Referenzhash, Dry-Run ohne `os.open()`
+  sowie Abbruch ohne Retry bei Short Write und Write-Exception. Ein Fehler im
+  zweiten Segment nach einem erfolgreichen ersten Segment verhindert
+  nachweislich alle verbleibenden Writes.
+
+Das eingefrorene Referenzbild liegt unter
+`tests/fixtures/lcd-0x08-reference.jpg`. Es wurde lokal mit ImageMagick
+7.1.2-27/libjpeg-turbo 3.1.3 ohne Paketinstallation erzeugt und besitzt:
+
+```text
+SHA-256: 5a1ca416974481eda228e5d69bc044c3556fd1325f0de1b12ed3ff458b584866
+L:       2236 Byte
+N:       3
+Padding: 824 Byte
+```
+
+Der Validator bestätigt offline 320×320, SOF0, 8 Bit, drei Komponenten und
+4:2:0. Die Datei wurde nicht an das Gerät gesendet. Während der Implementierung
+wurde kein HID-Gerät geöffnet, kein HID-Write ausgeführt und keine
+Schreibberechtigung aktiviert.
+
+## Statischer Safety- und Correctness-Code-Review
+
+Der unabhängige Review steht in
+`research/reports/test-jpeg-0x08-code-review.md` und endete nach begrenzten
+Korrekturen mit **PASS**.
+
+Gefunden und korrigiert wurden:
+
+- unvollständiges `JFIF\0` konnte zuvor als APP0 genügen;
+- referenzierte Quantisierungstabellen wurden zuvor nicht verlangt;
+- zusätzliche APP-/unbekannte Headersegmente wurden zuvor übersprungen;
+- der Risikoschalter war durch das argparse-Standardverhalten abkürzbar;
+- die JPEG-Eingabe war nicht ausdrücklich auf reguläre Dateien begrenzt.
+
+Der Parser verlangt nun einen vollständigen JFIF-Header ohne Thumbnail, DQT 0
+und 1, eine feste Marker-Allowlist und den vollständig ausgeschriebenen
+Risikoparameter. AST- und Callgraphprüfung bestätigen genau eine
+`os.write()`-Callsite in `_run_once()`, ausschließlich aufgerufen von `main()`.
+Pro Prozesslauf sind maximal vier Writes erreichbar; es gibt keinen Retry,
+Reconnect, Recovery-Write, zweiten Frame oder Interface-0-Pfad.
+
+Die Referenzdatei wurde unabhängig mit `file`, FFmpeg und ImageMagick als
+Baseline-JFIF, 320×320, 8 Bit, drei Komponenten und 4:2:0 bestätigt. Der
+rekonstruierte Payload besitzt denselben SHA-256 wie die Quelldatei und exakt
+824 Nullbytes Nachlauf. Keine Gerätekommunikation fand statt.
 
 ## Gefährliche und ausgeschlossene Pfade
 
@@ -356,12 +455,14 @@ Der eng begrenzte Quellenvergleich steht in
 
 ## Nächster klarer Arbeitsschritt
 
-Der Hostsender ist statisch rekonstruiert. Der nächste Arbeitsschritt innerhalb
-der passiven Grenze ist ein eng spezifizierter ASUS-Referenzcapture zur
-v49-/Laufzeitvalidierung. Er muss den konkreten GDI+-JPEG-Header, beide HID-
-Interfaces mit vollständigen URBs und Zeitstempeln sowie den sichtbaren
-Commitzeitpunkt erfassen. Er dient nicht mehr zur Bestimmung von Segmentierung,
-Padding oder Host-IN-Wartelogik.
+Der statische Code-Review ist abgeschlossen. Vor einem Live-Test bleiben die
+neue ausdrückliche menschliche Freigabe für genau die eingefrorene Fixture,
+ein kontrollierter Gerätezustand, ausgeschlossene parallele LCD-Writer und ein
+separat begrenztes Schreibfenster erforderlich. Encoderparameter, SHA-256,
+`L`, `N`, Padding und Segmentplan des Referenzbilds stehen fest.
 
-Keine Gerätekommunikation, Emulation oder Firmware-Schreibrechte. Jeder
-weitere reale HID-Write benötigt einen neuen ausdrücklich freigegebenen Auftrag.
+Keine Gerätekommunikation, Emulation oder Firmware-Schreibrechte sind durch
+diese Implementierung freigegeben. Der reale Einmaltransfer benötigt einen
+neuen, ausdrücklich auf genau dieses Gerät, Referenzartefakt und Verfahren
+begrenzten Auftrag. Schreibrechte bleiben bis dahin deaktiviert. Ein passiver
+ASUS-Referenzcapture bleibt optional zusätzliche Evidenz.
