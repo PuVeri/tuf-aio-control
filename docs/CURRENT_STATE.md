@@ -9,8 +9,10 @@ Ziel ist eine native Linux-Steuerung für das LCD der ASUS TUF Gaming LC III
 `tuf-aio-control` dupliziert diese Funktion nicht.
 
 Das undokumentierte HID-Protokoll wird vorrangig statisch und passiv
-untersucht. Zwei gesondert freigegebene, eng begrenzte reale `0x87`-Tests sind
-abgeschlossen. Weitere HID-Schreibtests sind nicht freigegeben.
+untersucht. Zwei gesondert freigegebene, eng begrenzte reale `0x87`-Tests, der
+erste `0x08`-JPEG-Test, ein Lauf des refaktorierten Einzelbildsenders und der
+erste Live-Lauf der automatischen Bildpipeline sind abgeschlossen. Weitere
+HID-Schreibtests sind nicht freigegeben.
 
 ## Bestätigte Hardware- und Transportfakten
 
@@ -574,6 +576,51 @@ Quadrat, Alpha-PNG, JPEG/PNG/WebP/BMP, animiertes GIF mit ausschließlich Frame
 Geräteoperationen sind gemockt; während dieses Tickets fand keine
 Gerätekommunikation statt und kein Bild wurde gesendet.
 
+## Realer Pipeline-Live-Test und statische Persistenzanalyse
+
+Die automatische Bildpipeline ist inzwischen auf dem realen Gerät mit
+Versionswert `0x0049` live bestätigt: Ein beliebiges unterstütztes Eingabebild
+wurde von `image_pipeline.py` in ein gültiges 320×320-Baseline-JPEG
+umgewandelt, über GUI und den unveränderten `lcd_transport.py`-Einzelbildpfad
+übertragen und sichtbar committed. Das erwartete Bild blieb nur kurz sichtbar
+und wurde anschließend durch einen anderen Displayinhalt ersetzt. In der
+darauffolgenden Analyse gab es keine weitere Gerätekommunikation.
+
+Die statische Ursache und ihre Evidenzgrenzen stehen in
+`research/reports/lcd-static-image-persistence-analysis.md`:
+
+- Der v51-`0x08`-Pfad besitzt keinen belegten Frame-Verfall oder Rollback.
+  Nach dem Commit bleibt sein Ringknoten sichtbar, bis ein anderer Produzent
+  einen Folgeknoten bereitstellt und der gemeinsame Displaycallback diesen
+  committed.
+- Der interne Boot-/Objektpfad ist ein solcher Produzent. Beim Default
+  `config+0x111 = 1` wiederholt der Bootcallback seine Recordfolge. `0x08`
+  deaktiviert diesen Callback nicht und ändert `+0x111` nicht. Das reale
+  Überschreiben passt zu diesem Mechanismus; dessen bytegenaue Identität in
+  v49 bleibt mangels v49-Binärdatei formal offen.
+- `config+0x110` beziehungsweise `0x1a` wählt nur zwischen zwei Zeit-/
+  Skalenberechnungen und ist kein belegter Holdbefehl. `0x1f` verändert
+  `+0x111`, aber keiner der rekonstruierten Werte ist als sicherer statischer
+  Holdzustand belegt: `0` aktiviert den normalen gespeicherten Objektpfad,
+  `1`/andere Nichtnullwerte wiederholen den Bootpfad, und `2` besitzt einen
+  zusätzlichen Übergangs-/Resetablauf.
+- ASUS InfoHub 1.0.0.15 setzt vor oder nach einem erfolgreichen Bildtransfer
+  keinen separaten Static-/Holdmodus. Sein Leerlauf-Worker ruft den
+  `0x08`-Sender wiederholt auf; `GetLEDData()` liefert denselben gespeicherten
+  JPEG-Puffer erneut, ohne ihn zu verbrauchen. Die Herstellerstrategie ist
+  damit laufende hostseitige Bildversorgung, nicht ein belegter Geräte-Hold.
+- Periodisches Resenden ist für den einzelnen Decode/Commit nicht nötig und
+  für dieses Projekt weiterhin weder implementiert noch freigegeben. Vor
+  einer Mehrfachframestrategie müssen Taktung, Queue-/Decoder-Lease,
+  Überlappung und Fehlerabbruch separat bewertet werden.
+
+Der nächste sichere Evidenzschritt ist ein passiver Mitschnitt der ohnehin
+durch InfoHub ausgeführten Auswahl eines statischen Nutzerbilds auf beiden
+HID-Interfaces mit ausreichendem Nachlauf. Er soll Wiederholungsrate und
+etwaige zeitlich benachbarte `0x1a`-/`0x1f`-Befehle auf dem realen v49-Gerät
+prüfen, ohne einen eigenen unbekannten Modusbefehl oder Mehrfachframepfad zu
+senden.
+
 ## Gefährliche und ausgeschlossene Pfade
 
 - `0x88`: SPI-Lesen und bedingtes SPI-Schreiben bei `0x21000`.
@@ -590,12 +637,13 @@ Gerätekommunikation statt und kein Bild wurde gesendet.
 
 ## Nächster klarer Arbeitsschritt
 
-Der freigegebene Einmaltransfer ist abgeschlossen und dokumentiert. Ein
-weiterer Frame, Animationen, Dauerbetrieb, Fehlerpfadtests oder andere
-JPEG-Profile sind weder aus dem Ergebnis ableitbar noch freigegeben. Jede
-solche Erweiterung benötigt eine neue, eigenständige Sicherheitsbewertung und
-ausdrückliche Autorisierung. Vor echter GIF-Animation müssen insbesondere
-Frame-Timing, Decoder-Lease, Framerate-/Laufzeitgrenzen, Teiltransferfehler und
-Abbruchverhalten statisch und real sicher bewertet werden. Schreibrechte
-bleiben deaktiviert. Ein passiver ASUS-Referenzcapture bleibt optional
-zusätzliche Evidenz.
+Der freigegebene Einmaltransfer und der automatische Pipeline-Live-Test sind
+abgeschlossen und dokumentiert. Der nächste sichere Schritt ist der oben
+beschriebene passive InfoHub-Capture zur statischen Persistenzfrage. Ein
+weiterer eigener Frame, ein `0x1a`-/`0x1f`-Versuch, Animationen, Dauerbetrieb,
+Fehlerpfadtests oder andere JPEG-Profile sind weder aus dem Ergebnis
+ableitbar noch freigegeben. Jede solche Erweiterung benötigt eine neue,
+eigenständige Sicherheitsbewertung und ausdrückliche Autorisierung. Vor echter
+GIF-Animation müssen insbesondere Frame-Timing, Decoder-Lease, Framerate-/
+Laufzeitgrenzen, Teiltransferfehler und Abbruchverhalten statisch und real
+sicher bewertet werden. Schreibrechte bleiben deaktiviert.
