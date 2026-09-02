@@ -269,7 +269,7 @@ Der ursprüngliche unabhängige Review ist unter
 `research/reports/test-jpeg-0x08-code-review.md` dokumentiert und endete nach
 begrenzten Validator- und CLI-Korrekturen mit **PASS**. Nach der späteren
 Extraktion der identischen Kernfunktionen in `lcd_transport.py` umfasst die
-Offline-Suite 48 erfolgreiche Tests.
+projektweite Offline-Suite 53 erfolgreiche Tests.
 
 Der Review bestätigte genau eine `os.write()`-Callsite, höchstens vier Writes
 pro Prozesslauf, keinen Retry-/Recovery-/Reconnectpfad und keinen Zugriff auf

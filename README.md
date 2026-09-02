@@ -5,9 +5,24 @@ Linux-Anwendung zur Steuerung des LCDs der **ASUS TUF Gaming LC III 360 ARGB
 LCD**. Langfristig soll das Display eigene Bilder oder Animationen sowie reale
 Hardwaretemperaturen anzeigen können.
 
-Das Projekt befindet sich in einer frühen Analysephase. Das USB-/HID-Protokoll
-ist bislang nicht dokumentiert. Daher hat die sichere, passive Untersuchung des
-Geräts Vorrang vor der Implementierung einer Steuerung.
+Der sichere Einzelbildpfad für bereits kompatible 320×320-JPEGs ist inzwischen
+statisch geprüft und auf dem realen Gerät bestätigt. Automatische
+Bildkonvertierung, Animationen, Dauerbetrieb und Sensordarstellung sind noch
+nicht implementiert.
+
+## Desktop-UI starten
+
+Die erste Desktop-Oberfläche verwendet PySide6 und startet mit:
+
+```text
+python3 -B src/tuf_aio_gui.py
+```
+
+Die UI sendet niemals automatisch. Sie zeigt kompatible und inkompatible
+Bilder als Vorschau, soweit Qt sie lesen kann. Nur ein bereits kompatibles
+JPEG kann nach einem ausdrücklichen Klick auf `Auf Display senden` genau einmal
+übertragen werden. Die Oberfläche konvertiert keine Bilder und verändert keine
+Geräteberechtigungen.
 
 ## Projektziele
 
@@ -23,8 +38,8 @@ Die geplante Anwendung soll:
 - Zugriffsfehler und nicht unterstützte Geräte verständlich melden,
 - das ermittelte Protokoll nachvollziehbar und reproduzierbar dokumentieren.
 
-Nicht Ziel der aktuellen Phase sind Schreibzugriffe auf das Gerät,
-Paketinstallation oder Anwendungscode.
+Nicht Ziel der aktuellen Phase sind automatische Bildkonvertierung,
+Animationen, Dauerbetrieb, Sensoranzeige, Autostart oder ein Hintergrunddienst.
 
 ## Aktueller Erkenntnisstand
 
@@ -33,19 +48,21 @@ Paketinstallation oder Anwendungscode.
 - Das Zielgerät ist die ASUS TUF Gaming LC III 360 ARGB LCD.
 - Die USB-Kennung lautet `0b05:1c7b`.
 - Das Gerät wird unter Linux als USB-HID-Gerät erkannt.
-- Es besitzt zwei HID-Schnittstellen.
-- Die zugehörigen HID-Raw-Geräte wurden in einer bisherigen Umgebung als
-  `/dev/hidraw7` und `/dev/hidraw8` beobachtet.
+- Interface 1 besitzt einen unnummerierten 1024-Byte-OUT-Report und ist der
+  empirisch bestätigte JPEG-Bildkanal.
+- Linux-hidraw verwendet dafür `00 || 1024-Byte-Report`, insgesamt 1025 Byte.
+- Ein 320×320-SOF0-/Baseline-JFIF-YCbCr-4:2:0-JPEG wurde auf dem realen Gerät
+  mit Versionswert `0x0049` erfolgreich sichtbar dargestellt.
+- Der wiederverwendbare Einzelbildpfad sendet ausschließlich Command `0x08`
+  und höchstens einen Frame pro explizitem Aufruf beziehungsweise Klick.
 
 ### Noch nicht bestätigt
 
-- Die Aufgabenverteilung zwischen den beiden HID-Schnittstellen.
-- Report-IDs, Report-Größen und Report-Typen.
-- Die Bedeutung einzelner Befehle und Antworten.
-- Das Bildformat, die Displayauflösung, Farbreihenfolge und
-  Übertragungssegmentierung.
-- Initialisierungs-, Status- oder Keepalive-Sequenzen.
-- Ob Sensorwerte vom Host gerendert oder als Zahlenwerte übertragen werden.
+- Animationen, mehrere Frames und langfristiger Dauerbetrieb.
+- Automatische Konvertierung beliebiger Quellbilder.
+- Fehler-, Timeout- und Recoveryverhalten des realen v49-Geräts.
+- Andere JPEG-Profile und Segmentzahlen als der erfolgreiche Referenztransfer.
+- Sensorerfassung und Darstellung von Hardwarewerten.
 
 Die beobachteten HID-Raw-Nummern sind nur Momentaufnahmen. Sie können sich nach
 Neustart, Neuverbinden oder durch andere USB-Geräte ändern und dürfen nicht als
@@ -67,16 +84,14 @@ Details, Beobachtungen und Hypothesen werden im
 | Beobachtete HID-Schnittstellen | 2 |
 | Bisher beobachtete Pfade | `/dev/hidraw7`, `/dev/hidraw8` |
 
-Eine spätere Implementierung muss passende Geräte über Vendor-ID und
-Product-ID identifizieren. Falls mehrere Geräte oder Schnittstellen passen,
-müssen zusätzlich stabile USB- und HID-Merkmale wie Interface-Nummer,
-Report-Deskriptor, Seriennummer oder physischer Gerätepfad ausgewertet werden.
+Die Implementierung identifiziert passende Geräte über Vendor-ID, Product-ID,
+Interface-Nummer und Reportstruktur. Dynamische hidraw-Pfade werden unmittelbar
+vor jedem Write erneut gegen sysfs validiert.
 
-## Geplante Architektur
+## Architektur
 
-Die genaue Sprache, GUI-Technik und Bibliotheksauswahl sind noch nicht
-festgelegt. Die fachlichen Grenzen sollen unabhängig davon wie folgt getrennt
-werden:
+Die erste Anwendung verwendet Python und PySide6. GUI, Validierung und
+Hardwarezugriff bleiben wie folgt getrennt:
 
 ```text
 Geräteerkennung ──> HID-/Protokollschicht ──> LCD-Transport
@@ -96,9 +111,9 @@ HID-Schnittstellen korrekt zu und prüft Zugriffsrechte. Dynamische
 
 ### HID- und Protokollschicht
 
-Kapselt HID-Reports, Report-IDs, Paketgrößen, Befehle, Antworten und
-Fehlerbehandlung. Erkenntnisse aus der passiven Analyse müssen dokumentiert und
-mit Originaldaten belegbar sein, bevor daraus Schreiboperationen entstehen.
+`src/lcd_transport.py` kapselt Geräteprüfung, JPEG-Validierung, Paketbildung
+und den einmaligen synchronen Frame-Transfer. Die GUI enthält keine eigene
+USB- oder HID-Protokollimplementierung.
 
 ### Sensorquellen
 
@@ -109,30 +124,30 @@ explizite Angaben zu Quelle, Einheit, Zeitstempel und Verfügbarkeit.
 
 ### Renderer
 
-Erzeugt aus Bildern, Animationen und Sensordaten ein vom Display erwartetes
-Format. Auflösung, Pixelreihenfolge, Farbraum, Bildrate und Segmentierung werden
-erst nach Protokollanalyse festgelegt.
+Eine automatische Aufbereitung existiert noch nicht. Der aktuelle Pfad nimmt
+nur bereits kompatible 320×320-JPEGs an.
 
 ### Anwendung und Benutzeroberfläche
 
-Verwaltet Konfiguration, Gerätestatus, Anzeigeinhalt und Fehlermeldungen. Die
-Fachlogik soll von der konkreten Oberfläche und vom Hardwarezugriff getrennt
-bleiben, damit sie ohne angeschlossenes Gerät getestet werden kann.
+`src/tuf_aio_gui.py` zeigt Gerätestatus, Vorschau, Bildmetadaten und Fehler.
+Sie ruft für einen expliziten Sendeklick genau einmal die Transport-API auf und
+ist ohne angeschlossenes Gerät testbar.
 
 ## Sicherheitsregeln
 
-Bis auf Weiteres gilt **ausschließlich passive Analyse**:
+Für alle aktuellen Senderpfade gelten enge Sicherheitsgrenzen:
 
-- Es werden keine Daten, Feature Reports oder Output Reports an das Gerät
-  gesendet.
+- Es wird niemals automatisch gesendet; jeder Frame benötigt eine explizite
+  Benutzeraktion.
+- Zulässig ist ausschließlich der bestätigte `0x08`-JPEG-Pfad auf Interface 1.
+- Es gibt keinen Retry, Reconnect, IN-Read, Recovery-Command oder Folgeframe.
 - Es werden keine willkürlichen oder geratenen HID-Pakete ausprobiert.
 - Beobachtete `/dev/hidrawX`-Pfade werden nicht fest codiert.
 - Mitschnitte, Deskriptoren und andere Originaldaten werden unverändert
   aufbewahrt und nicht überschrieben.
 - Beobachtung, Hypothese und bestätigte Erkenntnis werden klar getrennt.
-- Schreibtests beginnen frühestens nach dokumentierter Analyse der
-  Report-Größen, Report-IDs und Befehlsstruktur und benötigen einen gesonderten,
-  ausdrücklich freigegebenen Arbeitsauftrag.
+- Andere Commands, Animationen und weitere Betriebsarten benötigen eine neue
+  Sicherheitsbewertung und ausdrückliche Freigabe.
 
 Die verbindlichen Einzelheiten stehen in [docs/SAFETY.md](docs/SAFETY.md).
 
@@ -194,8 +209,8 @@ tuf-aio-control/
 - `docs/`: Projektdokumentation, Sicherheitsregeln und Protokolltagebuch.
 - `logs/`: lokale Diagnose- und Analyseprotokolle. Temporäre Logdateien werden
   nicht versioniert.
-- `src/`: späterer Anwendungscode. In der aktuellen Dokumentationsphase bleibt
-  der Ordner leer.
+- `src/`: Geräteerkennung, geprüfter Einzelbildtransport, CLI-Werkzeuge und
+  PySide6-Desktop-UI.
 
 `package.json` und `package-lock.json` sind bereits vorhandene
 Projektmetadaten. Ihre technische Rolle ist noch nicht festgelegt und wird in
@@ -203,7 +218,8 @@ dieser Phase nicht erweitert.
 
 ## Status
 
-**Forschungsphase / passive Analyse.** Es existiert noch keine funktionsfähige
-Anwendung und es wurde im Rahmen dieser Projektgrundlage kein Schreibzugriff auf
-das Gerät autorisiert.
-
+**Erste funktionsfähige Einzelbildstufe.** Der `0x08`-JPEG-Transfer und die
+wiederverwendbare Einzelbild-CLI wurden auf dem realen v49-Gerät bestätigt.
+Die Desktop-UI ist vollständig offline getestet, wurde in diesem Ticket aber
+nicht gegen das Gerät ausgeführt. Weitere Betriebsarten benötigen jeweils eine
+eigene Sicherheitsbewertung und Freigabe.

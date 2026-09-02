@@ -495,6 +495,13 @@ kleine wiederverwendbare Modulstruktur überführt:
   Safety-Werkzeug auf denselben Kernfunktionen, weiterhin hart auf `N<=4`
   begrenzt.
 
+Der refaktorierte Pfad `src/set_lcd_image.py --apply` wurde inzwischen genau
+einmal erfolgreich auf dem realen Gerät mit Versionswert `0x0049` und
+`bcdDevice 0.49` ausgeführt. Damit ist neben dem ursprünglichen Safety-Werkzeug
+auch die wiederverwendbare Transport-/CLI-Schichtung für einen einzelnen Frame
+empirisch bestätigt. Daraus folgt keine Freigabe für weitere Frames,
+Animationen oder Dauerbetrieb.
+
 Die Produktstufe akzeptiert nur bereits passende 320×320-SOF0-/Baseline-
 JFIF-YCbCr-4:2:0-JPEGs mit 8 Bit, drei Komponenten, Standard-Huffmantabellen,
 gültigem EOI ohne Nachlauf und `1<=N<=200`. Eine automatische Konvertierung
@@ -513,6 +520,35 @@ bis `N=200`, Nullpadding, Geräte-/Reportablehnungen, Abbruch bei Writefehlern,
 Preview ohne Geräteöffnung und genau einen Frame-Aufruf pro CLI-Lauf. Während
 dieses Tickets fand keine Gerätekommunikation statt. Bedienung und Grenzen
 stehen in `docs/LCD_SINGLE_IMAGE.md`.
+
+## Erste Desktop-UI
+
+`src/tuf_aio_gui.py` implementiert die erste native Desktop-Oberfläche mit dem
+bereits lokal vorhandenen PySide6 6.11.1. GUI und Transport bleiben getrennt:
+Die Oberfläche enthält keine Controlwords, HID-Paketbildung oder eigene
+Geräteöffnung, sondern verwendet ausschließlich `lcd_transport.py`.
+
+Die dunkle, layoutbasierte Oberfläche zeigt den dynamisch erkannten
+Gerätestatus, eine Bildvorschau, Pfad, Auflösung, JPEG-Profil, Dateigröße,
+Segmentzahl, Padding und Validierungsstatus. Bereits kompatible JPEGs können
+erst nach einem expliziten Klick auf `Auf Display senden` übertragen werden.
+Inkompatible, von Qt darstellbare Bilder bleiben als Preview sichtbar, der
+Sendebutton ist dann deaktiviert und der Validierungsfehler wird angezeigt.
+Eine automatische Bildkonvertierung existiert weiterhin nicht.
+
+Vor jedem Klicktransfer liest und validiert die GUI die Datei erneut und führt
+die dynamische Geräteerkennung erneut aus. Danach ruft sie
+`send_frame_once()` genau einmal auf; dessen VID/PID-, Interface-, Report- und
+Per-Write-Revalidierungen bleiben unverändert. Es gibt kein automatisches
+Senden, Retry, Reconnect, Polling-Write, IN-Read, Interface 0, Folgeframe,
+Animation, Autostart oder Hintergrunddienst.
+
+Die gesamte Offline-Suite umfasst jetzt 53 erfolgreiche Tests. Fünf
+headless-Qt-Tests prüfen Referenzbild, inkompatible Preview, fehlendes Gerät,
+Transportfehler ohne Retry und genau einen `send_frame_once()`-Aufruf pro
+Sendeklick. Alle Geräteoperationen sind gemockt; während dieses GUI-Tickets
+fand keine Gerätekommunikation statt und die Referenzdatei wurde nicht
+gesendet.
 
 ## Gefährliche und ausgeschlossene Pfade
 
