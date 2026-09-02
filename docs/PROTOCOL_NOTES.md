@@ -275,7 +275,7 @@ Offset  Hexadezimale Bytes
 
 | ID | Hypothese | Grundlage | Gegenbeobachtungen | Geplante passive Prüfung | Status |
 | --- | --- | --- | --- | --- | --- |
-| H-001 | Interface 1 trägt den 1024-Byte-Empfangspfad; die Bedeutung als LCD-/Bilddatenpfad bleibt offen. | Direkter Call von Endpointcallback 3 zu `0x001297e8`; High-Speed-MPS `0x400`. | Befehl `0x08` und Datenbedeutung sind noch nicht vollständig aufgelöst. | Statisch den `0x08`-Folgepfad verfolgen. | Transportzuordnung bestätigt als C-009; Semantik offen |
+| H-001 | Interface 1 trägt den 1024-Byte-Empfangspfad als LCD-/Bilddatenpfad. | Direkter Call von Endpointcallback 3 zu `0x001297e8`; High-Speed-MPS `0x400`; sichtbarer Erfolg des realen `0x08`-JPEG-Einmaltests. | Keine Gegenbeobachtung für den getesteten Einzelfall. | Keine weitere Prüfung für diese enge Zuordnung nötig. | bestätigt als C-033 und C-035 |
 | H-002 | Interface 0 verwendet die symmetrische 440-Byte-Anfrage-/Antwortstruktur. | Endpointcallbacks 1/2, High-Speed-MPS `0x1b8`/`0x1b8` und 440-Byte-Antwortbauer. | Keine Gegenbeobachtung im statischen Pfad. | Keine weitere Prüfung für die Interfacezuordnung nötig. | bestätigt als C-008 |
 | H-003 | `0x87` liefert einen firmwarebuildabhängigen Versionswert; für die analysierte v51-Binärdatei ist er `0x0051`, das mit `bcdDevice 0.49` erfasste reale Gerät liefert `0x0049`. | Statischer v51-Handler und vollständige 440-Byte-Antwort aus Live-Test 02. | Eine offizielle v49-Datei und ASUS-Zuordnung fehlen; die konkrete Binär-/Paketidentität des realen Geräts ist nicht belegt. | Nur noch statischer Vergleich mit einer glaubwürdigen v49-Datei oder offizielle ASUS-Zuordnung. | Versionswert-Abfrage bestätigt; Paketidentität v49 weiterhin abgeleitet |
 | H-004 | Beim Einmaltest wurde ein nach `open()` eingetroffener alter oder unabhängiger Interface-0-Report vor der neuen `0x87`-Antwort gelesen. | Das Programm prüft die Queue vor dem Write nicht und liest danach den ältesten verfügbaren Report; mehrere Antworttypen teilen den 440-Byte-IN-Pfad. | Ein Linux-Altbestand von vor `open()` ist für die neue per-Open-Queue ausgeschlossen; die Live-Bytes fehlen und belegen keinen fremden Befehl. | Zeitlich begrenzete, rein lesende Ruhezustandsbeobachtung und spätere Pre-Write-Readiness-Prüfung mit Abbruch. | technisch plausibel, nicht belegt |
@@ -330,9 +330,20 @@ möglich.
 | C-030 | Live-Test 02 durchlief eine fünfsekündige Ruhephase ohne Input und eine unmittelbar vor dem Write leere Queue, sendete genau einmal `00 | 87 01 00 80 | 436 × 00` und empfing genau `87 01 00 80 49 00 | 434 × 00` mit 440 Byte. Danach wurde ohne weiteren Write geschlossen. | Bestätigtes Bedienerergebnis; `research/reports/command-0x87-live-test-02.md`. | 2026-09-01 |
 | C-031 | `0x87` ist empirisch als Versions-/Versionswert-Abfragepfad bestätigt: Die v51-Firmware liefert statisch `0x0051`, das reale Gerät empirisch `0x0049`. Die beiden Antworten unterscheiden sich ausschließlich an Offset `0x0004`. | Ghidra-v51-Handler und vollständige Live-Test-02-Antwort. | 2026-09-01 |
 | C-032 | Für das reale Gerät stimmen der über `0x87` gelieferte Wert `0x0049` und die Ziffern der USB-Geräterevision `bcdDevice 0.49` überein. Damit ist noch nicht bytegenau bewiesen, dass der installierte Binärstand einer offiziellen ASUS-Datei mit Paketbezeichnung v49 entspricht. | C-021, C-030 und fehlender v49-Dateifund aus `firmware-v49-investigation.md`. | 2026-09-01 |
+| C-033 | Interface 1 funktioniert auf dem realen Gerät als Bildkanal: Drei `0x08`-Segmente über Interface 1 führten zum erwarteten sichtbaren Bild. | Bedienerbestätigter Einmaltest; `research/reports/lcd-0x08-live-test-01.md`. | 2026-09-02 |
+| C-034 | Linux-hidraw-Framing `00 || 1024-Byte-Report` funktioniert für den unnummerierten Interface-1-Outputreport. Im erfolgreichen Einmaltest wurden genau drei 1025-Byte-API-Puffer geschrieben. | Bedienerbestätigter Einmaltest; `research/reports/lcd-0x08-live-test-01.md`. | 2026-09-02 |
+| C-035 | Ein `0x08`-JPEG-Transfer funktioniert auf dem realen Gerät mit Versionswert `0x0049` und `bcdDevice 0.49`. | Sichtbares erwartetes weißes Quadrat nach dem Einmaltransfer; `research/reports/lcd-0x08-live-test-01.md`. | 2026-09-02 |
+| C-036 | Die Segmentierung `N=3` mit Erstwort `08 03 00 80` und Folgeindizes 1, 2 (`08 01 00 00`, `08 02 00 00`) funktioniert für die 2236-Byte-Referenzdatei. | Bedienerbestätigte gesendete Folge und sichtbares Ergebnis; `research/reports/lcd-0x08-live-test-01.md`. | 2026-09-02 |
+| C-037 | 824 Nullbytes nach dem EOI im letzten 1020-Byte-Payload werden bei diesem Transfer akzeptiert. | Eingefrorene Referenzdatei, Paketplan und sichtbares Ergebnis; `research/reports/lcd-0x08-live-test-01.md`. | 2026-09-02 |
+| C-038 | Das 320×320-SOF0-/Baseline-JFIF-YCbCr-4:2:0-Referenz-JPEG wird dekodiert und sichtbar auf dem LCD committed. | Erwartetes weißes Quadrat erschien sichtbar; `research/reports/lcd-0x08-live-test-01.md`. | 2026-09-02 |
+| C-039 | Für diesen erfolgreichen einzelnen JPEG-Transfer ist kein Interface-0-Begleitbefehl erforderlich. | Der Erfolgsweg enthielt keine Interface-0-Kommunikation; `research/reports/lcd-0x08-live-test-01.md`. | 2026-09-02 |
+| C-040 | Für diesen erfolgreichen einzelnen JPEG-Transfer ist kein Read von Endpoint `0x84` erforderlich. Dies sagt nichts über dessen Inhalt oder Bedeutung in anderen Abläufen aus. | Der Erfolgsweg enthielt keinen Interface-1-IN-Read; `research/reports/lcd-0x08-live-test-01.md`. | 2026-09-02 |
 
-Die Reportgrößen und das Host-Framing von Interface 0 sind bestätigt.
-Weiterhin offen sind mehrere Inhalts- und Befehlssemantiken.
+Die Reportgrößen und das Host-Framing von Interface 0 sind bestätigt. Für
+Interface 1 sind der 1024-Byte-Outputreport, das Linux-hidraw-Framing und der
+Bildtransport im beschriebenen einzelnen `0x08`-Erfolgsfall empirisch
+bestätigt. Weiterhin offen sind mehrere Inhalts- und Befehlssemantiken sowie
+alle nicht getesteten Bildprofile und Betriebsarten.
 
 ## Offene Fragen
 
@@ -633,8 +644,9 @@ Gerätedispatcher. Dessen Case `0x08` verändert globalen Zustand und stößt
 mehrere Grafik-/Systemaufrufe an, ohne den gemeinsamen Antwortbauer
 aufzurufen. Auf Interface 1 führt Endpoint 3 über den 1024-Byte-Empfänger
 einen vollständigen Befehl `0x08` in einen gesonderten Datenqueue-/
-Zustandspfad. Eine vollständige statische Verknüpfung und die höhere
-Datenbedeutung sind nicht belegt.
+Zustandspfad. Der spätere reale Einmaltest bestätigt diesen Pfad empirisch als
+JPEG-Bildkanal für die getestete Segmentfolge. Eine vollständige statische
+Verknüpfung aller internen v49-Pfade ist damit nicht belegt.
 
 Für eine einpaketige leere `0x87`-Anfrage ist statisch und empirisch belegt:
 
@@ -677,7 +689,8 @@ Abbruchkriterien und minimale Recovery stehen in
 - `0x1e` könnte Status oder Diagnose liefern.
 - `0x80..0x85` könnten Status-, Identitäts-, Display- oder
   Konfigurationswerte liefern.
-- Der 1024-Byte-Pfad könnte Daten oder Bildinhalte transportieren.
+- Weitere Profile und Mehrfachframes könnten denselben 1024-Byte-Bildpfad
+  verwenden; dies ist nicht getestet.
 
 Diese Bedeutungen sind nicht durch Symbole oder vollständige Datenflüsse
 bestätigt.
@@ -696,9 +709,9 @@ bestätigt.
 
 ### Unbekannte Punkte und Sicherheitsentscheidung
 
-Offen bleiben die Semantik des 16-Byte-IN-Pfads von Interface 1, die höheren
-Bedeutungen und die Verbindung der beiden `0x08`-Pfade, die Bedeutungen der
-anderen kurzen Antwortwerte sowie mehrere indirekte Callbackziele. Die
+Offen bleiben die Semantik des 16-Byte-IN-Pfads von Interface 1, die interne
+Verbindung der beiden `0x08`-Pfade auf v49, die Bedeutungen der anderen kurzen
+Antwortwerte sowie mehrere indirekte Callbackziele. Die
 Ghidra-Call-Graph-Suche konnte LCM/emWin, Boot-/JPG- und SPI-String-Eigentümer
 wegen indirekter Aufrufe nicht lückenlos mit den Dispatchern verbinden.
 
@@ -834,3 +847,39 @@ Nicht direkt bestätigt ist die bytegenaue Identität des installierten
 Binärstands mit einer offiziellen ASUS-Firmwaredatei v49. Die abgeschlossenen
 Tests erteilen keine weitere Sendefreigabe; in dieser Dokumentationsarbeit fand
 keine Gerätekommunikation statt.
+
+## Realer Einmaltest `0x08` – JPEG, dokumentiert am 2026-09-02
+
+Der gesondert autorisierte Test ist unter
+`../research/reports/lcd-0x08-live-test-01.md` vollständig dokumentiert. Das
+reale Gerät meldete zuvor über `0x87` den Wert `0x0049` und besitzt
+`bcdDevice 0.49`. Für diesen Boot war Interface 1 dynamisch `/dev/hidraw8`
+zugeordnet.
+
+Die eingefrorene 2236-Byte-Datei
+`tests/fixtures/lcd-0x08-reference.jpg` mit SHA-256
+`5a1ca416974481eda228e5d69bc044c3556fd1325f0de1b12ed3ff458b584866`
+ist ein 320×320-SOF0-/Baseline-JFIF-YCbCr-4:2:0-JPEG. Genau drei
+1025-Byte-hidraw-Puffer `00 || 1024-Byte-Report` wurden mit den Controlwords
+`08 03 00 80`, `08 01 00 00` und `08 02 00 00` übertragen. Im letzten
+Payload folgten auf 196 JPEG-Restbytes exakt 824 Nullbytes.
+
+Auf dem LCD erschien sichtbar das erwartete weiße Quadrat. Empirisch bestätigt
+sind damit für genau diesen Einzelfall Interface 1 als Bildkanal, das
+Linux-hidraw-Framing, der `0x08`-JPEG-Transfer, `N=3` mit den Folgeindizes 1
+und 2, Nullpadding nach EOI sowie JPEG-Dekodierung und sichtbarer
+Displaycommit. Der Erfolg benötigte weder einen Interface-0-Begleitbefehl noch
+einen Read von Endpoint `0x84`. Es gab keinen Retry, weiteren Command oder
+zweiten Frame.
+
+Nur aus v51 statisch bekannt bleiben Queuegrenzen, Decoder-Lease, interner
+Decoderstart, Queuefreigabe und die fehlende Erreichbarkeit von SPI-/Flash-/
+Bootloader- oder persistenten Konfigurationsschreibpfaden. Die bytegenaue
+Identität des realen Firmwarebinärstands mit einer offiziellen v49-Datei ist
+weiter offen.
+
+Aus diesem einen Test darf keine Aussage über Animationen, mehrere Frames,
+langfristigen Dauerbetrieb, Fehlerverhalten oder andere JPEG-Profile
+abgeleitet werden. Temporäre Schreibrechte wurden unmittelbar danach entfernt.
+Diese Dokumentationsarbeit führte keine weitere Gerätekommunikation aus und
+erteilt keine weitere Sendefreigabe.

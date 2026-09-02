@@ -178,12 +178,13 @@ Offline bestätigte Daten:
 | Controlbytes | `08 03 00 80`, `08 01 00 00`, `08 02 00 00` |
 
 Der Test `test_reference_jpeg_is_frozen_and_valid` bindet SHA-256, Struktur,
-`N` und Padding an diese Datei. Sie wurde nicht an das Gerät gesendet.
+`N` und Padding an diese Datei. Während Implementierung und Code-Review wurde
+sie nicht gesendet; im später gesondert autorisierten Live-Test wurde sie
+genau einmal übertragen.
 
-## Geplanter einmaliger Live-Test
+## Ausgeführter einmaliger Live-Test
 
-Nur ein später gesondert autorisierter Auftrag darf folgenden Schalter
-verwenden:
+Der gesondert autorisierte Einmaltest verwendete folgenden Aufruf:
 
 ```text
 python3 -B src/test_jpeg_0x08.py --i-understand-the-risk \
@@ -200,7 +201,11 @@ Der Erfolgsweg ist dann fest:
 6. Descriptor schließen.
 7. Keinen Read, Retry, weiteren Command oder zweiten Frame ausführen.
 
-Dieser Ablauf ist dokumentiert, aber in diesem Ticket nicht ausgeführt.
+Dieser Ablauf wurde genau einmal ausgeführt. Auf dem realen Gerät mit
+Versionswert `0x0049` und `bcdDevice 0.49` erschien sichtbar das erwartete
+weiße Quadrat. Der vollständige Ergebnisbericht steht in
+`research/reports/lcd-0x08-live-test-01.md`. Es gab keinen zweiten Frame;
+temporäre Schreibrechte wurden unmittelbar danach entfernt.
 
 ## Sofortige Abbruchbedingungen
 
@@ -268,15 +273,16 @@ pro Prozesslauf, keinen Retry-/Recovery-/Reconnectpfad und keinen Zugriff auf
 Interface 0. „Einmalig“ ist innerhalb eines Prozesslaufs technisch erzwungen;
 eine erneute manuelle Programmausführung bleibt organisatorisch zu verhindern.
 
-## Offene Punkte vor dem Live-Lauf
+## Grenzen nach dem Live-Lauf
 
-- neue ausdrückliche menschliche Freigabe für genau das eingefrorene JPEG und
-  genau einen Lauf;
-- kontrollierter, bekannter Gerätezustand und Ausschluss paralleler LCD-
-  Writer;
-- Schreibrecht nur in einem später separat freigegebenen Betriebsfenster;
-- vorab festgelegte menschliche Recovery für einen möglichen USB-/Display-
-  Hänger unter Beachtung der Kühlfunktion.
+- Kein weiterer Lauf oder zweiter Frame ist durch den erfolgreichen Einmaltest
+  freigegeben.
+- Animationen, mehrere Frames, langfristiger Dauerbetrieb, Fehlerverhalten und
+  andere JPEG-Profile sind nicht getestet und aus dem Ergebnis nicht
+  ableitbar.
+- Queuegrenzen, Decoder-Lease, interne Queuefreigabe und persistente
+  Pfaderreichbarkeit sind für v49 nicht dynamisch beobachtet; die zugehörigen
+  Detailbefunde stammen aus der statischen v51-Analyse.
 
 Eine fünfsekündige Interface-1-IN-Quiet-Phase ist nicht vorgesehen. Ohne
 Auswertung eines IN-Reports liefert sie keinen belegten Sicherheitsgewinn und

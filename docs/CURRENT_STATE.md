@@ -101,7 +101,9 @@ Die Ergebnisse stehen in
 - Der Objektpfad `0x001279e8 -> 0x0010f0d0 -> 0x0010eff4 -> 0x0011acd8`
   ist als JPEG-Pfad belegt: `0x00110a58` prüft `ff d8` sowie SOF0/1/2 und
   extrahiert Breite und Höhe; `0x0010f16c` dekodiert JPEG-Blöcke und Farben.
-  Das beweist JPEG für gespeicherte Objekte, nicht für USB-`0x08`.
+  Dieser statische Befund allein bewies JPEG nur für gespeicherte Objekte;
+  der spätere reale Einmaltest bestätigt JPEG zusätzlich für den getesteten
+  USB-`0x08`-Erfolgsfall.
 - `+0x110` wählt zwischen zwei Ganzzahl-Zeitumrechnungen. `+0x111` steuert
   Ablauf, Wiederholung und einen Sonderzustand `2`; fachliche Namen wie
   Animation oder Loop bleiben unbestätigt.
@@ -128,7 +130,9 @@ Export: `research/ghidra-scripts/ExportLcdPacketModel.java`.
 - `0x6021` erzeugt zwei Byte pro Ausgabepixel; `0x14021` erzeugt vier. Die
   Dimensionen liest der Grafikblock aus Hardwarezustand, nicht aus dem
   Ringknoten oder dem USB-Steuerwort. Derselbe Block wird im beschleunigten
-  JPEG-Pfad benutzt; JPEG für die USB-`0x08`-Quelle bleibt dennoch unbestätigt.
+  JPEG-Pfad benutzt. Die statische Analyse allein ließ JPEG für die
+  USB-`0x08`-Quelle offen; der spätere Einmaltest bestätigt es für genau die
+  getestete Referenzdatei und Segmentfolge.
 - Das Interface-1-Steuerwort ist vollständig: Byte 0 Befehl, Bytes 1/2 und
   die unteren sieben Bits von Byte 3 bilden das 23-Bit-Feld für Gesamtzahl
   beziehungsweise Index; Byte 3 Bit 7 kennzeichnet nur das Erstsegment. Es
@@ -221,11 +225,11 @@ Read-only-Export bleibt
   stehen exakt 1024 Byte, beginnend mit dem Command/Controlword. Aus der
   dokumentierten Linux-Semantik folgt für `hidraw.write()` exakt
   `00 || 1024-Byte-Report`, also 1025 Byte; der Kernel entfernt das API-
-  Nullbyte. Dies ist für Interface 1 nicht live getestet, aber statisch und
-  API-semantisch geschlossen. InfoHub bestätigt jetzt unabhängig davon die
-  Windows-Abbildung: `WriteFile` erhält `00 || report[1024]`, also 1025
-  API-Byte. Interface-1-Reads liefern den unnummerierten 16-Byte-IN-Report ohne
-  Nullpräfix; InfoHub führt einen solchen Read jedoch nicht aus.
+  Nullbyte. Der reale Einmaltest bestätigt dieses Framing jetzt für Interface
+  1. InfoHub bestätigt unabhängig davon die Windows-Abbildung: `WriteFile`
+  erhält `00 || report[1024]`, also 1025 API-Byte. Interface-1-Reads liefern
+  den unnummerierten 16-Byte-IN-Report ohne Nullpräfix; InfoHub und der
+  erfolgreiche Einmaltest führen einen solchen Read jedoch nicht aus.
 - Der Firmware-Headerparser erkennt SOF0/SOF1/SOF2 und ein bis vier
   Komponenten; das ist keine Decoderfreigabe. Die offizielle N9H20-
   Dokumentation beschränkt den Hardwarecodec auf Baseline Sequential. Die
@@ -240,14 +244,15 @@ Read-only-Export bleibt
   ausschließlich Nullbytes nach EOI bis zum Ende des letzten Blocks.
 - Ein späterer passiver Capture soll weiterhin beide Interfaces vollständig
   und mit URB-Zeitstempeln erfassen. Suffix, Folgeindizes und fehlender
-  Host-IN-Read sind statisch geklärt; offen bleiben besonders v49/v51-
-  Gleichheit, der konkrete GDI+-JPEG-SOF-/Subsampling-Output und der sichtbare
-  Commitzeitpunkt.
+  Host-IN-Read sind für den Einmaltest auch empirisch bestätigt; offen bleiben
+  besonders v49/v51-Gleichheit, der konkrete GDI+-JPEG-SOF-/Subsampling-
+  Output und der genaue Commitzeitpunkt. Dass ein sichtbarer Commit erfolgt,
+  ist für die Referenzdatei bestätigt.
 - Zum Zeitpunkt dieser Analyse waren v49/v51-Gleichheit, Codec-Untermenge und
   fehlender Decoder-Done-Status noch Blocker. Die Codec-Untermenge und der
   ASUS-Hostpfad sind inzwischen ausreichend eingegrenzt; `08 81` bleibt nur
-  Queueannahme/Start und wird im ersten Test weder gelesen noch als Done-Status
-  verwendet.
+  Queueannahme/Start und wurde im ersten Test weder gelesen noch als
+  Done-Status verwendet.
 
 ## Statische InfoHub-Hostextraktion
 
@@ -370,8 +375,9 @@ Der Abschlussbericht steht in
 ## Offline-Werkzeug für den ersten JPEG-Test
 
 `src/test_jpeg_0x08.py` und die Bedienungs-/Sicherheitsdokumentation
-`docs/JPEG_0X08_TEST.md` implementieren den geplanten Einmalpfad, ohne ihn
-ausgeführt zu haben.
+`docs/JPEG_0X08_TEST.md` implementierten den geplanten Einmalpfad. Der später
+gesondert freigegebene Live-Test ist in
+`research/reports/lcd-0x08-live-test-01.md` dokumentiert.
 
 - Standardlauf und `--dry-run` validieren genau eine explizite JPEG-Datei,
   bauen sämtliche Pakete offline und öffnen keinen hidraw-Knoten.
@@ -409,9 +415,8 @@ Padding: 824 Byte
 ```
 
 Der Validator bestätigt offline 320×320, SOF0, 8 Bit, drei Komponenten und
-4:2:0. Die Datei wurde nicht an das Gerät gesendet. Während der Implementierung
-wurde kein HID-Gerät geöffnet, kein HID-Write ausgeführt und keine
-Schreibberechtigung aktiviert.
+4:2:0. Während der Implementierung wurde die Datei nicht gesendet; im später
+gesondert autorisierten Live-Test wurde sie genau einmal übertragen.
 
 ## Statischer Safety- und Correctness-Code-Review
 
@@ -439,6 +444,43 @@ Baseline-JFIF, 320×320, 8 Bit, drei Komponenten und 4:2:0 bestätigt. Der
 rekonstruierte Payload besitzt denselben SHA-256 wie die Quelldatei und exakt
 824 Nullbytes Nachlauf. Keine Gerätekommunikation fand statt.
 
+## Erster realer `0x08`-JPEG-Live-Test
+
+Der gesondert autorisierte Einmaltest ist unter
+`research/reports/lcd-0x08-live-test-01.md` dokumentiert. Das reale Gerät mit
+VID:PID `0b05:1c7b`, Versionswert `0x0049` und `bcdDevice 0.49` wurde über
+Interface 1 angesprochen; `/dev/hidraw8` war lediglich die dynamische
+Zuordnung während dieses Boots.
+
+Gesendet wurde ausschließlich die eingefrorene 2236-Byte-Referenzdatei mit
+SHA-256
+`5a1ca416974481eda228e5d69bc044c3556fd1325f0de1b12ed3ff458b584866`.
+Die drei 1025-Byte-hidraw-Puffer trugen `00 || 1024-Byte-Report` und die
+Controlwords `08 03 00 80`, `08 01 00 00`, `08 02 00 00`. Der letzte Payload
+enthielt nach den verbleibenden 196 JPEG-Bytes exakt 824 Nullbytes. Es gab
+keinen Retry, keine Interface-0-Kommunikation, keinen Endpoint-`0x84`-Read,
+keinen weiteren Command und keinen zweiten Frame.
+
+Auf dem LCD erschien sichtbar das erwartete weiße Quadrat. Damit sind auf dem
+realen Gerät für genau diesen Erfolgsfall empirisch bestätigt:
+
+- Interface 1 als Bildkanal;
+- Linux-hidraw-Framing `00 || 1024`;
+- der `0x08`-JPEG-Transfer mit `N=3` und Folgeindizes 1, 2;
+- Nullpadding nach EOI;
+- JPEG-Dekodierung und sichtbarer Displaycommit;
+- Erfolg ohne Interface-0-Begleitbefehl und ohne Endpoint-`0x84`-Read.
+
+Nur aus v51 statisch bekannt bleiben die internen Queuegrenzen, Decoder-Lease,
+Decoderstart- und Queuefreigabepfade sowie die fehlende Erreichbarkeit
+persistenter Schreibpfade. Die bytegenaue Identität des realen Binärstands mit
+einer offiziellen v49-Datei ist weiterhin nicht belegt.
+
+Der Einzeltest erlaubt ausdrücklich keine Aussage über Animationen, mehrere
+Frames, langfristigen Dauerbetrieb, Fehlerverhalten oder andere JPEG-Profile.
+Temporäre Schreibrechte wurden unmittelbar nach dem Test wieder entfernt; in
+dieser Dokumentationsarbeit fand keine weitere Gerätekommunikation statt.
+
 ## Gefährliche und ausgeschlossene Pfade
 
 - `0x88`: SPI-Lesen und bedingtes SPI-Schreiben bei `0x21000`.
@@ -455,14 +497,9 @@ rekonstruierte Payload besitzt denselben SHA-256 wie die Quelldatei und exakt
 
 ## Nächster klarer Arbeitsschritt
 
-Der statische Code-Review ist abgeschlossen. Vor einem Live-Test bleiben die
-neue ausdrückliche menschliche Freigabe für genau die eingefrorene Fixture,
-ein kontrollierter Gerätezustand, ausgeschlossene parallele LCD-Writer und ein
-separat begrenztes Schreibfenster erforderlich. Encoderparameter, SHA-256,
-`L`, `N`, Padding und Segmentplan des Referenzbilds stehen fest.
-
-Keine Gerätekommunikation, Emulation oder Firmware-Schreibrechte sind durch
-diese Implementierung freigegeben. Der reale Einmaltransfer benötigt einen
-neuen, ausdrücklich auf genau dieses Gerät, Referenzartefakt und Verfahren
-begrenzten Auftrag. Schreibrechte bleiben bis dahin deaktiviert. Ein passiver
+Der freigegebene Einmaltransfer ist abgeschlossen und dokumentiert. Ein
+weiterer Frame, Animationen, Dauerbetrieb, Fehlerpfadtests oder andere
+JPEG-Profile sind weder aus dem Ergebnis ableitbar noch freigegeben. Jede
+solche Erweiterung benötigt eine neue, eigenständige Sicherheitsbewertung und
+ausdrückliche Autorisierung. Schreibrechte bleiben deaktiviert. Ein passiver
 ASUS-Referenzcapture bleibt optional zusätzliche Evidenz.
