@@ -3,9 +3,11 @@
 ## Zweck und Status
 
 `src/test_jpeg_0x08.py` implementiert den eng begrenzten Hostpfad für genau
-einen späteren JPEG-Transfer an das ASUS-TUF-AIO-LCD. Standardmäßig arbeitet
-das Werkzeug ausschließlich als Preview/Dry-Run. Die Implementierung und ihre
-Offline-Tests autorisieren keine Gerätekommunikation.
+einen JPEG-Transfer an das ASUS-TUF-AIO-LCD. Es verwendet die
+wiederverwendbaren, bytegleichen Bausteine aus `src/lcd_transport.py`, behält
+aber seine konservative Testgrenze `N<=4`. Standardmäßig arbeitet das Werkzeug
+ausschließlich als Preview/Dry-Run. Die Implementierung und ihre Offline-Tests
+autorisieren keine Gerätekommunikation.
 
 Während der Erstellung wurden keine HID-Geräte geöffnet, keine HID-Writes
 ausgeführt, keine Schreibrechte aktiviert und keine Pakete installiert. Ein
@@ -263,10 +265,11 @@ Keine Testfunktion öffnet `/dev/hidraw*`.
 
 ## Ergebnis des statischen Code-Reviews
 
-Der unabhängige Review ist unter
+Der ursprüngliche unabhängige Review ist unter
 `research/reports/test-jpeg-0x08-code-review.md` dokumentiert und endete nach
-begrenzten Validator- und CLI-Korrekturen mit **PASS**. Die Offline-Suite
-umfasst nun 37 erfolgreiche Tests.
+begrenzten Validator- und CLI-Korrekturen mit **PASS**. Nach der späteren
+Extraktion der identischen Kernfunktionen in `lcd_transport.py` umfasst die
+Offline-Suite 48 erfolgreiche Tests.
 
 Der Review bestätigte genau eine `os.write()`-Callsite, höchstens vier Writes
 pro Prozesslauf, keinen Retry-/Recovery-/Reconnectpfad und keinen Zugriff auf

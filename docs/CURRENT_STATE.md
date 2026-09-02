@@ -481,6 +481,39 @@ Frames, langfristigen Dauerbetrieb, Fehlerverhalten oder andere JPEG-Profile.
 Temporäre Schreibrechte wurden unmittelbar nach dem Test wieder entfernt; in
 dieser Dokumentationsarbeit fand keine weitere Gerätekommunikation statt.
 
+## Wiederverwendbarer Einzelbild-Sender
+
+Der empirisch bestätigte Pfad ist jetzt ohne Protokollerweiterung in eine
+kleine wiederverwendbare Modulstruktur überführt:
+
+- `src/lcd_transport.py`: dynamische Erkennung von `0b05:1c7b`/Interface 1,
+  JPEG-Validierung, reine Paketbildung und exakt einmaliger synchroner
+  Frame-Transfer;
+- `src/set_lcd_image.py`: allgemeine Einzelbild-CLI, standardmäßig nur
+  Preview; ein Transfer ist ausschließlich über `--apply` erreichbar;
+- `src/test_jpeg_0x08.py`: funktional gleichwertiges konservatives
+  Safety-Werkzeug auf denselben Kernfunktionen, weiterhin hart auf `N<=4`
+  begrenzt.
+
+Die Produktstufe akzeptiert nur bereits passende 320×320-SOF0-/Baseline-
+JFIF-YCbCr-4:2:0-JPEGs mit 8 Bit, drei Komponenten, Standard-Huffmantabellen,
+gültigem EOI ohne Nachlauf und `1<=N<=200`. Eine automatische Konvertierung
+existiert nicht. Der Linux-Puffer bleibt exakt `00 || 1024-Byte-Report`; der
+letzte Payload wird ausschließlich mit Nullbytes aufgefüllt.
+
+Der gesamte neue JPEG-Senderpfad besitzt genau eine `os.write()`-Callsite in
+`send_frame_once()`. Ein Aufruf überträgt höchstens einen Frame und maximal
+200 Segmente. Bei der ersten Revalidierungsabweichung, Write-Exception oder
+einem Short Write wird ohne Retry und ohne weitere Writes geschlossen. Es
+gibt keinen Interface-0- oder IN-Read-Pfad, keine anderen Commands, keine
+Recovery, keinen Reconnect, keine Animation und keinen Hintergrunddienst.
+
+48 Offline-Tests bestätigen unter anderem `N=1/2/3/4`, größere gültige Werte
+bis `N=200`, Nullpadding, Geräte-/Reportablehnungen, Abbruch bei Writefehlern,
+Preview ohne Geräteöffnung und genau einen Frame-Aufruf pro CLI-Lauf. Während
+dieses Tickets fand keine Gerätekommunikation statt. Bedienung und Grenzen
+stehen in `docs/LCD_SINGLE_IMAGE.md`.
+
 ## Gefährliche und ausgeschlossene Pfade
 
 - `0x88`: SPI-Lesen und bedingtes SPI-Schreiben bei `0x21000`.
@@ -501,5 +534,8 @@ Der freigegebene Einmaltransfer ist abgeschlossen und dokumentiert. Ein
 weiterer Frame, Animationen, Dauerbetrieb, Fehlerpfadtests oder andere
 JPEG-Profile sind weder aus dem Ergebnis ableitbar noch freigegeben. Jede
 solche Erweiterung benötigt eine neue, eigenständige Sicherheitsbewertung und
-ausdrückliche Autorisierung. Schreibrechte bleiben deaktiviert. Ein passiver
-ASUS-Referenzcapture bleibt optional zusätzliche Evidenz.
+ausdrückliche Autorisierung. Vor automatischer Bildkonvertierung müssen
+Skalierung/Crop, Farbraum, 4:2:0-Sampling, Baseline-Encoderparameter,
+Qualitäts-/Größengrenzen und die erneute Ausgangsvalidierung deterministisch
+festgelegt und offline getestet werden. Schreibrechte bleiben deaktiviert.
+Ein passiver ASUS-Referenzcapture bleibt optional zusätzliche Evidenz.

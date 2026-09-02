@@ -14,9 +14,13 @@ from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_PATH = PROJECT_ROOT / "src" / "test_jpeg_0x08.py"
+TRANSPORT_SOURCE_PATH = PROJECT_ROOT / "src" / "lcd_transport.py"
 REFERENCE_PATH = PROJECT_ROOT / "tests" / "fixtures" / "lcd-0x08-reference.jpg"
 REFERENCE_SHA256 = "5a1ca416974481eda228e5d69bc044c3556fd1325f0de1b12ed3ff458b584866"
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
+import lcd_transport as TRANSPORT
+import set_lcd_image as SET_IMAGE
+
 SPEC = importlib.util.spec_from_file_location("jpeg_0x08_tool", SOURCE_PATH)
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError("test_jpeg_0x08.py konnte nicht geladen werden")
@@ -209,17 +213,19 @@ class JpegValidatorTests(unittest.TestCase):
 
 
 class StaticSafetyTests(unittest.TestCase):
-    def test_source_has_exactly_one_os_write_call(self) -> None:
-        tree = ast.parse(SOURCE_PATH.read_text(encoding="utf-8"))
-        calls = [
-            node
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and isinstance(node.func.value, ast.Name)
-            and node.func.value.id == "os"
-            and node.func.attr == "write"
-        ]
+    def test_jpeg_sender_has_exactly_one_os_write_callsite(self) -> None:
+        calls = []
+        for path in (SOURCE_PATH, TRANSPORT_SOURCE_PATH, PROJECT_ROOT / "src" / "set_lcd_image.py"):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            calls.extend(
+                node
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "os"
+                and node.func.attr == "write"
+            )
         self.assertEqual(len(calls), 1)
 
     def test_default_preview_never_opens_hidraw(self) -> None:
@@ -366,7 +372,7 @@ class OfflineWriteControlFlowTests(unittest.TestCase):
     def _run_with_write_mock(
         self, write_side_effect: object
     ) -> tuple[int, mock.Mock, mock.Mock]:
-        jpeg = bytes((0x5A,)) * 2041
+        jpeg = _jpeg(total_length=2041)
         segments = TOOL.build_transfer_segments(jpeg)
         write_mock = mock.Mock(side_effect=write_side_effect)
         close_mock = mock.Mock()
@@ -375,7 +381,7 @@ class OfflineWriteControlFlowTests(unittest.TestCase):
             mock.patch.object(TOOL.os, "open", return_value=123),
             mock.patch.object(TOOL.os, "write", write_mock),
             mock.patch.object(TOOL.os, "close", close_mock),
-            mock.patch.object(TOOL, "_validate_open_target"),
+            mock.patch.object(TRANSPORT, "validate_open_target"),
             contextlib.redirect_stdout(io.StringIO()),
             contextlib.redirect_stderr(io.StringIO()),
         ):
@@ -419,6 +425,173 @@ class OfflineWriteControlFlowTests(unittest.TestCase):
     def test_n_five_is_rejected(self) -> None:
         with self.assertRaisesRegex(TOOL.JpegValidationError, "N muss"):
             TOOL.segment_count(4081)
+
+
+class ReusableTransportTests(unittest.TestCase):
+    def test_reference_transfer_matches_successful_live_test_byte_for_byte(self) -> None:
+        jpeg = REFERENCE_PATH.read_bytes()
+        self.assertEqual(hashlib.sha256(jpeg).hexdigest(), REFERENCE_SHA256)
+
+        segments = TRANSPORT.build_segments(jpeg)
+        self.assertEqual(len(segments), 3)
+        self.assertEqual(
+            [segment.control for segment in segments],
+            [
+                b"\x08\x03\x00\x80",
+                b"\x08\x01\x00\x00",
+                b"\x08\x02\x00\x00",
+            ],
+        )
+        self.assertTrue(all(len(segment.hidraw_buffer) == 1025 for segment in segments))
+        self.assertEqual(segments[0].hidraw_buffer[:5], b"\x00\x08\x03\x00\x80")
+        self.assertEqual(segments[1].hidraw_buffer[:5], b"\x00\x08\x01\x00\x00")
+        self.assertEqual(segments[2].hidraw_buffer[:5], b"\x00\x08\x02\x00\x00")
+        self.assertEqual(segments[0].payload, jpeg[:1020])
+        self.assertEqual(segments[1].payload, jpeg[1020:2040])
+        self.assertEqual(segments[2].payload[:196], jpeg[2040:])
+        self.assertEqual(segments[2].payload[196:], bytes(824))
+
+        reconstructed = b"".join(segment.payload for segment in segments)
+        self.assertEqual(reconstructed[: len(jpeg)], jpeg)
+        self.assertEqual(reconstructed[len(jpeg) :], bytes(824))
+
+    def test_general_builder_covers_n1_n2_n3_n4(self) -> None:
+        for length, expected in ((1, 1), (1021, 2), (2041, 3), (3061, 4)):
+            with self.subTest(length=length):
+                segments = TRANSPORT.build_segments(bytes((0xA5,)) * length)
+                self.assertEqual(len(segments), expected)
+                self.assertTrue(all(len(item.hidraw_buffer) == 1025 for item in segments))
+
+    def test_general_builder_accepts_larger_bounded_segment_counts(self) -> None:
+        for count in (5, 17, 200):
+            with self.subTest(count=count):
+                length = (count - 1) * TRANSPORT.PAYLOAD_BYTES + 1
+                segments = TRANSPORT.build_segments(bytes((0x33,)) * length)
+                self.assertEqual(len(segments), count)
+                self.assertEqual(segments[0].control, bytes((0x08, count, 0, 0x80)))
+                self.assertEqual(segments[-1].control, bytes((0x08, count - 1, 0, 0)))
+
+    def test_general_builder_rejects_n201(self) -> None:
+        with self.assertRaisesRegex(TRANSPORT.JpegValidationError, "N muss"):
+            TRANSPORT.build_segments(bytes(200 * TRANSPORT.PAYLOAD_BYTES + 1))
+
+    def test_general_builder_zero_pads_only_the_last_payload(self) -> None:
+        jpeg = bytes((0x7E,)) * 2041
+        segments = TRANSPORT.build_segments(jpeg)
+        self.assertEqual(segments[0].payload, jpeg[:1020])
+        self.assertEqual(segments[1].payload, jpeg[1020:2040])
+        self.assertEqual(segments[2].payload[:1], b"\x7e")
+        self.assertEqual(segments[2].payload[1:], bytes(1019))
+
+    def test_general_validator_accepts_reference_fixture(self) -> None:
+        info = TRANSPORT.validate_jpeg(REFERENCE_PATH.read_bytes())
+        self.assertEqual(info.segment_count, 3)
+        self.assertEqual(info.padding_length, 824)
+
+    def test_general_validator_accepts_valid_large_jpeg(self) -> None:
+        for count in (17, 200):
+            with self.subTest(count=count):
+                info = TRANSPORT.validate_jpeg(
+                    _jpeg(total_length=(count - 1) * 1020 + 1)
+                )
+                self.assertEqual(info.segment_count, count)
+
+
+class SingleImageCliTests(unittest.TestCase):
+    @staticmethod
+    def _device() -> object:
+        return TRANSPORT.HidrawInterface(
+            device_path="/dev/hidraw-never-opened",
+            sysfs_path="/sys/class/hidraw/hidraw-never-opened",
+            interface_number=1,
+            manufacturer="ASUS",
+            product="TUF AIO",
+            serial=None,
+            vendor_id="0b05",
+            product_id="1c7b",
+            input_report_bytes=16,
+            output_report_bytes=1024,
+            feature_report_bytes=None,
+            report_ids=(),
+            readable=False,
+            udev_properties={},
+        )
+
+    def test_default_preview_never_opens_or_sends(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "single.jpg"
+            path.write_bytes(_jpeg())
+            with (
+                mock.patch.object(
+                    SET_IMAGE.transport,
+                    "discover_lcd_interface",
+                    return_value=(None, "offline"),
+                ),
+                mock.patch.object(
+                    SET_IMAGE.transport.os,
+                    "open",
+                    side_effect=AssertionError("os.open called"),
+                ),
+                mock.patch.object(
+                    SET_IMAGE.transport,
+                    "send_frame_once",
+                    side_effect=AssertionError("send_frame_once called"),
+                ),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                self.assertEqual(SET_IMAGE.main([str(path)]), SET_IMAGE.EXIT_SUCCESS)
+
+    def test_apply_requests_exactly_one_frame(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "single.jpg"
+            path.write_bytes(_jpeg(total_length=2041))
+            send_mock = mock.Mock(return_value=3)
+            with (
+                mock.patch.object(
+                    SET_IMAGE.transport,
+                    "discover_lcd_interface",
+                    return_value=(self._device(), "gültig"),
+                ),
+                mock.patch.object(SET_IMAGE.transport, "send_frame_once", send_mock),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                self.assertEqual(
+                    SET_IMAGE.main(["--apply", str(path)]),
+                    SET_IMAGE.EXIT_SUCCESS,
+                )
+            send_mock.assert_called_once()
+
+    def test_apply_switch_cannot_be_abbreviated(self) -> None:
+        with (
+            mock.patch.object(
+                SET_IMAGE.transport.os,
+                "open",
+                side_effect=AssertionError("os.open called"),
+            ),
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            with self.assertRaises(SystemExit) as raised:
+                SET_IMAGE.main(["--app", "unused.jpg"])
+        self.assertEqual(raised.exception.code, 2)
+
+    def test_invalid_jpeg_stops_before_discovery_or_open(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "invalid.jpg"
+            path.write_bytes(b"not a jpeg")
+            with (
+                mock.patch.object(
+                    SET_IMAGE.transport,
+                    "discover_lcd_interface",
+                    side_effect=AssertionError("discovery called"),
+                ),
+                mock.patch.object(
+                    SET_IMAGE.transport.os,
+                    "open",
+                    side_effect=AssertionError("os.open called"),
+                ),
+                contextlib.redirect_stderr(io.StringIO()),
+            ):
+                self.assertEqual(SET_IMAGE.main([str(path)]), SET_IMAGE.EXIT_INPUT)
 
 
 if __name__ == "__main__":
