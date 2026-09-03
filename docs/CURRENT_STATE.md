@@ -14,7 +14,7 @@ Kanonischer Live-Stand vom 2026-09-03:
 - Danach ersetzte die AIO das Standbild wieder durch ihr ASUS-Standardbild.
 - Echte GIF-Animation ist weder implementiert noch empirisch bestätigt.
 
-Stand: 2026-09-02
+Stand: 2026-09-03
 
 ## Ziel und Grenze
 
@@ -332,6 +332,47 @@ Größen- und SHA-256-Manifest liegt unter
   oder `0x1f`; `FF 01 00 00` erscheint nur nach zwei fehlgeschlagenen
   HID2-Writes.
 
+## Statische InfoHub-LCD-Refreshworkeranalyse
+
+Die geschlossene Workerrekonstruktion steht in
+`research/reports/infohub-lcd-refresh-worker-analysis.md`. Reproduzierbarer
+read-only Export:
+`research/ghidra-scripts/ExportInfoHubRefreshTriage.java`.
+
+- `0x0040b103` liegt im `DeviceMainDlg`-Initialisierungspfad
+  `0x0040ada0`. Er startet über `_beginthreadex` den generischen Timerthread
+  `0x00425c10` mit einer Zielperiode von 12 ms, Repeat- und Run-Flag sowie
+  einem manuellen Abschluss-Event.
+- Die Schleifenrückkante liegt in `0x00425c10`, nicht im Worker
+  `0x00414ff0`. Der Timer zieht nur die Callbacklaufzeit von 12 ms ab; dauert
+  der synchrone Transfer länger, folgt die nächste Iteration ohne zusätzlichen
+  Sleep. 12 ms sind daher eine Zielperiode, keine garantierte JPEG-Framerate.
+- `0x00414ff0` verarbeitet entweder genau ein Hostereignis ohne JPEG oder
+  ruft im leeren Queuezustand `0x00416bc0` auf. Nur Connection-Gate, Windows-
+  Power-Suppression und ein vorhandener JPEG-Puffer können den anschließenden
+  Write verhindern. Der 2000-ms-Zweig ist ausschließlich ein Monitoringtask,
+  nicht der Transportrefresh.
+- `GetLEDData()` erzeugt vor einem Refresh kein neues Bild und konsumiert den
+  Puffer nicht. Jeder berechtigte Idle-Tick sendet den jeweils letzten
+  vollständigen JPEG-Stand erneut. `OnControlTimer()` und
+  `DrawHideControl()` bilden den getrennten Producer: defaultmäßig 30 ms, bei
+  GIF nach Metadaten mit mindestens 16 ms.
+- Während der Startqueue wird nach HID-Erkennung und Konfigurationsaufbau ein
+  separates Interface-0-Controlword `12 01 00 80` gesendet. Sein Payloadbyte
+  stammt aus der Einstellung `led_brightness`. Eine Abschaltung des internen
+  Boot-/Objektproduzenten ist dadurch nicht belegt; pro erfolgreichem
+  `0x08`-Refresh existiert weiterhin kein Interface-0-Begleitbefehl.
+- Belegt ist daher Strategie A: InfoHub hält das Hostbild durch wiederholte
+  vollständige `0x08`-Transfers sichtbar. Ein interner Producer-Hold oder eine
+  Deaktivierung ist nicht belegt. Der eigene einmalige Linux-Transfer wird
+  später vom nächsten internen Commit überstimmt, während InfoHub seinerseits
+  fortlaufend neue Hostcommits liefert.
+- Der generische Stophelfer `0x00425bc0` löscht das Run-Flag, wartet höchstens
+  1000 ms auf das Abschluss-Event und schließt es. Für die konkrete LCD-
+  Timerinstanz wurde kein direkter Aufruf dieser Stopkante gefunden; ihre
+  Bindung an die InfoHub-Prozess-/Dialoglebensdauer ist daher stärker gestützt
+  als vollständig bewiesen.
+
 ## Öffentlicher Protokollfamilien-Cross-Check
 
 Der eng begrenzte Quellenvergleich steht in
@@ -625,15 +666,16 @@ Die statische Ursache und ihre Evidenzgrenzen stehen in
   damit laufende hostseitige Bildversorgung, nicht ein belegter Geräte-Hold.
 - Periodisches Resenden ist für den einzelnen Decode/Commit nicht nötig und
   für dieses Projekt weiterhin weder implementiert noch freigegeben. Vor
-  einer Mehrfachframestrategie müssen Taktung, Queue-/Decoder-Lease,
-  Überlappung und Fehlerabbruch separat bewertet werden.
+  einer Mehrfachframestrategie müssen die nun bekannte 12-ms-Hosttaktung,
+  Queue-/Decoder-Lease, Transferdauer, Überlappung, Fehlerabbruch und
+  v49-Laufzeitgrenzen gemeinsam bewertet werden.
 
-Der nächste sichere Evidenzschritt ist ein passiver Mitschnitt der ohnehin
-durch InfoHub ausgeführten Auswahl eines statischen Nutzerbilds auf beiden
-HID-Interfaces mit ausreichendem Nachlauf. Er soll Wiederholungsrate und
-etwaige zeitlich benachbarte `0x1a`-/`0x1f`-Befehle auf dem realen v49-Gerät
-prüfen, ohne einen eigenen unbekannten Modusbefehl oder Mehrfachframepfad zu
-senden.
+Die Hoststrategie, Zielperiode und Initialisierungsfolge sind statisch
+geschlossen. Ein passiver Mitschnitt einer ohnehin durch InfoHub ausgeführten
+statischen Bildauswahl bleibt als v49-Laufzeitabgleich sinnvoll; er soll die
+tatsächlichen Transferabstände sowie das einmalige initiale Interface-0-
+`0x12` auf dem realen Gerät prüfen, ohne einen eigenen unbekannten Modusbefehl
+oder Mehrfachframepfad zu senden.
 
 ## Gefährliche und ausgeschlossene Pfade
 
@@ -652,12 +694,15 @@ senden.
 ## Nächster klarer Arbeitsschritt
 
 Der freigegebene Einmaltransfer und der automatische Pipeline-Live-Test sind
-abgeschlossen und dokumentiert. Der nächste sichere Schritt ist der oben
-beschriebene passive InfoHub-Capture zur statischen Persistenzfrage. Ein
-weiterer eigener Frame, ein `0x1a`-/`0x1f`-Versuch, Animationen, Dauerbetrieb,
-Fehlerpfadtests oder andere JPEG-Profile sind weder aus dem Ergebnis
-ableitbar noch freigegeben. Jede solche Erweiterung benötigt eine neue,
-eigenständige Sicherheitsbewertung und ausdrückliche Autorisierung. Vor echter
-GIF-Animation müssen insbesondere Frame-Timing, Decoder-Lease, Framerate-/
-Laufzeitgrenzen, Teiltransferfehler und Abbruchverhalten statisch und real
-sicher bewertet werden. Schreibrechte bleiben deaktiviert.
+abgeschlossen und dokumentiert. InfoHubs Hostrefresh ist nun statisch
+geschlossen: 12-ms-Zielperiode, synchroner vollständiger `0x08`-Transfer des
+jeweils letzten JPEG-Puffers und getrennte XYUI-Produktion. Der nächste sichere
+Analyseschritt ist ein eigenes statisches Safety-Review dieser
+Mehrfachtransferstrategie gegen Queue, Decoder-Lease, Transferdauer,
+Fehlerabbruch und v49-Restunsicherheit; ein passiver InfoHub-Capture kann den
+realen v49-Takt zusätzlich abgleichen. Ein weiterer eigener Frame, ein
+`0x1a`-/`0x1f`-Versuch, Animationen, Dauerbetrieb oder Fehlerpfadtests sind
+weder aus dem Ergebnis ableitbar noch freigegeben. Vor echter GIF-Animation
+müssen insbesondere Producer-/Frame-Timing, Decoder-Lease, Framerate-/
+Laufzeitgrenzen, Teiltransferfehler und eine kontrollierte Stopstrategie
+statisch und real sicher bewertet werden. Schreibrechte bleiben deaktiviert.
