@@ -73,6 +73,52 @@ class RefreshFrame:
 
 
 @dataclass(frozen=True)
+class FrameSnapshot:
+    """One immutable, validated JPEG version published for refresh use."""
+
+    jpeg_bytes: bytes
+    generation: int
+    jpeg_info: lcd_transport.JpegInfo = field(repr=False, compare=False)
+
+
+class FrameSource(Protocol):
+    def snapshot(self) -> FrameSnapshot:
+        """Return one atomic immutable view of the currently published frame."""
+
+
+class LatestFrameBuffer:
+    """Publish validated latest-frame snapshots without maintaining a queue."""
+
+    def __init__(self, initial_jpeg: bytes | None = None) -> None:
+        self._lock = threading.Lock()
+        self._current: FrameSnapshot | None = None
+        if initial_jpeg is not None:
+            self.publish(initial_jpeg)
+
+    def publish(self, jpeg_bytes: bytes) -> FrameSnapshot:
+        """Validate before locking, then atomically replace the current frame."""
+        validated = RefreshFrame(jpeg_bytes)
+        with self._lock:
+            generation = (
+                1 if self._current is None else self._current.generation + 1
+            )
+            snapshot = FrameSnapshot(
+                jpeg_bytes=validated.jpeg_bytes,
+                generation=generation,
+                jpeg_info=validated.jpeg_info,
+            )
+            self._current = snapshot
+            return snapshot
+
+    def snapshot(self) -> FrameSnapshot:
+        """Return the current immutable snapshot under only a short read lock."""
+        with self._lock:
+            if self._current is None:
+                raise RefreshStateError("Noch kein Refresh-Frame publiziert")
+            return self._current
+
+
+@dataclass(frozen=True)
 class RefreshPlan:
     """Immutable frames plus explicit transport and session limits."""
 
@@ -175,6 +221,7 @@ class RefreshController:
         plan: RefreshPlan,
         sender: FrameSender,
         *,
+        frame_source: FrameSource | None = None,
         clock: Callable[[], float] = time.monotonic,
         wait_function: WaitFunction = _event_wait,
     ) -> None:
@@ -182,8 +229,16 @@ class RefreshController:
             raise TypeError("sender muss aufrufbar sein")
         if not callable(clock) or not callable(wait_function):
             raise TypeError("clock und wait_function müssen aufrufbar sein")
+        if frame_source is not None:
+            if not callable(getattr(frame_source, "snapshot", None)):
+                raise TypeError("frame_source muss snapshot() bereitstellen")
+            if len(plan.frames) != 1:
+                raise RefreshConfigurationError(
+                    "Eine dynamische FrameSource ist nur für Einframepläne zulässig"
+                )
         self._plan = plan
         self._sender = sender
+        self._frame_source = frame_source
         self._clock = clock
         self._wait_function = wait_function
         self._stop_event = threading.Event()
@@ -230,7 +285,7 @@ class RefreshController:
             if not self._started or self._thread is None:
                 raise RefreshStateError("Refreshsession wurde nicht gestartet")
             thread = self._thread
-        self._stop_event.set()
+        self.request_stop()
         thread.join(timeout)
         if thread.is_alive():
             raise TimeoutError("Refreshworker konnte innerhalb des Timeouts nicht stoppen")
@@ -238,6 +293,10 @@ class RefreshController:
         if result is None:
             raise RefreshStateError("Refreshworker endete ohne Ergebnis")
         return result
+
+    def request_stop(self) -> None:
+        """Request a stop without waiting or performing any device operation."""
+        self._stop_event.set()
 
     def wait(self, timeout: float | None = None) -> RefreshResult | None:
         """Join without requesting stop; return None only when timeout expires."""
@@ -313,18 +372,25 @@ class RefreshController:
                     frame_index = (frame_index + 1) % len(self._plan.frames)
                     frame_changed = True
 
-            frame = self._plan.frames[frame_index]
+            if self._frame_source is None:
+                frame = self._plan.frames[frame_index]
+                jpeg_bytes = frame.jpeg_bytes
+                jpeg_info = frame.jpeg_info
+            else:
+                snapshot = self._frame_source.snapshot()
+                jpeg_bytes = snapshot.jpeg_bytes
+                jpeg_info = snapshot.jpeg_info
             transfer_started = self._clock()
             try:
-                completed_writes = self._sender(frame.jpeg_bytes)
+                completed_writes = self._sender(jpeg_bytes)
                 if (
                     isinstance(completed_writes, bool)
                     or not isinstance(completed_writes, int)
-                    or completed_writes != frame.jpeg_info.segment_count
+                    or completed_writes != jpeg_info.segment_count
                 ):
                     raise lcd_transport.LcdTransportError(
                         f"Frame meldete {completed_writes} statt "
-                        f"{frame.jpeg_info.segment_count} vollständigen Writes"
+                        f"{jpeg_info.segment_count} vollständigen Writes"
                     )
             except Exception as error:
                 return self._result_for(

@@ -991,3 +991,29 @@ Transport. Eine spätere Aktivierung bleibt auf `0b05:1c7b`, Interface 1 und
 den vorhandenen `0x08`-Sender begrenzt, ohne Autostart, Retry, Interface 0 oder
 Parallelwriter. OpenRGB beziehungsweise `0b05:19af` bleiben unberührt. Details:
 `research/reports/gui-live-refresh-integration-plan.md`.
+
+### FrameSource und dynamischer Einframe-Refresh
+
+Die Schritte 1 und 2 des GUI-/Refreshintegrationsplans sind offline
+implementiert. `FrameSnapshot` hält immutable JPEG-Bytes, Generation und die
+bereits durch den bestehenden Validator ermittelten Metadaten. Der
+thread-sichere `LatestFrameBuffer` validiert jeden Kandidaten vor seinem kurzen
+Lock und ersetzt darunter nur atomar den letzten gültigen Snapshot. Erfolgreiche
+Publikationen erhöhen die Generation; ungültige Frames verändern weder Stand
+noch Generation. Es existiert keine Framequeue.
+
+`RefreshController` akzeptiert optional eine `FrameSource` für statische
+Einframepläne und liest unmittelbar vor jedem Senderaufruf genau einen
+Snapshot. Ein laufender Transfer behält seine alte immutable Referenz, während
+parallel bereits die nächste Generation publiziert werden kann. Der folgende
+Transfer übernimmt erst danach den neuen Stand. Statische Einframepläne und die
+bestehende Animationsrotation bleiben unverändert; dynamische Quellen werden
+nicht mit Mehrframeplänen vermischt.
+
+`request_stop()` setzt nicht blockierend ausschließlich das vorhandene
+Stop-Event; `stop()` verwendet es weiterhin zusammen mit dem bisherigen Join,
+und `wait()` bleibt unverändert. 24 gezielte Tests, darunter wiederholte
+Konkurrenzläufe, sowie die vollständige Suite mit 152 Tests bestanden offline.
+Es gab keine Gerätekommunikation, keine HID-Writes und keine GUI-Live-
+Verdrahtung. Nächster offener Schritt ist das weiterhin rein offline geplante
+GUI-State-Modell mit injizierbarer Controller-/Senderfabrik.

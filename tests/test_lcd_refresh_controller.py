@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import threading
 import unittest
+from dataclasses import FrozenInstanceError
 from pathlib import Path
 from unittest import mock
 
@@ -54,6 +55,127 @@ def _plan(
         max_duration_seconds=max_duration,
         max_frames=max_frames,
     )
+
+
+class LatestFrameBufferTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.first = REFERENCE_PATH.read_bytes()
+        cls.second = _jpeg("blue")
+        cls.third = _jpeg("green")
+
+    def test_first_publish_creates_generation_one(self) -> None:
+        source = lcd_refresh.LatestFrameBuffer()
+        with self.assertRaises(lcd_refresh.RefreshStateError):
+            source.snapshot()
+        published = source.publish(self.first)
+
+        self.assertEqual(published.generation, 1)
+        self.assertIs(published.jpeg_bytes, self.first)
+        self.assertIs(source.snapshot(), published)
+
+    def test_generation_increases_only_after_successful_publish(self) -> None:
+        source = lcd_refresh.LatestFrameBuffer(self.first)
+        before = source.snapshot()
+
+        with self.assertRaises(lcd_refresh.RefreshConfigurationError):
+            source.publish(b"not a jpeg")
+
+        self.assertIs(source.snapshot(), before)
+        published = source.publish(self.second)
+        self.assertEqual(published.generation, before.generation + 1)
+        self.assertIs(published.jpeg_bytes, self.second)
+
+    def test_snapshot_is_frozen_and_contains_immutable_bytes(self) -> None:
+        snapshot = lcd_refresh.LatestFrameBuffer(self.first).snapshot()
+        self.assertIsInstance(snapshot.jpeg_bytes, bytes)
+        with self.assertRaises(FrozenInstanceError):
+            snapshot.generation = 2  # type: ignore[misc]
+
+    def test_validation_occurs_without_holding_snapshot_lock(self) -> None:
+        source = lcd_refresh.LatestFrameBuffer(self.first)
+        validation_started = threading.Event()
+        allow_validation = threading.Event()
+        original_validate = lcd_refresh.lcd_transport.validate_jpeg
+
+        def blocking_validate(jpeg: bytes) -> lcd_transport.JpegInfo:
+            validation_started.set()
+            self.assertTrue(allow_validation.wait(1.0))
+            return original_validate(jpeg)
+
+        with mock.patch.object(
+            lcd_refresh.lcd_transport,
+            "validate_jpeg",
+            side_effect=blocking_validate,
+        ):
+            publisher = threading.Thread(target=source.publish, args=(self.second,))
+            publisher.start()
+            self.assertTrue(validation_started.wait(1.0))
+            observed: list[lcd_refresh.FrameSnapshot] = []
+            snapshot_finished = threading.Event()
+            reader = threading.Thread(
+                target=lambda: (
+                    observed.append(source.snapshot()),
+                    snapshot_finished.set(),
+                )
+            )
+            reader.start()
+            try:
+                self.assertTrue(snapshot_finished.wait(0.1))
+            finally:
+                allow_validation.set()
+            publisher.join(1.0)
+            reader.join(1.0)
+
+        self.assertFalse(publisher.is_alive())
+        self.assertFalse(reader.is_alive())
+        self.assertEqual(observed[0].generation, 1)
+        self.assertEqual(source.snapshot().generation, 2)
+
+    def test_concurrent_snapshot_and_publish_never_exposes_partial_state(self) -> None:
+        source = lcd_refresh.LatestFrameBuffer(self.first)
+        start = threading.Barrier(2)
+        finished = threading.Event()
+        observed: list[lcd_refresh.FrameSnapshot] = []
+
+        def publish_many() -> None:
+            start.wait()
+            for index in range(100):
+                source.publish(self.second if index % 2 else self.third)
+            finished.set()
+
+        publisher = threading.Thread(target=publish_many)
+        publisher.start()
+        start.wait()
+        while not finished.is_set():
+            observed.append(source.snapshot())
+        observed.append(source.snapshot())
+        publisher.join(1.0)
+
+        self.assertFalse(publisher.is_alive())
+        self.assertTrue(observed)
+        self.assertEqual(
+            [item.generation for item in observed],
+            sorted(item.generation for item in observed),
+        )
+        self.assertTrue(
+            all(
+                item.jpeg_bytes in {self.first, self.second, self.third}
+                for item in observed
+            )
+        )
+        self.assertEqual(source.snapshot().generation, 101)
+
+    def test_rapid_publishes_retain_only_latest_frame(self) -> None:
+        source = lcd_refresh.LatestFrameBuffer()
+        source.publish(self.first)
+        source.publish(self.second)
+        latest = source.publish(self.third)
+
+        self.assertIs(source.snapshot(), latest)
+        self.assertEqual(latest.generation, 3)
+        self.assertIs(latest.jpeg_bytes, self.third)
+        self.assertFalse(hasattr(source, "_queue"))
 
 
 class RefreshControllerTests(unittest.TestCase):
@@ -300,6 +422,87 @@ class RefreshControllerTests(unittest.TestCase):
         self.assertEqual(len(observed), 3)
         self.assertTrue(all(item is self.jpeg for item in observed))
         self.assertEqual(result.frame_indices, (0, 0, 0))
+
+    def test_publish_during_transfer_changes_only_the_next_transfer(self) -> None:
+        next_jpeg = _jpeg("blue")
+        source = lcd_refresh.LatestFrameBuffer(self.jpeg)
+        first_started = threading.Event()
+        release_first = threading.Event()
+        observed: list[bytes] = []
+
+        def sender(jpeg: bytes) -> int:
+            observed.append(jpeg)
+            if len(observed) == 1:
+                first_started.set()
+                self.assertTrue(release_first.wait(1.0))
+            return lcd_transport.validate_jpeg(jpeg).segment_count
+
+        controller = lcd_refresh.RefreshController(
+            _plan((lcd_refresh.RefreshFrame(self.jpeg),), max_frames=2),
+            sender,
+            frame_source=source,
+        )
+        controller.start()
+        self.assertTrue(first_started.wait(1.0))
+
+        published = source.publish(next_jpeg)
+        self.assertEqual(published.generation, 2)
+        self.assertEqual(observed, [self.jpeg])
+        release_first.set()
+        result = controller.wait(timeout=1.0)
+
+        assert result is not None
+        self.assertEqual(result.stop_reason, lcd_refresh.RefreshStopReason.MAX_FRAMES)
+        self.assertEqual(observed, [self.jpeg, next_jpeg])
+
+    def test_dynamic_source_is_rejected_for_animation_plan(self) -> None:
+        source = lcd_refresh.LatestFrameBuffer(self.jpeg)
+        frame = lcd_refresh.RefreshFrame(self.jpeg, duration_seconds=0.1)
+        with self.assertRaisesRegex(
+            lcd_refresh.RefreshConfigurationError,
+            "nur für Einframepläne",
+        ):
+            lcd_refresh.RefreshController(
+                _plan((frame, frame)),
+                mock.Mock(),
+                frame_source=source,
+            )
+
+    def test_request_stop_is_nonblocking_and_performs_no_device_access(self) -> None:
+        first_send = threading.Event()
+        sender = mock.Mock(
+            side_effect=lambda _: (first_send.set(), self.segment_count)[1]
+        )
+        controller = lcd_refresh.RefreshController(
+            _plan(
+                (lcd_refresh.RefreshFrame(self.jpeg),),
+                interval=30.0,
+                max_duration=60.0,
+                max_frames=100,
+            ),
+            sender,
+        )
+
+        with mock.patch.object(
+            lcd_refresh.lcd_transport.os,
+            "open",
+            side_effect=AssertionError("device opened"),
+        ) as device_open:
+            controller.start()
+            self.assertTrue(first_send.wait(1.0))
+            returned = threading.Event()
+            requester = threading.Thread(
+                target=lambda: (controller.request_stop(), returned.set())
+            )
+            requester.start()
+            self.assertTrue(returned.wait(0.1))
+            requester.join(1.0)
+            result = controller.wait(timeout=1.0)
+
+        self.assertFalse(requester.is_alive())
+        assert result is not None
+        self.assertEqual(result.stop_reason, lcd_refresh.RefreshStopReason.EXPLICIT_STOP)
+        device_open.assert_not_called()
 
     def test_animated_frames_rotate_in_order_without_skipping(self) -> None:
         clock = FakeClock()
