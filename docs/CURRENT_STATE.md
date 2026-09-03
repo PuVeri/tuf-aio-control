@@ -968,3 +968,26 @@ Preview-/LCD-Renderpfade blieben unverändert. Die vollständige Offline-Suite
 bestand danach mit 143 Tests. Es fanden keine Gerätekommunikation, keine
 HID-/USB-Writes und keine Live-Tests statt; Transport-, Refresh- und
 Sensorverhalten wurden nicht verändert.
+
+## Geplante GUI-/Refreshintegration
+
+Die vorhandenen Grenzen zwischen GUI, Sensorpolling, Overlayrenderer,
+JPEG-Encoding, Refreshcontroller und `send_frame_once()` sind vollständig
+kartiert. Für das nächste reine Offline-Ticket ist als kleinste Brücke ein
+validierender `LatestFrameBuffer` vorgesehen: Der GUI-Thread publiziert darin
+atomar nur fertige immutable JPEG-Frames, während der Refreshworker pro Takt
+einen Snapshot liest und denselben Puffer zwischen Sensorupdates wiederverwenden
+kann. Ein nicht blockierendes `request_stop()` ergänzt später die vorhandenen
+`start()`-/`stop()`-/`wait()`-APIs für den Qt-Lebenszyklus.
+
+Das geplante GUI-Modell umfasst `idle`, `starting`, `running`, `stopping` und
+`error`. Sensorpolling bleibt bei ungefähr 1 Hz; Overlay/JPEG werden nur bei
+geändertem Bild, Overlay oder Sensorstand erzeugt; der USB-Takt bleibt davon
+getrennt und ist noch nicht festgelegt. Die gemessenen 108–109 ms pro Transfer
+werden bei der späteren konservativen Taktwahl berücksichtigt.
+
+Der Plan implementiert keinen Live-Pfad und ändert weder Controller noch
+Transport. Eine spätere Aktivierung bleibt auf `0b05:1c7b`, Interface 1 und
+den vorhandenen `0x08`-Sender begrenzt, ohne Autostart, Retry, Interface 0 oder
+Parallelwriter. OpenRGB beziehungsweise `0b05:19af` bleiben unberührt. Details:
+`research/reports/gui-live-refresh-integration-plan.md`.
