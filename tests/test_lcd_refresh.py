@@ -358,6 +358,32 @@ class RefreshControllerTests(unittest.TestCase):
         ):
             _plan((frame, frame))
 
+    def test_first_live_profile_is_fixed_to_reference_and_conservative_limits(self) -> None:
+        plan = lcd_refresh.build_first_refresh_live_test_plan(self.jpeg)
+
+        self.assertEqual(len(plan.frames), 1)
+        self.assertIs(plan.frames[0].jpeg_bytes, self.jpeg)
+        self.assertIsNone(plan.frames[0].duration_seconds)
+        self.assertEqual(
+            plan.transport_interval_seconds,
+            lcd_refresh.FIRST_REFRESH_INTERVAL_SECONDS,
+        )
+        self.assertEqual(
+            plan.max_duration_seconds,
+            lcd_refresh.FIRST_REFRESH_MAX_DURATION_SECONDS,
+        )
+        self.assertEqual(plan.max_frames, lcd_refresh.FIRST_REFRESH_MAX_FRAMES)
+        self.assertEqual(plan.transport_interval_seconds, 1.0)
+        self.assertEqual(plan.max_duration_seconds, 6.0)
+        self.assertEqual(plan.max_frames, 5)
+
+    def test_first_live_profile_rejects_other_valid_jpeg(self) -> None:
+        with self.assertRaisesRegex(
+            lcd_refresh.RefreshConfigurationError,
+            "nur das empirisch bestätigte Referenz-JPEG",
+        ):
+            lcd_refresh.build_first_refresh_live_test_plan(_jpeg("black"))
+
 
 if __name__ == "__main__":
     unittest.main()

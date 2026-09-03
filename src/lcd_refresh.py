@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import math
 import threading
 import time
@@ -14,6 +15,15 @@ import lcd_transport
 
 MAX_REFRESH_DURATION_SECONDS = 60.0
 MAX_REFRESH_FRAME_COUNT = 500
+
+# Offline safety profile for the separately authorized first live refresh test.
+# Constructing this plan performs no device access and starts no worker.
+FIRST_REFRESH_REFERENCE_SHA256 = (
+    "5a1ca416974481eda228e5d69bc044c3556fd1325f0de1b12ed3ff458b584866"
+)
+FIRST_REFRESH_INTERVAL_SECONDS = 1.0
+FIRST_REFRESH_MAX_DURATION_SECONDS = 6.0
+FIRST_REFRESH_MAX_FRAMES = 5
 
 
 class RefreshConfigurationError(ValueError):
@@ -99,6 +109,24 @@ class RefreshPlan:
             raise RefreshConfigurationError(
                 "Jeder Frame einer Animation benötigt ein explizites Frameintervall"
             )
+
+
+def build_first_refresh_live_test_plan(jpeg_bytes: bytes) -> RefreshPlan:
+    """Build, but never start, the fixed first-live-refresh safety profile."""
+    frame = RefreshFrame(jpeg_bytes)
+    digest = hashlib.sha256(jpeg_bytes).hexdigest()
+    if digest != FIRST_REFRESH_REFERENCE_SHA256:
+        raise RefreshConfigurationError(
+            "Erster Live-Refresh akzeptiert nur das empirisch bestätigte "
+            f"Referenz-JPEG (SHA-256 {FIRST_REFRESH_REFERENCE_SHA256}); "
+            f"erhalten: {digest}"
+        )
+    return RefreshPlan(
+        frames=(frame,),
+        transport_interval_seconds=FIRST_REFRESH_INTERVAL_SECONDS,
+        max_duration_seconds=FIRST_REFRESH_MAX_DURATION_SECONDS,
+        max_frames=FIRST_REFRESH_MAX_FRAMES,
+    )
 
 
 @dataclass(frozen=True)

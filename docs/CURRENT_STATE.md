@@ -716,16 +716,54 @@ Design, Grenzen und Testergebnisse stehen in
 - `HidrawFrameSender` ist nur ein zukünftiger Adapter. Pro Frame bleiben
   dynamische Interface-1-Revalidierung, kein Retry und das `finally`-Close des
   Einzelframesenders erhalten. GUI und CLI aktivieren diesen Adapter nicht.
-- 14 neue Offline-Tests prüfen Start/Stop, Parallelität, ersten Fehler,
+- 16 Offline-Refreshtests prüfen Start/Stop, Parallelität, ersten Fehler,
   fehlende Retries, Frame-/Zeitlimits, langsame Transfers, fehlende
   Catch-up-Bursts, statische Wiederverwendung, animierte Reihenfolge,
-  GIF-Dauern/Loopwert und vollständige Mockbarkeit. Die gesamte Suite mit 80
-  Tests ist erfolgreich.
+  GIF-Dauern/Loopwert, das fixierte Ersttestprofil und vollständige
+  Mockbarkeit. Die gesamte Suite mit 82 Tests ist erfolgreich.
 
 Es gab in diesem Ticket keine Gerätekommunikation und keinen HID-Write. Ein
 Live-Refresh bleibt gesperrt, bis ein eigenes GO/NO-GO-Review eine konservative
 Periode und wesentlich kleinere normative Testgrenzen gegen Queue,
 Decoder-Lease, Transferdauer und v49-Restunsicherheit festlegt.
+
+## Readiness des ersten kurzen Refresh-Live-Tests
+
+Der abschließende statische Review steht in
+`research/reports/lcd-first-refresh-live-readiness.md` und endet mit **GO**
+für einen gesondert autorisierten, eng begrenzten Folgetest. In diesem Review
+gab es keine Gerätekommunikation und keinen HID-Write; ein Refresh-Live-Test
+wurde weiterhin noch nicht ausgeführt.
+
+Das erste Testprofil ist auf die bereits live bestätigte 2236-Byte-
+Referenzdatei und ihren SHA-256 festgelegt: ein unveränderliches statisches
+JPEG, 1,0 s Abstand zwischen Frame-Startzeitpunkten, höchstens 6,0 s und
+höchstens fünf vollständige Frames beziehungsweise 15 Writes. `12 ms` bleibt
+nur die InfoHub-Worker-Zielperiode und wird nicht als sichere eigene Rate
+übernommen.
+
+`src/lcd_refresh.py` besitzt dafür nun den rein offline arbeitenden Builder
+`build_first_refresh_live_test_plan()`. Er akzeptiert ausschließlich den
+empirisch bestätigten Referenzhash, fixiert die genannten Grenzen, öffnet kein
+Gerät und startet keinen Worker. Der eigentliche Refreshcontroller bleibt ohne
+CLI-/GUI-Aktivierung und ohne Autostart.
+
+Die Wiederholung ändert weder Paketformat noch v51-Reachability. Weiter offen
+sind ein messbarer Decoder-Done-Zeitpunkt, die Lease-Wandzeiteinheit, die
+Framebuffer-Ringgröße und die exakte maximale sichere v49-Rate. Der
+Herstellerpfad belegt jedoch wiederholte synchrone Volltransfers ohne IN-Wait;
+fünf Referenzeinträge benötigen selbst ohne Freigabe nur 15.320 von 204.800
+Queuebytes. Das verbleibende Testrestrisiko ist daher flüchtige Queue-/Decoder-/
+Display- oder USB-Störung. Persistente Pfade sind ab v51-`0x08` nicht
+erreichbar; für v49 bleibt eine zusätzliche, unbelegte strukturelle Kante
+formal unbekannt.
+
+Vor dem gesondert autorisierten Live-Test müssen externe Writer ausgeschlossen,
+nur Interface 1 temporär schreibbar gemacht und dessen ursprüngliche Rechte
+unmittelbar danach auch im Fehlerfall wiederhergestellt werden. Transporterfolg
+(fünf vollständige Frames/15 vollständige Writes) und sichtbarer Erfolg
+(Referenzbild bleibt während der aktiven Session ohne Default-Unterbrechung)
+sind getrennt zu erfassen; der Code behauptet keinen sichtbaren Erfolg.
 
 ## Gefährliche und ausgeschlossene Pfade
 
@@ -745,13 +783,12 @@ Decoder-Lease, Transferdauer und v49-Restunsicherheit festlegt.
 
 Der freigegebene Einmaltransfer und der automatische Pipeline-Live-Test sind
 abgeschlossen und dokumentiert. InfoHubs Hostrefresh ist statisch geschlossen,
-und die eigene begrenzte Refresh-Scheduling-Schicht ist offline implementiert
-und getestet. Der nächste sichere Schritt ist ein statisches GO/NO-GO-Review
-für genau einen kurzen statischen Refresh-Test. Es muss eine konservative
-Periode und wesentlich kleinere Dauer-/Framegrenzen gegen Queue,
-Decoder-Lease, gemessene Transferdauer, Fehlerabbruch und v49-Restunsicherheit
-festlegen; ein passiver InfoHub-Capture kann den realen v49-Takt zusätzlich
-abgleichen. Der neue Refreshadapter ist weder in GUI noch CLI aktiviert.
-Ein eigener Live-Refresh, `0x1a`-/`0x1f`-Versuche, echte GIF-Animation,
+und die eigene begrenzte Refresh-Scheduling-Schicht ist offline implementiert,
+getestet und für genau einen kurzen statischen Folgetest mit **GO** bewertet.
+Der nächste sichere Schritt ist dieser gesondert autorisierte Test mit dem
+fixierten Referenz-JPEG, 1,0 s Intervall, höchstens 6,0 s und höchstens fünf
+Frames. Der Refreshadapter ist weiterhin weder in GUI noch CLI aktiviert.
+Bis zur gesonderten Autorisierung wurde kein eigener Live-Refresh ausgeführt.
+Andere Intervalle oder Bilder, `0x1a`-/`0x1f`-Versuche, echte GIF-Animation,
 Dauerbetrieb und Fehlerpfadtests bleiben nicht freigegeben. Schreibrechte
 bleiben deaktiviert.
