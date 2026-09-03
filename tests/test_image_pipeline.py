@@ -186,6 +186,137 @@ class ImagePipelineOfflineTests(unittest.TestCase):
         for frame in prepared.frames:
             self.assertEqual(frame.jpeg_info, lcd_transport.validate_jpeg(frame.jpeg_bytes))
 
+    def test_overlay_layout_is_triangular_and_inside_round_safe_area(self) -> None:
+        placements = image_pipeline.layout_temperature_overlay(
+            image_pipeline.TemperatureOverlayValues(51.25, 43.5, 46.75),
+            image_pipeline.TemperatureOverlayConfig(enabled=True),
+        )
+        self.assertEqual(
+            [placement.sensor for placement in placements],
+            ["cpu_package", "gpu", "cpu_ccd"],
+        )
+        self.assertLess(placements[0].center[0], 160)
+        self.assertGreater(placements[1].center[0], 160)
+        self.assertGreater(placements[2].center[1], placements[0].center[1])
+        self.assertEqual(
+            [placement.label for placement in placements],
+            ["CPU Package / Tctl", "GPU / edge", "CPU CCD / Tccd1"],
+        )
+        self.assertLess(
+            image_pipeline.OVERLAY_LABEL_PREFERRED_SIZE,
+            image_pipeline.OVERLAY_VALUE_MINIMUM_SIZE,
+        )
+        for placement in placements:
+            left, top, right, bottom = placement.bounds
+            self.assertGreaterEqual(left, image_pipeline.OVERLAY_SAFE_BOUNDS[0])
+            self.assertGreaterEqual(top, image_pipeline.OVERLAY_SAFE_BOUNDS[1])
+            self.assertLessEqual(right, image_pipeline.OVERLAY_SAFE_BOUNDS[2])
+            self.assertLessEqual(bottom, image_pipeline.OVERLAY_SAFE_BOUNDS[3])
+            for x in (left, right):
+                for y in (top, bottom):
+                    distance = ((x - 160) ** 2 + (y - 160) ** 2) ** 0.5
+                    self.assertLessEqual(
+                        distance,
+                        image_pipeline.OVERLAY_ROUND_SAFE_RADIUS,
+                    )
+
+    def test_missing_overlay_values_use_em_dash_and_default_white(self) -> None:
+        placements = image_pipeline.layout_temperature_overlay(
+            image_pipeline.TemperatureOverlayValues(),
+            image_pipeline.TemperatureOverlayConfig(enabled=True),
+        )
+        self.assertEqual([item.value_text for item in placements], ["—", "—", "—"])
+        self.assertEqual([item.color for item in placements], ["#FFFFFF"] * 3)
+
+    def test_disabled_overlay_preserves_base_pixels_and_jpeg_bytes(self) -> None:
+        result = self._prepare(
+            Image.new("RGB", (320, 320), "#204060"),
+            suffix=".png",
+            image_format="PNG",
+        )
+        rerendered = image_pipeline.rerender_prepared_image(
+            result,
+            overlay_config=image_pipeline.TemperatureOverlayConfig(enabled=False),
+            temperatures=image_pipeline.TemperatureOverlayValues(50.0, 40.0, 45.0),
+        )
+        self.assertEqual(rerendered.base_rgb_bytes, result.base_rgb_bytes)
+        self.assertEqual(rerendered.jpeg_bytes, result.jpeg_bytes)
+
+    def test_custom_overlay_color_is_used_for_all_three_sensors(self) -> None:
+        config = image_pipeline.TemperatureOverlayConfig(
+            enabled=True,
+            colors=image_pipeline.TemperatureOverlayColors.uniform("#12aBcD"),
+        )
+        placements = image_pipeline.layout_temperature_overlay(
+            image_pipeline.TemperatureOverlayValues(50.0, 40.0, 45.0),
+            config,
+        )
+        self.assertEqual([item.color for item in placements], ["#12ABCD"] * 3)
+        base = Image.new("RGB", (320, 320), "black")
+        rendered = image_pipeline.render_temperature_overlay(
+            base,
+            image_pipeline.TemperatureOverlayValues(50.0, 40.0, 45.0),
+            config,
+        )
+        self.assertNotEqual(rendered.tobytes(), base.tobytes())
+        self.assertEqual(rendered.getpixel((160, 160)), base.getpixel((160, 160)))
+
+    def test_overlay_is_supported_for_png_jpeg_and_gif_frame(self) -> None:
+        config = image_pipeline.TemperatureOverlayConfig(enabled=True)
+        values = image_pipeline.TemperatureOverlayValues(50.0, 40.0, 45.0)
+        cases = (("PNG", ".png"), ("JPEG", ".jpg"), ("GIF", ".gif"))
+        for image_format, suffix in cases:
+            with self.subTest(image_format=image_format):
+                with tempfile.TemporaryDirectory() as directory:
+                    path = Path(directory) / f"source{suffix}"
+                    Image.new("RGB", (320, 320), "#204060").save(
+                        path,
+                        format=image_format,
+                    )
+                    without_overlay = image_pipeline.prepare_image(path)
+                    prepared = image_pipeline.prepare_image(
+                        path,
+                        overlay_config=config,
+                        temperatures=values,
+                    )
+                self._assert_valid_output(prepared)
+                self.assertEqual(prepared.base_rgb_bytes, without_overlay.base_rgb_bytes)
+                self.assertNotEqual(prepared.jpeg_bytes, without_overlay.jpeg_bytes)
+
+    def test_gif_overlay_rerender_preserves_order_timing_and_base_frames(self) -> None:
+        images = (
+            Image.new("RGB", (320, 320), "red"),
+            Image.new("RGB", (320, 320), "blue"),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "animated.gif"
+            images[0].save(
+                path,
+                format="GIF",
+                save_all=True,
+                append_images=[images[1]],
+                duration=[40, 90],
+                loop=2,
+            )
+            prepared = image_pipeline.prepare_gif(path)
+        rerendered = image_pipeline.rerender_prepared_animation(
+            prepared,
+            overlay_config=image_pipeline.TemperatureOverlayConfig(enabled=True),
+            temperatures=image_pipeline.TemperatureOverlayValues(50.0, 40.0, 45.0),
+        )
+        self.assertEqual(
+            [(frame.source_index, frame.duration_ms) for frame in rerendered.frames],
+            [(0, 40), (1, 90)],
+        )
+        self.assertEqual(
+            [frame.base_rgb_bytes for frame in rerendered.frames],
+            [frame.base_rgb_bytes for frame in prepared.frames],
+        )
+        self.assertNotEqual(
+            [frame.jpeg_bytes for frame in rerendered.frames],
+            [frame.jpeg_bytes for frame in prepared.frames],
+        )
+
     def test_exif_orientation_is_applied_before_scaling(self) -> None:
         exif = Image.Exif()
         exif[274] = 6

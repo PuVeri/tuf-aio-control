@@ -8,7 +8,9 @@ Hardwaretemperaturen anzeigen können.
 Der sichere Einzelbildpfad ist statisch geprüft und auf dem realen Gerät
 bestätigt. Die Desktop-UI bereitet JPEG, PNG, WebP, BMP und den ersten
 GIF-Frame automatisch als validiertes 320×320-JPEG vor. Animationen,
-Dauerbetrieb und Sensordarstellung sind noch nicht implementiert.
+Dauerbetrieb ist noch nicht implementiert. Die GUI zeigt lokale Linux-hwmon-
+Temperaturen für CPU, CPU Package und GPU an, soweit der Kernel getrennte
+passende Sensoren bereitstellt.
 
 ## Desktop-UI starten
 
@@ -23,6 +25,10 @@ Pillow 12.3.0 mit libjpeg-turbo; das Projekt installiert keine Pakete selbst.
 
 Die UI sendet niemals automatisch. Sie zeigt Original und finale
 320×320-Vorschau und bietet mittiges Zuschneiden oder Einpassen auf Schwarz.
+Optional legt derselbe Renderer `CPU Package / Tctl`, `GPU / edge` und
+`CPU CCD / Tccd1` dreiecksförmig über Vorschau und finalen JPEG-Frame. Die
+gemeinsame Schriftfarbe ist frei wählbar, wird sofort sichtbar und als
+`#RRGGBB` in den App-Einstellungen gespeichert; Default ist Weiß.
 Erst nach erfolgreicher Konvertierung und erneuter ASUS-JPEG-Validierung kann
 ein ausdrücklicher Klick auf `Auf Display senden` genau einen Frame
 übertragen. GIF wird ausschließlich als Standbild aus Frame 0 verarbeitet.
@@ -42,8 +48,8 @@ Die geplante Anwendung soll:
 - Zugriffsfehler und nicht unterstützte Geräte verständlich melden,
 - das ermittelte Protokoll nachvollziehbar und reproduzierbar dokumentieren.
 
-Nicht Ziel der aktuellen Phase sind Animationen, Dauerbetrieb, Sensoranzeige,
-Autostart oder ein Hintergrunddienst.
+Nicht Ziel der aktuellen Phase sind Animationen, Dauerbetrieb, Autostart oder
+ein Hintergrunddienst.
 
 ## Aktueller Erkenntnisstand
 
@@ -66,7 +72,7 @@ Autostart oder ein Hintergrunddienst.
 - Weitere Eingabeformate außerhalb JPEG, PNG, WebP, BMP und GIF-Frame 0.
 - Fehler-, Timeout- und Recoveryverhalten des realen v49-Geräts.
 - Andere JPEG-Profile und Segmentzahlen als der erfolgreiche Referenztransfer.
-- Sensorerfassung und Darstellung von Hardwarewerten.
+- Weitere Sensorkanäle jenseits der aktuellen CPU-/Package-/GPU-Anzeige.
 
 Die beobachteten HID-Raw-Nummern sind nur Momentaufnahmen. Sie können sich nach
 Neustart, Neuverbinden oder durch andere USB-Geräte ändern und dürfen nicht als
@@ -130,7 +136,9 @@ explizite Angaben zu Quelle, Einheit, Zeitstempel und Verfügbarkeit.
 
 `src/image_pipeline.py` berücksichtigt EXIF-Orientierung und Transparenz,
 skaliert per Crop oder Fit und erzeugt im Speicher ein konservatives
-320×320-JPEG. Der bestehende ASUS-Validator prüft jede Ausgabe erneut.
+320×320-JPEG. Ein optionales Temperaturoverlay wird aus einem gecachten
+Basisframe gerendert, ohne Sensor- oder Transportzugriff. Der bestehende
+ASUS-Validator prüft jede Ausgabe erneut.
 
 ### Anwendung und Benutzeroberfläche
 
@@ -223,9 +231,12 @@ dieser Phase nicht erweitert.
 
 ## Status
 
-**Funktionsfähige Einzelbildstufe mit Offline-Bildvorbereitung.** Der
+**Funktionsfähige Einzelbildstufe mit lokaler Temperaturanzeige.** Der
 `0x08`-JPEG-Transfer und die wiederverwendbare Einzelbild-CLI wurden auf dem
 realen v49-Gerät bestätigt. Bildpipeline und Desktop-UI sind vollständig
-offline getestet, wurden in diesem Ticket aber nicht gegen das Gerät
-ausgeführt. GIF-Animation und weitere Betriebsarten benötigen jeweils eine
-eigene Sicherheitsbewertung und Freigabe.
+offline getestet. Die GUI liest CPU-, Package- und GPU-Werte ausschließlich
+lokal und read-only aus hwmon; fehlende getrennte Werte erscheinen als `N/A`.
+Der vorbereitete LCD-Frame kann Tctl, Tccd1 und `edge` der primären GPU mit
+persistenter gemeinsamer Schriftfarbe darstellen; fehlende Overlaywerte
+erscheinen als `—`. GIF-Animation und weitere Betriebsarten benötigen jeweils
+eine eigene Sicherheitsbewertung und Freigabe.

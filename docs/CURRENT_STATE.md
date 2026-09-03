@@ -905,3 +905,48 @@ mit zeitgestempelter Sichtbeobachtung bestimmt werden. Erst danach lässt sich
 eine tatsächlich ausreichende Refreshrate bewerten. Andere Intervalle oder
 Bilder, `0x1a`-/`0x1f`-Versuche, echte GIF-Animation, Dauerbetrieb und
 Fehlerpfadtests bleiben nicht freigegeben. Schreibrechte bleiben deaktiviert.
+
+## Lokale Temperaturen und LCD-Overlay
+
+Die PySide6-GUI zeigt `CPU`, `CPU Package` und `GPU` über eine getrennte,
+ausschließlich lesende hwmon-Schicht an. `src/system_sensors.py` erkennt
+`k10temp` und `amdgpu` bei jedem Poll dynamisch über `name`, `temp*_label` und
+`temp*_input`; wechselnde `hwmonN`-Nummern werden nicht als Geräteidentität
+verwendet. Fehlende, verschwundene oder fehlerhafte GUI-Werte erscheinen als
+`N/A`.
+
+Der tatsächlich erzeugte 320×320-JPEG-Frame kann optional ein gemeinsames
+Temperaturoverlay tragen: oben links `CPU Package / Tctl`, oben rechts
+`GPU / edge` der konfigurierten primären GPU `0000:03:00.0` und unten mittig
+`CPU CCD / Tccd1`. Fehlende Overlaywerte erscheinen als `—`. Vorschau und
+späterer expliziter Einzelbildtransfer verwenden dieselben validierten
+JPEG-Bytes. Bei deaktiviertem Overlay bleiben Basisframe und deterministisch
+erzeugte JPEG-Bytes unverändert.
+
+Die gemeinsame Farbe für Labels und Werte ist in der GUI frei wählbar, wird
+sofort in der Vorschau angewendet und als normalisiertes `#RRGGBB` in QSettings
+gespeichert. Default und sicherer Fallback für ungültige gespeicherte Werte ist
+Weiß. Das interne Farbmodell besitzt bereits ein Feld pro Sensor, die GUI setzt
+heute jedoch bewusst eine gemeinsame Farbe.
+
+Ein Qt-Timer liest ungefähr einmal pro Sekunde. Nur geänderte Sensorwerte lösen
+ein Overlay-Re-Rendering aus dem gecachten RGB-Basisframe und eine neue
+JPEG-Erzeugung aus. Sensorpolling und Rendering sind nicht mit einem USB-Refresh
+verbunden. Vorbereitete GIF-Frames behalten Reihenfolge, Dauer und Loopwert und
+können offline mit neuen Werten gerendert werden; die GUI sendet weiterhin
+keine GIF-Live-Animation.
+
+Zusätzlich erkannt, aber nicht ins Standardlayout aufgenommen sind `junction`
+und `mem` der primären GPU, `edge` einer zweiten GPU, die NVMe-Kanäle
+`Composite`, `Sensor 1` und `Sensor 2` sowie ein unbeschrifteter r8169-Kanal.
+Weitere CCDs und belegte Mainboard-/Chipsatzwerte bleiben mögliche spätere
+Erweiterungen. Details und Evidenzgrenzen stehen in
+`research/reports/gui-temperature-monitoring.md` und
+`research/reports/lcd-temperature-overlay.md`.
+
+Der Recovery-Audit begann ohne Änderungen und fand keine Konfliktmarker,
+abgebrochenen Dateien, Syntax-, Import- oder bestehenden Testfehler. Vor den
+Ergänzungen bestanden 131 Offline-Tests. Abschließend bestanden 141 Tests;
+`git diff --check` war sauber. Es fanden keine Gerätekommunikation, keine
+HID-/USB-Writes und keine Live-Tests statt. LCD-Transport, Refresh-Protokoll und
+Fallback-Timing-Pfade blieben unverändert.

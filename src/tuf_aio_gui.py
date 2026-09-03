@@ -5,11 +5,14 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Callable
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QImageReader, QPixmap, QResizeEvent
+from PySide6.QtCore import QSettings, QTimer, Qt
+from PySide6.QtGui import QColor, QImageReader, QPixmap, QResizeEvent
 from PySide6.QtWidgets import (
     QApplication,
+    QCheckBox,
+    QColorDialog,
     QComboBox,
     QFileDialog,
     QFrame,
@@ -26,13 +29,41 @@ from PySide6.QtWidgets import (
 
 import image_pipeline
 import lcd_transport as transport
+import system_sensors
+
+TemperatureReader = Callable[[], system_sensors.TemperatureSnapshot]
+SETTINGS_ORGANIZATION = "HeartDriveLab"
+SETTINGS_APPLICATION = "tuf-aio-control"
+OVERLAY_ENABLED_SETTING = "lcd_temperature_overlay/enabled"
+OVERLAY_COLOR_SETTING = "lcd_temperature_overlay/color"
 
 
 class MainWindow(QMainWindow):
     """Single-image UI; conversion and transport stay in separate modules."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        sensor_reader: TemperatureReader | None = None,
+        settings: QSettings | None = None,
+    ) -> None:
         super().__init__()
+        self._sensor_reader = sensor_reader or system_sensors.read_lcd_temperatures
+        self._settings = (
+            settings
+            if settings is not None
+            else QSettings(SETTINGS_ORGANIZATION, SETTINGS_APPLICATION)
+        )
+        self._overlay_enabled = self._read_bool_setting(OVERLAY_ENABLED_SETTING)
+        raw_color = self._settings.value(
+            OVERLAY_COLOR_SETTING,
+            image_pipeline.DEFAULT_OVERLAY_COLOR,
+        )
+        self._overlay_color = image_pipeline.normalize_overlay_color(raw_color)
+        if raw_color != self._overlay_color:
+            self._settings.setValue(OVERLAY_COLOR_SETTING, self._overlay_color)
+            self._settings.sync()
+        self._latest_temperature_snapshot = system_sensors.TemperatureSnapshot()
         self._selected_path: Path | None = None
         self._prepared: image_pipeline.PreparedImage | None = None
         self._device_ready = False
@@ -40,10 +71,15 @@ class MainWindow(QMainWindow):
         self._final_pixmap: QPixmap | None = None
 
         self.setWindowTitle("TUF AIO Control")
-        self.resize(920, 820)
+        self.resize(920, 900)
         self._build_ui()
         self._apply_style()
         self.refresh_device_status()
+        self.refresh_temperatures()
+        self._temperature_timer = QTimer(self)
+        self._temperature_timer.setInterval(1000)
+        self._temperature_timer.timeout.connect(self.refresh_temperatures)
+        self._temperature_timer.start()
 
     def _build_ui(self) -> None:
         central = QWidget(self)
@@ -74,6 +110,32 @@ class MainWindow(QMainWindow):
         device_layout.addWidget(self.refresh_button)
         outer.addWidget(device_card)
 
+        temperature_card = QFrame()
+        temperature_card.setObjectName("card")
+        temperature_layout = QGridLayout(temperature_card)
+        temperature_layout.setHorizontalSpacing(24)
+        temperature_layout.setVerticalSpacing(4)
+        temperature_title = QLabel("Lokale Temperaturen")
+        temperature_title.setObjectName("sectionTitle")
+        temperature_layout.addWidget(temperature_title, 0, 0, 1, 3)
+        (
+            self.cpu_temperature_value,
+            self.cpu_temperature_source,
+        ) = self._add_temperature_column(temperature_layout, 1, 0, "CPU")
+        (
+            self.cpu_package_temperature_value,
+            self.cpu_package_temperature_source,
+        ) = self._add_temperature_column(
+            temperature_layout, 1, 1, "CPU Package"
+        )
+        (
+            self.gpu_temperature_value,
+            self.gpu_temperature_source,
+        ) = self._add_temperature_column(temperature_layout, 1, 2, "GPU")
+        for column in range(3):
+            temperature_layout.setColumnStretch(column, 1)
+        outer.addWidget(temperature_card)
+
         previews = QFrame()
         previews.setObjectName("previewCard")
         preview_grid = QGridLayout(previews)
@@ -98,6 +160,14 @@ class MainWindow(QMainWindow):
         self.scale_mode.addItem("Einpassen", "fit")
         self.scale_mode.currentIndexChanged.connect(self._scale_mode_changed)
         options_layout.addWidget(self.scale_mode)
+        self.overlay_checkbox = QCheckBox("Temperaturen auf LCD anzeigen")
+        self.overlay_checkbox.setChecked(self._overlay_enabled)
+        self.overlay_checkbox.toggled.connect(self._overlay_toggled)
+        options_layout.addWidget(self.overlay_checkbox)
+        self.overlay_color_button = QPushButton()
+        self.overlay_color_button.clicked.connect(self._choose_overlay_color)
+        self._update_overlay_color_button()
+        options_layout.addWidget(self.overlay_color_button)
         options_layout.addStretch(1)
         outer.addWidget(options)
 
@@ -163,6 +233,21 @@ class MainWindow(QMainWindow):
         layout.setColumnStretch(1, 1)
         return value
 
+    @staticmethod
+    def _add_temperature_column(
+        layout: QGridLayout, row: int, column: int, name: str
+    ) -> tuple[QLabel, QLabel]:
+        key = QLabel(name)
+        key.setObjectName("temperatureKey")
+        value = QLabel("N/A")
+        value.setObjectName("temperatureValue")
+        source = QLabel("nicht verfügbar")
+        source.setObjectName("muted")
+        layout.addWidget(key, row, column)
+        layout.addWidget(value, row + 1, column)
+        layout.addWidget(source, row + 2, column)
+        return value, source
+
     def _apply_style(self) -> None:
         self.setStyleSheet(
             """
@@ -175,8 +260,12 @@ class MainWindow(QMainWindow):
                 background: #1a1f26; border: 1px solid #2b323d; border-radius: 10px;
             }
             QLabel#deviceDot { color: #7f8996; font-size: 20px; }
-            QLabel#deviceStatus, QLabel#previewTitle { font-weight: 600; font-size: 15px; }
+            QLabel#deviceStatus, QLabel#previewTitle, QLabel#sectionTitle {
+                font-weight: 600; font-size: 15px;
+            }
             QLabel#muted, QLabel#infoKey { color: #9ca5b1; }
+            QLabel#temperatureKey { color: #9ca5b1; font-weight: 600; }
+            QLabel#temperatureValue { font-size: 22px; font-weight: 700; color: #f4f5f7; }
             QLabel#preview {
                 background: #0d1014; border: 1px dashed #343c48;
                 border-radius: 7px; color: #747f8c;
@@ -199,6 +288,114 @@ class MainWindow(QMainWindow):
             }
             """
         )
+
+    def _read_bool_setting(self, key: str) -> bool:
+        value = self._settings.value(key, False)
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.casefold() in {"1", "true", "yes", "on"}
+        return False
+
+    def _overlay_config(self) -> image_pipeline.TemperatureOverlayConfig:
+        return image_pipeline.TemperatureOverlayConfig(
+            enabled=self._overlay_enabled,
+            colors=image_pipeline.TemperatureOverlayColors.uniform(
+                self._overlay_color
+            ),
+        )
+
+    @staticmethod
+    def _overlay_values(
+        snapshot: system_sensors.TemperatureSnapshot,
+    ) -> image_pipeline.TemperatureOverlayValues:
+        return image_pipeline.TemperatureOverlayValues(
+            cpu_package=(
+                snapshot.cpu_package.celsius
+                if snapshot.cpu_package is not None
+                else None
+            ),
+            gpu=snapshot.gpu.celsius if snapshot.gpu is not None else None,
+            cpu_ccd=(
+                snapshot.cpu_ccd.celsius if snapshot.cpu_ccd is not None else None
+            ),
+        )
+
+    def _overlay_toggled(self, enabled: bool) -> None:
+        self._overlay_enabled = enabled
+        self._settings.setValue(OVERLAY_ENABLED_SETTING, enabled)
+        self._settings.sync()
+        self._rerender_temperature_overlay()
+
+    def _choose_overlay_color(self) -> None:
+        selected = QColorDialog.getColor(
+            QColor(self._overlay_color),
+            self,
+            "Farbe der LCD-Temperaturanzeige",
+        )
+        if selected.isValid():
+            self._set_overlay_color(selected.name(QColor.NameFormat.HexRgb))
+
+    def _set_overlay_color(self, color: object) -> None:
+        self._overlay_color = image_pipeline.normalize_overlay_color(color)
+        self._settings.setValue(OVERLAY_COLOR_SETTING, self._overlay_color)
+        self._settings.sync()
+        self._update_overlay_color_button()
+        self._rerender_temperature_overlay()
+
+    def _update_overlay_color_button(self) -> None:
+        self.overlay_color_button.setText(f"Overlayfarbe: {self._overlay_color}")
+        foreground = "#111111" if QColor(self._overlay_color).lightness() > 160 else "#FFFFFF"
+        self.overlay_color_button.setStyleSheet(
+            f"background: {self._overlay_color}; color: {foreground};"
+        )
+
+    @staticmethod
+    def _show_temperature(
+        value_label: QLabel,
+        source_label: QLabel,
+        reading: system_sensors.TemperatureValue | None,
+    ) -> None:
+        if reading is None:
+            value_label.setText("N/A")
+            source_label.setText("nicht verfügbar")
+            value_label.setToolTip("Keine passende lokale hwmon-Quelle verfügbar")
+            return
+        value_label.setText(f"{reading.celsius:.1f} °C")
+        source = f"{reading.sensor.hwmon_name} · {reading.sensor.label}"
+        source_label.setText(source)
+        value_label.setToolTip(f"Quelle: {source} · {reading.sensor.channel}")
+
+    def refresh_temperatures(self) -> system_sensors.TemperatureSnapshot:
+        """Sample local hwmon sources once without involving any HID path."""
+        previous_values = self._overlay_values(self._latest_temperature_snapshot)
+        try:
+            snapshot = self._sensor_reader()
+        except (OSError, RuntimeError, ValueError):
+            snapshot = system_sensors.TemperatureSnapshot()
+        self._show_temperature(
+            self.cpu_temperature_value,
+            self.cpu_temperature_source,
+            snapshot.cpu,
+        )
+        self._show_temperature(
+            self.cpu_package_temperature_value,
+            self.cpu_package_temperature_source,
+            snapshot.cpu_package,
+        )
+        self._show_temperature(
+            self.gpu_temperature_value,
+            self.gpu_temperature_source,
+            snapshot.gpu,
+        )
+        self._latest_temperature_snapshot = snapshot
+        if (
+            self._overlay_enabled
+            and self._prepared is not None
+            and self._overlay_values(snapshot) != previous_values
+        ):
+            self._rerender_temperature_overlay()
+        return snapshot
 
     def refresh_device_status(self) -> transport.HidrawInterface | None:
         """Perform one read-only discovery and update the visible status."""
@@ -262,7 +459,14 @@ class MainWindow(QMainWindow):
 
         mode = self.scale_mode.currentData()
         try:
-            prepared = image_pipeline.prepare_image(resolved, mode=mode)
+            prepared = image_pipeline.prepare_image(
+                resolved,
+                mode=mode,
+                overlay_config=self._overlay_config(),
+                temperatures=self._overlay_values(
+                    self._latest_temperature_snapshot
+                ),
+            )
             self._load_final_preview(prepared.jpeg_bytes)
         except (image_pipeline.ImagePipelineError, OSError, RuntimeError, ValueError) as error:
             self._prepared = None
@@ -272,6 +476,10 @@ class MainWindow(QMainWindow):
             self._set_invalid_image(str(error))
             return False
 
+        self._show_prepared_image(prepared)
+        return True
+
+    def _show_prepared_image(self, prepared: image_pipeline.PreparedImage) -> None:
         self._prepared = prepared
         oriented_text = f"{prepared.oriented_size[0]}×{prepared.oriented_size[1]}"
         if prepared.source_size != prepared.oriented_size:
@@ -295,7 +503,24 @@ class MainWindow(QMainWindow):
         self.validation_value.setStyleSheet("color: #55c987;")
         self.status_label.setText("Status: Bild vorbereitet – Senden nur nach Klick")
         self._update_send_enabled()
-        return True
+
+    def _rerender_temperature_overlay(self) -> None:
+        if self._prepared is None:
+            return
+        try:
+            prepared = image_pipeline.rerender_prepared_image(
+                self._prepared,
+                overlay_config=self._overlay_config(),
+                temperatures=self._overlay_values(
+                    self._latest_temperature_snapshot
+                ),
+            )
+            self._load_final_preview(prepared.jpeg_bytes)
+        except (image_pipeline.ImagePipelineError, OSError, RuntimeError, ValueError) as error:
+            self._prepared = None
+            self._set_invalid_image(str(error))
+            return
+        self._show_prepared_image(prepared)
 
     def _load_original_preview(self, path: Path) -> tuple[int, int] | None:
         reader = QImageReader(str(path))
