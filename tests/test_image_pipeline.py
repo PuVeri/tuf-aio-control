@@ -7,7 +7,7 @@ from io import BytesIO
 from pathlib import Path
 from unittest import mock
 
-from PIL import Image
+from PIL import Image, ImageFont
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(PROJECT_ROOT / "src"))
@@ -206,6 +206,8 @@ class ImagePipelineOfflineTests(unittest.TestCase):
             image_pipeline.OVERLAY_LABEL_PREFERRED_SIZE,
             image_pipeline.OVERLAY_VALUE_MINIMUM_SIZE,
         )
+        self.assertEqual(image_pipeline.OVERLAY_LABEL_PREFERRED_SIZE, 13)
+        self.assertEqual(image_pipeline.OVERLAY_VALUE_PREFERRED_SIZE, 33)
         for placement in placements:
             left, top, right, bottom = placement.bounds
             self.assertGreaterEqual(left, image_pipeline.OVERLAY_SAFE_BOUNDS[0])
@@ -219,6 +221,45 @@ class ImagePipelineOfflineTests(unittest.TestCase):
                         distance,
                         image_pipeline.OVERLAY_ROUND_SAFE_RADIUS,
                     )
+
+    def test_overlay_font_strategy_prefers_weighted_monospace_with_fallback(self) -> None:
+        self.assertEqual(
+            image_pipeline.OVERLAY_FONT_CANDIDATES["label"][0],
+            "NotoSansMono-SemiBold.ttf",
+        )
+        self.assertEqual(
+            image_pipeline.OVERLAY_FONT_CANDIDATES["value"][0],
+            "NotoSansMono-Bold.ttf",
+        )
+        fallback_font = ImageFont.load_default(size=13)
+        with (
+            mock.patch.object(
+                image_pipeline.ImageFont,
+                "truetype",
+                side_effect=OSError("font unavailable"),
+            ),
+            mock.patch.object(
+                image_pipeline.ImageFont,
+                "load_default",
+                return_value=fallback_font,
+            ) as fallback,
+        ):
+            font = image_pipeline._overlay_font(13, "label")
+        fallback.assert_called_once_with(size=13)
+        self.assertIsNotNone(font)
+
+    def test_overlay_uses_distinct_label_and_value_font_roles(self) -> None:
+        with mock.patch.object(
+            image_pipeline,
+            "_overlay_font",
+            wraps=image_pipeline._overlay_font,
+        ) as load_font:
+            image_pipeline.layout_temperature_overlay(
+                image_pipeline.TemperatureOverlayValues(51.25, 43.5, 46.75),
+                image_pipeline.TemperatureOverlayConfig(enabled=True),
+            )
+        roles = {call.args[1] for call in load_font.call_args_list}
+        self.assertEqual(roles, {"label", "value"})
 
     def test_missing_overlay_values_use_em_dash_and_default_white(self) -> None:
         placements = image_pipeline.layout_temperature_overlay(

@@ -950,3 +950,21 @@ Ergänzungen bestanden 131 Offline-Tests. Abschließend bestanden 141 Tests;
 `git diff --check` war sauber. Es fanden keine Gerätekommunikation, keine
 HID-/USB-Writes und keine Live-Tests statt. LCD-Transport, Refresh-Protokoll und
 Fallback-Timing-Pfade blieben unverändert.
+
+### Technische Overlay-Typografie
+
+Das LCD-Temperaturoverlay verwendet nun eine gestufte technische
+Monospace-Strategie. Bevorzugt werden `Noto Sans Mono SemiBold` für Labels und
+`Noto Sans Mono Bold` für Werte; danach folgen `DejaVu Sans Mono` und
+`Liberation Mono`, jeweils in kräftiger Ausprägung. Ist keine dieser Schriften
+verfügbar, fällt der Renderer kontrolliert auf Pillows Standardschrift zurück.
+Es besteht keine harte Abhängigkeit von einer einzelnen installierten Datei.
+
+Die bevorzugten Größen wurden von 15 auf 13 Pixel für Labels und von 38 auf
+33 Pixel für Werte reduziert. Damit ist die Darstellung ungefähr zehn Prozent
+kompakter; Semibold/Bold hält sie zugleich klar lesbar. Die bestehenden
+Label- und Wertmittelpunkte, Dreiecksanordnung, Rundrandprüfung, Farben und
+Preview-/LCD-Renderpfade blieben unverändert. Die vollständige Offline-Suite
+bestand danach mit 143 Tests. Es fanden keine Gerätekommunikation, keine
+HID-/USB-Writes und keine Live-Tests statt; Transport-, Refresh- und
+Sensorverhalten wurden nicht verändert.

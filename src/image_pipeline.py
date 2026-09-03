@@ -25,13 +25,34 @@ DEFAULT_OVERLAY_COLOR = "#FFFFFF"
 OVERLAY_SAFE_BOUNDS = (24, 24, 296, 296)
 OVERLAY_ROUND_CENTER = (160, 160)
 OVERLAY_ROUND_SAFE_RADIUS = 148
-OVERLAY_LABEL_PREFERRED_SIZE = 15
-OVERLAY_LABEL_MINIMUM_SIZE = 10
-OVERLAY_VALUE_PREFERRED_SIZE = 38
-OVERLAY_VALUE_MINIMUM_SIZE = 24
+OVERLAY_LABEL_PREFERRED_SIZE = 13
+OVERLAY_LABEL_MINIMUM_SIZE = 8
+OVERLAY_VALUE_PREFERRED_SIZE = 33
+OVERLAY_VALUE_MINIMUM_SIZE = 22
+OVERLAY_FONT_CANDIDATES = {
+    "label": (
+        "NotoSansMono-SemiBold.ttf",
+        "/usr/share/fonts/google-noto/NotoSansMono-SemiBold.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSansMono-SemiBold.ttf",
+        "DejaVuSansMono-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",
+        "/usr/share/fonts/TTF/DejaVuSansMono-Bold.ttf",
+        "LiberationMono-Bold.ttf",
+    ),
+    "value": (
+        "NotoSansMono-Bold.ttf",
+        "/usr/share/fonts/google-noto/NotoSansMono-Bold.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSansMono-Bold.ttf",
+        "DejaVuSansMono-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",
+        "/usr/share/fonts/TTF/DejaVuSansMono-Bold.ttf",
+        "LiberationMono-Bold.ttf",
+    ),
+}
 
 ScaleMode = Literal["crop", "fit"]
 OverlaySensor = Literal["cpu_package", "gpu", "cpu_ccd"]
+OverlayFontRole = Literal["label", "value"]
 
 
 class ImagePipelineError(ValueError):
@@ -166,7 +187,13 @@ def _format_temperature(value: float | None) -> str:
     return f"{value:.0f} °C"
 
 
-def _overlay_font(size: int) -> ImageFont.FreeTypeFont:
+def _overlay_font(size: int, role: OverlayFontRole) -> ImageFont.FreeTypeFont:
+    """Load a technical semibold/bold mono face with a safe Pillow fallback."""
+    for candidate in OVERLAY_FONT_CANDIDATES[role]:
+        try:
+            return ImageFont.truetype(candidate, size=size)
+        except OSError:
+            continue
     return ImageFont.load_default(size=size)
 
 
@@ -177,9 +204,10 @@ def _fit_font(
     preferred_size: int,
     minimum_size: int,
     maximum_width: int,
+    role: OverlayFontRole,
 ) -> ImageFont.FreeTypeFont:
     for size in range(preferred_size, minimum_size - 1, -1):
-        font = _overlay_font(size)
+        font = _overlay_font(size, role)
         bounds = draw.textbbox((0, 0), text, font=font, stroke_width=1)
         if bounds[2] - bounds[0] <= maximum_width:
             return font
@@ -221,6 +249,7 @@ def layout_temperature_overlay(
             preferred_size=OVERLAY_LABEL_PREFERRED_SIZE,
             minimum_size=OVERLAY_LABEL_MINIMUM_SIZE,
             maximum_width=106,
+            role="label",
         )
         value_font = _fit_font(
             draw,
@@ -228,6 +257,7 @@ def layout_temperature_overlay(
             preferred_size=OVERLAY_VALUE_PREFERRED_SIZE,
             minimum_size=OVERLAY_VALUE_MINIMUM_SIZE,
             maximum_width=114,
+            role="value",
         )
         label_bounds = draw.textbbox(
             label_center,
@@ -306,6 +336,7 @@ def render_temperature_overlay(
             preferred_size=OVERLAY_LABEL_PREFERRED_SIZE,
             minimum_size=OVERLAY_LABEL_MINIMUM_SIZE,
             maximum_width=106,
+            role="label",
         )
         value_font = _fit_font(
             draw,
@@ -313,6 +344,7 @@ def render_temperature_overlay(
             preferred_size=OVERLAY_VALUE_PREFERRED_SIZE,
             minimum_size=OVERLAY_VALUE_MINIMUM_SIZE,
             maximum_width=114,
+            role="value",
         )
         draw.text(
             placement.label_center,

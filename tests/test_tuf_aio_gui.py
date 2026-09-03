@@ -26,6 +26,12 @@ class TufAioGuiOfflineTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.app = QApplication.instance() or QApplication([])
 
+    def setUp(self) -> None:
+        self._settings_directory = tempfile.TemporaryDirectory()
+
+    def tearDown(self) -> None:
+        self._settings_directory.cleanup()
+
     @staticmethod
     def _device() -> lcd_transport.HidrawInterface:
         return lcd_transport.HidrawInterface(
@@ -53,6 +59,10 @@ class TufAioGuiOfflineTests(unittest.TestCase):
     ) -> tuf_aio_gui.MainWindow:
         result = discovery if discovery is not None else (self._device(), "gültig")
         reader = sensor_reader or system_sensors.TemperatureSnapshot
+        if settings is None:
+            settings = self._settings(
+                Path(self._settings_directory.name) / "default-settings.ini"
+            )
         with mock.patch.object(
             tuf_aio_gui.transport, "discover_lcd_interface", return_value=result
         ):
