@@ -616,18 +616,23 @@ Vertrag einschließlich JFIF, SOF0, 8 Bit, Standard-Huffmantabellen, EOI ohne
 Nachlauf und `N<=200` erfüllen. Quellen über 64.000.000 Pixel werden vor der
 vollständigen Verarbeitung abgelehnt; Originaldateien werden nie verändert.
 
-GIF ist ausdrücklich nur als Standbild unterstützt. Pipeline und GUI laden
-ausschließlich Frame 0, iterieren über keine weiteren Frames und kennzeichnen
-die Quelle als `GIF · erstes Bild als Standbild`. Es existieren kein `QMovie`,
-Timer oder Mehrfachframepfad. Details stehen in
-`docs/LCD_IMAGE_PIPELINE.md`.
+Die aktive GUI unterstützt GIF weiterhin ausschließlich als Standbild. Ihr
+normaler `prepare_image()`-Pfad lädt nur Frame 0 und kennzeichnet die Quelle
+als `GIF · erstes Bild als Standbild`; es existieren dort weder `QMovie`,
+Timer noch Mehrfachframesenden. Zusätzlich kann `prepare_gif()` nun rein
+offline alle Frames, originalen Millisekunden-Dauern, Loopwert und bereits
+validierte 320×320-JPEGs als unveränderliches `PreparedAnimation`-Datenmodell
+bereitstellen. Dieser Pfad ist nicht an GUI oder Gerät angeschlossen. Die
+bisherige Einzelframepipeline steht in `docs/LCD_IMAGE_PIPELINE.md`; die neue
+Offline-Erweiterung in `research/reports/lcd-refresh-sender-design.md`.
 
-Die gesamte Offline-Suite umfasst jetzt 66 erfolgreiche Tests. Fünf
+Die gesamte Offline-Suite umfasst jetzt 80 erfolgreiche Tests. Fünf
 headless-Qt-Tests prüfen Referenzbild, inkompatible Preview, fehlendes Gerät,
 Transportfehler ohne Retry und genau einen `send_frame_once()`-Aufruf pro
 Sendeklick. Weitere Pipeline-Tests prüfen Landscape/Portrait in Crop und Fit,
 Quadrat, Alpha-PNG, JPEG/PNG/WebP/BMP, animiertes GIF mit ausschließlich Frame
-0, EXIF-Rotation sowie sehr kleine, große und ungültige Quellen. Alle
+0, die getrennte Offline-Vorbereitung aller GIF-Frames samt Dauer-/Loopwert,
+EXIF-Rotation sowie sehr kleine, große und ungültige Quellen. Alle
 Geräteoperationen sind gemockt; während dieses Tickets fand keine
 Gerätekommunikation statt und kein Bild wurde gesendet.
 
@@ -677,6 +682,51 @@ tatsächlichen Transferabstände sowie das einmalige initiale Interface-0-
 `0x12` auf dem realen Gerät prüfen, ohne einen eigenen unbekannten Modusbefehl
 oder Mehrfachframepfad zu senden.
 
+## Kontrollierte Offline-Refresharchitektur
+
+Design, Grenzen und Testergebnisse stehen in
+`research/reports/lcd-refresh-sender-design.md`.
+
+- `src/lcd_refresh.py` ergänzt eine eigenständige Scheduling-Schicht ohne
+  HID-Opcode, Paketbuilder, Interface-0- oder IN-Read-Pfad. Sie delegiert einen
+  vollständigen Frame ausschließlich synchron an den bestehenden
+  `send_frame_once()`-Pfad.
+- `RefreshPlan` verlangt ohne Defaultwerte ein explizites
+  Transportintervall, eine maximale Laufzeit und eine maximale Frameanzahl.
+  Die technischen Hardcaps liegen bei 60 s und 500 vollständigen Frames; sie
+  sind keine Freigabe oder Empfehlung für einen Live-Test.
+- `RefreshController` kann nur explizit und pro Instanz genau einmal gestartet
+  werden. Ein Stop-Event unterbricht Wartezeiten, der nicht als Daemon
+  markierte Thread wird gejoint, und jede Session endet spätestens an einem
+  Limit oder beim ersten Senderfehler.
+- Prozessweite Nonblocking-Locks verhindern zwei parallele Refreshsessions
+  sowie zwei gleichzeitig laufende `send_frame_once()`-Aufrufe. Es gibt keine
+  Framequeue, keinen Catch-up-Burst, keinen Retry, keine Recovery und keinen
+  Autostart. Die Locks koordinieren keine fremden Prozesse; externe
+  LCD-Writer müssen vor einem Live-Test gesondert ausgeschlossen werden.
+- Das Transportintervall beschreibt die minimale Zielperiode zwischen
+  tatsächlichen Startzeitpunkten vollständiger Transfers. Die Transferdauer
+  wird gemessen. Ist sie länger als das Intervall, beginnt frühestens nach
+  Rückkehr genau der nächste synchrone Transfer; dessen Zeitplan wird neu
+  basiert.
+- JPEG-Produktion, USB-Übertragungsrate und gewünschte sichtbare Framedauer
+  sind getrennt. Der aktuelle Loop erzeugt kein JPEG, sondern verwendet nur
+  vollständig vorbereitete Frames. Bei Animationen wird ohne Überspringen
+  zyklisch weitergeschaltet; GIF-Loopwerte werden noch nicht ausgeführt.
+- `HidrawFrameSender` ist nur ein zukünftiger Adapter. Pro Frame bleiben
+  dynamische Interface-1-Revalidierung, kein Retry und das `finally`-Close des
+  Einzelframesenders erhalten. GUI und CLI aktivieren diesen Adapter nicht.
+- 14 neue Offline-Tests prüfen Start/Stop, Parallelität, ersten Fehler,
+  fehlende Retries, Frame-/Zeitlimits, langsame Transfers, fehlende
+  Catch-up-Bursts, statische Wiederverwendung, animierte Reihenfolge,
+  GIF-Dauern/Loopwert und vollständige Mockbarkeit. Die gesamte Suite mit 80
+  Tests ist erfolgreich.
+
+Es gab in diesem Ticket keine Gerätekommunikation und keinen HID-Write. Ein
+Live-Refresh bleibt gesperrt, bis ein eigenes GO/NO-GO-Review eine konservative
+Periode und wesentlich kleinere normative Testgrenzen gegen Queue,
+Decoder-Lease, Transferdauer und v49-Restunsicherheit festlegt.
+
 ## Gefährliche und ausgeschlossene Pfade
 
 - `0x88`: SPI-Lesen und bedingtes SPI-Schreiben bei `0x21000`.
@@ -694,15 +744,14 @@ oder Mehrfachframepfad zu senden.
 ## Nächster klarer Arbeitsschritt
 
 Der freigegebene Einmaltransfer und der automatische Pipeline-Live-Test sind
-abgeschlossen und dokumentiert. InfoHubs Hostrefresh ist nun statisch
-geschlossen: 12-ms-Zielperiode, synchroner vollständiger `0x08`-Transfer des
-jeweils letzten JPEG-Puffers und getrennte XYUI-Produktion. Der nächste sichere
-Analyseschritt ist ein eigenes statisches Safety-Review dieser
-Mehrfachtransferstrategie gegen Queue, Decoder-Lease, Transferdauer,
-Fehlerabbruch und v49-Restunsicherheit; ein passiver InfoHub-Capture kann den
-realen v49-Takt zusätzlich abgleichen. Ein weiterer eigener Frame, ein
-`0x1a`-/`0x1f`-Versuch, Animationen, Dauerbetrieb oder Fehlerpfadtests sind
-weder aus dem Ergebnis ableitbar noch freigegeben. Vor echter GIF-Animation
-müssen insbesondere Producer-/Frame-Timing, Decoder-Lease, Framerate-/
-Laufzeitgrenzen, Teiltransferfehler und eine kontrollierte Stopstrategie
-statisch und real sicher bewertet werden. Schreibrechte bleiben deaktiviert.
+abgeschlossen und dokumentiert. InfoHubs Hostrefresh ist statisch geschlossen,
+und die eigene begrenzte Refresh-Scheduling-Schicht ist offline implementiert
+und getestet. Der nächste sichere Schritt ist ein statisches GO/NO-GO-Review
+für genau einen kurzen statischen Refresh-Test. Es muss eine konservative
+Periode und wesentlich kleinere Dauer-/Framegrenzen gegen Queue,
+Decoder-Lease, gemessene Transferdauer, Fehlerabbruch und v49-Restunsicherheit
+festlegen; ein passiver InfoHub-Capture kann den realen v49-Takt zusätzlich
+abgleichen. Der neue Refreshadapter ist weder in GUI noch CLI aktiviert.
+Ein eigener Live-Refresh, `0x1a`-/`0x1f`-Versuche, echte GIF-Animation,
+Dauerbetrieb und Fehlerpfadtests bleiben nicht freigegeben. Schreibrechte
+bleiben deaktiviert.

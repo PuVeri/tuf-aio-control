@@ -153,6 +153,39 @@ class ImagePipelineOfflineTests(unittest.TestCase):
         self.assertGreater(red, 220)
         self.assertLess(blue, 30)
 
+    def test_gif_preparation_preserves_frames_durations_and_loop_value(self) -> None:
+        images = (
+            Image.new("RGB", (320, 320), "red"),
+            Image.new("RGB", (320, 320), "green"),
+            Image.new("RGB", (320, 320), "blue"),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "animated.gif"
+            images[0].save(
+                path,
+                format="GIF",
+                save_all=True,
+                append_images=list(images[1:]),
+                duration=[40, 90, 120],
+                loop=2,
+            )
+            prepared = image_pipeline.prepare_gif(path, mode="fit")
+
+        self.assertEqual(prepared.source_size, (320, 320))
+        self.assertEqual(prepared.scale_mode, "fit")
+        self.assertEqual(prepared.loop_count, 2)
+        self.assertEqual(
+            [frame.source_index for frame in prepared.frames],
+            [0, 1, 2],
+        )
+        self.assertEqual(
+            [frame.duration_ms for frame in prepared.frames],
+            [40, 90, 120],
+        )
+        self.assertEqual(len({frame.jpeg_bytes for frame in prepared.frames}), 3)
+        for frame in prepared.frames:
+            self.assertEqual(frame.jpeg_info, lcd_transport.validate_jpeg(frame.jpeg_bytes))
+
     def test_exif_orientation_is_applied_before_scaling(self) -> None:
         exif = Image.Exif()
         exif[274] = 6

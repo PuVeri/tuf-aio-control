@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import os
 import stat
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
@@ -23,6 +24,8 @@ PAYLOAD_BYTES = 1020
 MAX_SEGMENTS = 200
 MAX_JPEG_BYTES = MAX_SEGMENTS * PAYLOAD_BYTES
 COMMAND = 0x08
+
+_FRAME_SEND_LOCK = threading.Lock()
 
 SOI = 0xD8
 EOI = 0xD9
@@ -561,40 +564,45 @@ def send_frame_once(device: HidrawInterface, jpeg: bytes) -> int:
     Returns the number of successful writes. Any failure raises immediately;
     the descriptor is closed by the function's finally block.
     """
-    validate_jpeg(jpeg)
-    segments = build_segments(jpeg)
-    error = device_validation_error(device)
-    if error is not None:
-        raise LcdTransportError(error)
-    if not os.access(device.device_path, os.W_OK):
-        raise PermissionError(
-            "Keine Schreibberechtigung; Rechte wurden nicht verändert"
-        )
-
-    flags = os.O_WRONLY | os.O_NONBLOCK
-    flags |= getattr(os, "O_CLOEXEC", 0)
-    flags |= getattr(os, "O_NOFOLLOW", 0)
-    fd = os.open(device.device_path, flags)
-
-    completed = 0
+    if not _FRAME_SEND_LOCK.acquire(blocking=False):
+        raise LcdTransportError("Ein anderer Frame-Sender ist bereits aktiv")
     try:
-        for segment in segments:
-            validate_open_target(fd, device)
-            validate_transfer_invariants(jpeg, segments)
-            try:
-                written = os.write(fd, segment.hidraw_buffer)
-            except PermissionError:
-                raise
-            except OSError as error:
-                raise LcdTransportError(
-                    f"Write für Segment {segment.index} fehlgeschlagen: {error}"
-                ) from error
-            if written != HIDRAW_WRITE_BYTES:
-                raise LcdTransportError(
-                    f"Short Write bei Segment {segment.index}: "
-                    f"{written} statt {HIDRAW_WRITE_BYTES} Byte; kein Nachsenden"
-                )
-            completed += 1
-        return completed
+        validate_jpeg(jpeg)
+        segments = build_segments(jpeg)
+        error = device_validation_error(device)
+        if error is not None:
+            raise LcdTransportError(error)
+        if not os.access(device.device_path, os.W_OK):
+            raise PermissionError(
+                "Keine Schreibberechtigung; Rechte wurden nicht verändert"
+            )
+
+        flags = os.O_WRONLY | os.O_NONBLOCK
+        flags |= getattr(os, "O_CLOEXEC", 0)
+        flags |= getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(device.device_path, flags)
+
+        completed = 0
+        try:
+            for segment in segments:
+                validate_open_target(fd, device)
+                validate_transfer_invariants(jpeg, segments)
+                try:
+                    written = os.write(fd, segment.hidraw_buffer)
+                except PermissionError:
+                    raise
+                except OSError as error:
+                    raise LcdTransportError(
+                        f"Write für Segment {segment.index} fehlgeschlagen: {error}"
+                    ) from error
+                if written != HIDRAW_WRITE_BYTES:
+                    raise LcdTransportError(
+                        f"Short Write bei Segment {segment.index}: "
+                        f"{written} statt {HIDRAW_WRITE_BYTES} Byte; kein Nachsenden"
+                    )
+                completed += 1
+            return completed
+        finally:
+            os.close(fd)
     finally:
-        os.close(fd)
+        _FRAME_SEND_LOCK.release()
