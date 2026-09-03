@@ -1123,3 +1123,50 @@ GUI-Live-Test mit temporärer Interface-1-Schreibberechtigung, ausgeschlossenem
 Fremdwriter und getrennten Kriterien für Transport, sichtbare Kontinuität,
 Stopverhalten sowie das harte 30-s-/30-Frame-Ende. Daraus folgt weiterhin keine
 Freigabe für andere Intervalle, Animation oder Dauerbetrieb.
+
+### Erster kontrollierter GUI-Hardware-Live-Test 01
+
+Der einmalig freigegebene GUI-Live-Test wurde ausgeführt und anschließend ohne
+zweiten Lauf beendet. Der vollständige Offline-Preflight bestand mit 168 Tests
+und sauberem `git diff --check`. Dynamisch erkannt wurden `/dev/hidraw7` als
+Interface 0 und `/dev/hidraw8` als Interface 1 desselben Geräts
+`0b05:1c7b`. Interface 1 erfüllte sämtliche Production-Gates: Produktname,
+`bcdDevice 0x0049`, Usage `ff06/01`, Input 16 Byte, Output 1024 Byte, keine
+Feature-Reports, korrektes HID-/Endpointprofil und keine konkurrierenden Writer.
+
+Nur Interface 1 wurde temporär von `0640` auf `0660 root:input` gesetzt;
+Interface 0 blieb durchgehend `0640` und effektiv nicht schreibbar. Nach erneut
+bestandenem read-only Preflight und ausdrücklicher menschlicher Freigabe wurde
+die normale GUI gestartet. Bildwahl, Overlayaktivierung,
+Hardware-Livefreigabe, Sessionstart und eine Farbänderung während `running`
+erfolgten ausschließlich manuell.
+
+Die GUI blieb responsiv und zeigte Bild, Temperaturwerte sowie die neue Farbe.
+Auf dem physischen LCD erschien jedoch weder das ausgewählte Bild noch Tctl,
+Tccd1 oder GPU-edge. Das ASUS-Defaultbild lief permanent und ohne beobachtete
+Änderung weiter. Damit sind sichtbarer GUI-Framecommit, sichtbare
+Temperaturupdates und sichtbare Farbaktualisierung für diesen Lauf nicht
+bestätigt. Ob Frames transportseitig ankamen, nicht committed oder sofort vom
+internen Defaultproduzenten überstimmt wurden, bleibt ohne persistentes
+Transportresultat unbekannt.
+
+Der Refreshworker war nach dem Lauf beendet, kein Gerätewriter war mehr offen
+und keine automatische Folgesession startete. Die tatsächliche Framezahl und
+Controllerlaufzeit wurden im GUI-Prozess nicht persistent protokolliert und vor
+dem Schließen nicht abgelesen; belastbar bestätigt sind deshalb nur die harten
+Obergrenzen von 30 vollständigen Frames und 30,0 s, keine erfundenen Istwerte.
+Dieser Beobachtungsmangel wird nicht durch einen zweiten Test kompensiert.
+
+Nach Beendigung der senderlosen GUI wurde die temporäre Berechtigung entfernt.
+Der Postflight bestätigte beide Interfaces wieder als `0640 root:input`, für
+den Benutzer nicht schreibbar, weiterhin ohne konkurrierenden Writer,
+GUI-Prozess oder Hintergrundsession. Interface 0 und `0b05:19af`/OpenRGB wurden
+nicht beschrieben oder verändert. Details:
+`research/reports/gui-first-live-test-01.md`.
+
+Der 30-s-/30-Frame-Entwicklungshardcap darf im nächsten Ticket nicht durch
+normalen Dauerbetrieb ersetzt werden. Vor einem weiteren Live-Test müssen
+zunächst offline persistente Controller-/Transportdiagnostik und eine gezielte
+Auswertung des negativen Sichtbefunds entworfen werden. Andere Intervalle,
+Interface-0-Steuerung, weitere Opcodes, GIF-Liveanimation und Dauerbetrieb
+bleiben nicht freigegeben.
