@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import sys
 import tempfile
 import unittest
@@ -397,13 +398,24 @@ class ImagePipelineOfflineTests(unittest.TestCase):
             top_right=telemetry.MetricValue(
                 telemetry.MetricId.GPU_USAGE, "GPU", 82.0, "%"
             ),
-            bottom_center=None,
+            bottom_left=None,
+            bottom_right=telemetry.MetricValue(
+                telemetry.MetricId.GPU_TEMPERATURE,
+                "GPU Temperatur",
+                52.0,
+                "°C",
+            ),
         )
         placements = image_pipeline.layout_data_overlay(
             slots, image_pipeline.TemperatureOverlayConfig(enabled=True)
         )
-        self.assertEqual([item.sensor for item in placements], ["top_left", "top_right"])
-        self.assertEqual([item.value_text for item in placements], ["17 %", "82 %"])
+        self.assertEqual(
+            [item.sensor for item in placements],
+            ["top_left", "top_right", "bottom_right"],
+        )
+        self.assertEqual(
+            [item.value_text for item in placements], ["17 %", "82 %", "52 °C"]
+        )
 
         missing = image_pipeline.layout_data_overlay(
             image_pipeline.OverlaySlots(
@@ -414,6 +426,62 @@ class ImagePipelineOfflineTests(unittest.TestCase):
             image_pipeline.TemperatureOverlayConfig(enabled=True),
         )
         self.assertEqual(missing[0].value_text, "—")
+
+    def test_four_slot_grid_is_symmetric_nonoverlapping_and_round_safe(self) -> None:
+        import telemetry
+
+        metrics = tuple(
+            telemetry.MetricValue(metric_id, label, value, unit)
+            for metric_id, label, value, unit in (
+                (telemetry.MetricId.CPU_USAGE, "CPU", 17.0, "%"),
+                (telemetry.MetricId.GPU_USAGE, "GPU", 82.0, "%"),
+                (telemetry.MetricId.CPU_PACKAGE, "CPU Package", 47.0, "°C"),
+                (
+                    telemetry.MetricId.GPU_TEMPERATURE,
+                    "GPU Temperatur",
+                    52.0,
+                    "°C",
+                ),
+            )
+        )
+        placements = image_pipeline.layout_data_overlay(
+            image_pipeline.OverlaySlots(*metrics),
+            image_pipeline.TemperatureOverlayConfig(enabled=True),
+        )
+        self.assertEqual(
+            [item.sensor for item in placements],
+            ["top_left", "top_right", "bottom_left", "bottom_right"],
+        )
+        self.assertEqual(
+            [item.center for item in placements],
+            [(108, 110), (212, 110), (108, 242), (212, 242)],
+        )
+        for index, first in enumerate(placements):
+            for second in placements[index + 1 :]:
+                horizontal_gap = max(
+                    first.bounds[0], second.bounds[0]
+                ) - min(first.bounds[2], second.bounds[2])
+                vertical_gap = max(
+                    first.bounds[1], second.bounds[1]
+                ) - min(first.bounds[3], second.bounds[3])
+                self.assertTrue(horizontal_gap >= 0 or vertical_gap >= 0)
+            for x in (first.bounds[0], first.bounds[2]):
+                for y in (first.bounds[1], first.bounds[3]):
+                    self.assertLessEqual(
+                        math.hypot(x - 160, y - 160),
+                        image_pipeline.OVERLAY_ROUND_SAFE_RADIUS,
+                    )
+        slot_names = ("top_left", "top_right", "bottom_left", "bottom_right")
+        for disabled in slot_names:
+            with self.subTest(disabled=disabled):
+                slot_values = dict(zip(slot_names, metrics, strict=True))
+                slot_values[disabled] = None
+                visible = image_pipeline.layout_data_overlay(
+                    image_pipeline.OverlaySlots(**slot_values),
+                    image_pipeline.TemperatureOverlayConfig(enabled=True),
+                )
+                self.assertEqual(len(visible), 3)
+                self.assertNotIn(disabled, {item.sensor for item in visible})
 
     def test_overlay_is_composed_before_rotation_and_jpeg_validation(self) -> None:
         import telemetry
@@ -436,6 +504,58 @@ class ImagePipelineOfflineTests(unittest.TestCase):
         )
         self.assertEqual(info, image_pipeline.lcd_transport.validate_jpeg(jpeg))
         self.assertEqual(jpeg, image_pipeline._encode_jpeg(rotated))
+
+    def test_asymmetric_base_and_all_four_overlays_rotate_once_together(self) -> None:
+        import telemetry
+
+        base = Image.new("RGB", (320, 320), "black")
+        draw = image_pipeline.ImageDraw.Draw(base)
+        draw.rectangle((12, 12, 52, 52), fill="#ff0000")
+        draw.rectangle((268, 268, 308, 308), fill="#0000ff")
+        slots = image_pipeline.OverlaySlots(
+            *(
+                telemetry.MetricValue(metric_id, label, value, unit)
+                for metric_id, label, value, unit in (
+                    (telemetry.MetricId.CPU_USAGE, "CPU", 11.0, "%"),
+                    (telemetry.MetricId.GPU_USAGE, "GPU", 22.0, "%"),
+                    (telemetry.MetricId.CPU_PACKAGE, "CPU Package", 33.0, "°C"),
+                    (
+                        telemetry.MetricId.GPU_TEMPERATURE,
+                        "GPU Temperatur",
+                        44.0,
+                        "°C",
+                    ),
+                )
+            )
+        )
+        config = image_pipeline.TemperatureOverlayConfig(enabled=True)
+        unrotated = image_pipeline.render_data_overlay(base, slots, config)
+        operations = {
+            0: None,
+            90: Image.Transpose.ROTATE_270,
+            180: Image.Transpose.ROTATE_180,
+            270: Image.Transpose.ROTATE_90,
+        }
+        for rotation, operation in operations.items():
+            with self.subTest(rotation=rotation):
+                expected = (
+                    unrotated.copy()
+                    if operation is None
+                    else unrotated.transpose(operation)
+                )
+                final = image_pipeline.compose_lcd_frame(
+                    base.tobytes(),
+                    config,
+                    image_pipeline.TemperatureOverlayValues(),
+                    overlay_slots=slots,
+                    rotation_degrees=rotation,
+                )
+                self.assertEqual(final.tobytes(), expected.tobytes())
+                self.assertEqual(final.size, (320, 320))
+                self.assertEqual(
+                    image_pipeline._encode_jpeg(final),
+                    image_pipeline._encode_jpeg(expected),
+                )
 
     def test_exif_orientation_is_applied_before_scaling(self) -> None:
         exif = Image.Exif()

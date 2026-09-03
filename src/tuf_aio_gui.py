@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Callable, Protocol
 
 from PySide6.QtCore import QSettings, QTimer, Qt
-from PySide6.QtGui import QColor, QCloseEvent, QImageReader, QPixmap, QResizeEvent
+from PySide6.QtGui import QColor, QCloseEvent, QPixmap, QResizeEvent
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -59,9 +59,10 @@ OVERLAY_COLOR_SETTING = "lcd_temperature_overlay/color"
 ROTATION_SETTING = "lcd_output/rotation_degrees"
 SLOT_SETTING_PREFIX = "lcd_data_slots"
 SLOT_DEFAULTS = {
-    "top_left": telemetry.MetricId.CPU_PACKAGE,
-    "top_right": telemetry.MetricId.GPU_TEMPERATURE,
-    "bottom_center": telemetry.MetricId.CPU_CCD,
+    "top_left": telemetry.MetricId.CPU_USAGE,
+    "top_right": telemetry.MetricId.GPU_USAGE,
+    "bottom_left": telemetry.MetricId.CPU_PACKAGE,
+    "bottom_right": telemetry.MetricId.GPU_TEMPERATURE,
 }
 
 
@@ -108,13 +109,7 @@ class MainWindow(QMainWindow):
             self._settings.value(ROTATION_SETTING, 0)
         )
         self._settings.setValue(ROTATION_SETTING, self._rotation_degrees)
-        self._slot_metric_ids = {
-            slot: telemetry.parse_metric_id(
-                self._settings.value(f"{SLOT_SETTING_PREFIX}/{slot}", default.value),
-                default,
-            )
-            for slot, default in SLOT_DEFAULTS.items()
-        }
+        self._slot_metric_ids = self._read_slot_settings()
         for slot, metric_id in self._slot_metric_ids.items():
             self._settings.setValue(f"{SLOT_SETTING_PREFIX}/{slot}", metric_id.value)
         self._settings.sync()
@@ -122,7 +117,6 @@ class MainWindow(QMainWindow):
         self._selected_path: Path | None = None
         self._prepared: image_pipeline.PreparedImage | None = None
         self._device_ready = False
-        self._original_pixmap: QPixmap | None = None
         self._final_pixmap: QPixmap | None = None
         self._refresh_state = GuiRefreshState.IDLE
         self._frame_buffer: lcd_refresh.LatestFrameBuffer | None = None
@@ -216,14 +210,10 @@ class MainWindow(QMainWindow):
         preview_grid = QGridLayout(previews)
         preview_grid.setContentsMargins(18, 18, 18, 18)
         preview_grid.setHorizontalSpacing(18)
-        preview_grid.addWidget(self._preview_title("Original"), 0, 0)
-        preview_grid.addWidget(self._preview_title("LCD-Ausgabe 320×320"), 0, 1)
-        self.original_preview = self._preview_label("Noch kein Bild ausgewählt")
+        preview_grid.addWidget(self._preview_title("LCD-Ausgabe 320×320"), 0, 0)
         self.final_preview = self._preview_label("Noch keine Ausgabe erzeugt")
-        preview_grid.addWidget(self.original_preview, 1, 0)
-        preview_grid.addWidget(self.final_preview, 1, 1)
+        preview_grid.addWidget(self.final_preview, 1, 0)
         preview_grid.setColumnStretch(0, 1)
-        preview_grid.setColumnStretch(1, 1)
         outer.addWidget(previews, 1)
 
         options = QFrame()
@@ -260,10 +250,13 @@ class MainWindow(QMainWindow):
         slot_labels = {
             "top_left": "Oben links",
             "top_right": "Oben rechts",
-            "bottom_center": "Unten Mitte",
+            "bottom_left": "Unten links",
+            "bottom_right": "Unten rechts",
         }
         for column, (slot, label) in enumerate(slot_labels.items()):
-            slots_layout.addWidget(QLabel(label), 1, column)
+            row = 1 + (column // 2) * 2
+            grid_column = column % 2
+            slots_layout.addWidget(QLabel(label), row, grid_column)
             combo = QComboBox()
             for definition in telemetry.METRIC_DEFINITIONS:
                 combo.addItem(definition.display_label, definition.metric_id.value)
@@ -274,8 +267,8 @@ class MainWindow(QMainWindow):
                     selected_slot
                 )
             )
-            slots_layout.addWidget(combo, 2, column)
-            slots_layout.setColumnStretch(column, 1)
+            slots_layout.addWidget(combo, row + 1, grid_column)
+            slots_layout.setColumnStretch(grid_column, 1)
             self.slot_combos[slot] = combo
         outer.addWidget(slots_card)
 
@@ -410,6 +403,22 @@ class MainWindow(QMainWindow):
             return value.casefold() in {"1", "true", "yes", "on"}
         return False
 
+    def _read_slot_settings(self) -> dict[str, telemetry.MetricId]:
+        values: dict[str, telemetry.MetricId] = {}
+        for slot, default in SLOT_DEFAULTS.items():
+            key = f"{SLOT_SETTING_PREFIX}/{slot}"
+            if slot == "bottom_left" and not self._settings.contains(key):
+                legacy_key = f"{SLOT_SETTING_PREFIX}/bottom_center"
+                raw = (
+                    self._settings.value(legacy_key)
+                    if self._settings.contains(legacy_key)
+                    else default.value
+                )
+            else:
+                raw = self._settings.value(key, default.value)
+            values[slot] = telemetry.parse_metric_id(raw, default)
+        return values
+
     def _overlay_config(self) -> image_pipeline.TemperatureOverlayConfig:
         return image_pipeline.TemperatureOverlayConfig(
             enabled=self._overlay_enabled,
@@ -449,7 +458,8 @@ class MainWindow(QMainWindow):
         return image_pipeline.OverlaySlots(
             top_left=selected("top_left"),
             top_right=selected("top_right"),
-            bottom_center=selected("bottom_center"),
+            bottom_left=selected("bottom_left"),
+            bottom_right=selected("bottom_right"),
         )
 
     def _visible_metric_signature(
@@ -458,7 +468,12 @@ class MainWindow(QMainWindow):
         slots = self._overlay_slots(snapshot)
         return tuple(
             None if metric is None else (metric.metric_id.value, metric.display_value)
-            for metric in (slots.top_left, slots.top_right, slots.bottom_center)
+            for metric in (
+                slots.top_left,
+                slots.top_right,
+                slots.bottom_left,
+                slots.bottom_right,
+            )
         )
 
     def _slot_selection_changed(self, slot: str) -> None:
@@ -636,10 +651,7 @@ class MainWindow(QMainWindow):
             return False
         resolved = path.expanduser().resolve()
         self.path_value.setText(str(resolved))
-        preview_size = self._load_original_preview(resolved)
-        self.original_size_value.setText(
-            f"{preview_size[0]}×{preview_size[1]}" if preview_size else "unbekannt"
-        )
+        self.original_size_value.setText("wird ermittelt …")
         previous_prepared = self._prepared
         if self._refresh_state is GuiRefreshState.IDLE:
             self._prepared = None
@@ -743,19 +755,6 @@ class MainWindow(QMainWindow):
             "Status: Frame-Aktualisierung fehlgeschlagen – letzter gültiger "
             f"Frame bleibt aktiv: {error}"
         )
-
-    def _load_original_preview(self, path: Path) -> tuple[int, int] | None:
-        reader = QImageReader(str(path))
-        reader.setAutoTransform(True)
-        image = reader.read()  # For GIF this reads only frame 0; no QMovie is used.
-        if image.isNull():
-            self._original_pixmap = None
-            self.original_preview.setPixmap(QPixmap())
-            self.original_preview.setText("Keine Originalvorschau verfügbar")
-            return None
-        self._original_pixmap = QPixmap.fromImage(image)
-        self._update_scaled_preview(self.original_preview, self._original_pixmap)
-        return image.width(), image.height()
 
     def _load_final_preview(self, jpeg: bytes) -> None:
         pixmap = QPixmap()
@@ -960,7 +959,6 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802 - Qt API
         super().resizeEvent(event)
-        self._update_scaled_preview(self.original_preview, self._original_pixmap)
         self._update_scaled_preview(self.final_preview, self._final_pixmap)
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802 - Qt API

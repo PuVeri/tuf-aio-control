@@ -264,7 +264,6 @@ class TufAioGuiOfflineTests(unittest.TestCase):
             self.assertEqual(window.output_size_value.text(), "320×320")
             self.assertEqual(window.segments_value.text(), "3")
             self.assertIn("ASUS-JPEG-Validator: PASS", window.validation_value.text())
-            self.assertIsNotNone(window._original_pixmap)
             self.assertIsNotNone(window._final_pixmap)
         finally:
             window.close()
@@ -348,9 +347,16 @@ class TufAioGuiOfflineTests(unittest.TestCase):
     def test_rotation_cycles_persists_and_preview_matches_final_jpeg(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "settings.ini"
-            window = self._window(settings=self._settings(path))
+            settings = self._settings(path)
+            settings.setValue(tuf_aio_gui.OVERLAY_ENABLED_SETTING, True)
+            source_path = Path(directory) / "asymmetric.png"
+            source = Image.new("RGB", (320, 320), "black")
+            source.paste("red", (10, 10, 60, 60))
+            source.paste("blue", (260, 260, 310, 310))
+            source.save(source_path)
+            window = self._window(settings=settings)
             try:
-                self.assertTrue(window.load_image(REFERENCE_PATH))
+                self.assertTrue(window.load_image(source_path))
                 observed = []
                 for _ in range(4):
                     window.rotation_button.click()
@@ -407,7 +413,8 @@ class TufAioGuiOfflineTests(unittest.TestCase):
                 selections = {
                     "top_left": telemetry.MetricId.CPU_USAGE,
                     "top_right": telemetry.MetricId.GPU_USAGE,
-                    "bottom_center": telemetry.MetricId.OFF,
+                    "bottom_left": telemetry.MetricId.CPU_CCD,
+                    "bottom_right": telemetry.MetricId.OFF,
                 }
                 for slot, metric_id in selections.items():
                     combo = window.slot_combos[slot]
@@ -431,10 +438,48 @@ class TufAioGuiOfflineTests(unittest.TestCase):
             try:
                 self.assertIs(
                     fallback._slot_metric_ids["top_right"],
-                    telemetry.MetricId.GPU_TEMPERATURE,
+                    telemetry.MetricId.GPU_USAGE,
                 )
             finally:
                 fallback.close()
+
+    def test_legacy_three_slot_settings_migrate_without_losing_valid_values(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "settings.ini"
+            settings = self._settings(path)
+            settings.setValue(
+                f"{tuf_aio_gui.SLOT_SETTING_PREFIX}/top_left",
+                telemetry.MetricId.GPU_MEMORY.value,
+            )
+            settings.setValue(
+                f"{tuf_aio_gui.SLOT_SETTING_PREFIX}/top_right",
+                telemetry.MetricId.OFF.value,
+            )
+            settings.setValue(
+                f"{tuf_aio_gui.SLOT_SETTING_PREFIX}/bottom_center",
+                telemetry.MetricId.CPU_CCD.value,
+            )
+            settings.sync()
+
+            window = self._window(settings=self._settings(path))
+            try:
+                self.assertEqual(
+                    window._slot_metric_ids,
+                    {
+                        "top_left": telemetry.MetricId.GPU_MEMORY,
+                        "top_right": telemetry.MetricId.OFF,
+                        "bottom_left": telemetry.MetricId.CPU_CCD,
+                        "bottom_right": telemetry.MetricId.GPU_TEMPERATURE,
+                    },
+                )
+                self.assertEqual(
+                    window._settings.value(
+                        f"{tuf_aio_gui.SLOT_SETTING_PREFIX}/bottom_left"
+                    ),
+                    telemetry.MetricId.CPU_CCD.value,
+                )
+            finally:
+                window.close()
 
     def test_invalid_saved_color_falls_back_to_persisted_white(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -525,7 +570,11 @@ class TufAioGuiOfflineTests(unittest.TestCase):
             telemetry.MetricId.OFF.value,
         )
         settings.setValue(
-            f"{tuf_aio_gui.SLOT_SETTING_PREFIX}/bottom_center",
+            f"{tuf_aio_gui.SLOT_SETTING_PREFIX}/bottom_left",
+            telemetry.MetricId.OFF.value,
+        )
+        settings.setValue(
+            f"{tuf_aio_gui.SLOT_SETTING_PREFIX}/bottom_right",
             telemetry.MetricId.OFF.value,
         )
         window = self._window(
@@ -901,7 +950,9 @@ class TufAioGuiOfflineTests(unittest.TestCase):
 
                 generation = source.snapshot().generation
                 combo = window.slot_combos["top_left"]
-                combo.setCurrentIndex(combo.findData(telemetry.MetricId.CPU_USAGE.value))
+                combo.setCurrentIndex(
+                    combo.findData(telemetry.MetricId.GPU_MEMORY.value)
+                )
                 self.assertEqual(source.snapshot().generation, generation + 1)
                 self.assertIs(window._refresh_controller, controller)
 

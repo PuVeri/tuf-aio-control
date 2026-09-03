@@ -99,7 +99,8 @@ class TemperatureOverlayValues:
 class OverlaySlots:
     top_left: telemetry.MetricValue | None = None
     top_right: telemetry.MetricValue | None = None
-    bottom_center: telemetry.MetricValue | None = None
+    bottom_left: telemetry.MetricValue | None = None
+    bottom_right: telemetry.MetricValue | None = None
 
 
 @dataclass(frozen=True)
@@ -348,17 +349,24 @@ def layout_data_overlay(
     slots: OverlaySlots,
     config: TemperatureOverlayConfig,
 ) -> tuple[TemperatureOverlayPlacement, ...]:
-    """Lay out arbitrary metrics at the three stable logical LCD positions."""
+    """Lay out arbitrary metrics in a symmetric round-safe 2x2 grid."""
     canvas = Image.new("RGB", OUTPUT_SIZE)
     draw = ImageDraw.Draw(canvas)
     specs = (
-        ("top_left", slots.top_left, (102, 66), (102, 100), config.colors.cpu_package),
-        ("top_right", slots.top_right, (218, 66), (218, 100), config.colors.gpu),
+        ("top_left", slots.top_left, (108, 78), (108, 110), config.colors.cpu_package),
+        ("top_right", slots.top_right, (212, 78), (212, 110), config.colors.gpu),
         (
-            "bottom_center",
-            slots.bottom_center,
-            (160, 216),
-            (160, 250),
+            "bottom_left",
+            slots.bottom_left,
+            (108, 210),
+            (108, 242),
+            config.colors.cpu_ccd,
+        ),
+        (
+            "bottom_right",
+            slots.bottom_right,
+            (212, 210),
+            (212, 242),
             config.colors.cpu_ccd,
         ),
     )
@@ -373,7 +381,7 @@ def layout_data_overlay(
             label,
             preferred_size=OVERLAY_LABEL_PREFERRED_SIZE,
             minimum_size=OVERLAY_LABEL_MINIMUM_SIZE,
-            maximum_width=106,
+            maximum_width=100,
             role="label",
         )
         value_font = _fit_font(
@@ -381,7 +389,7 @@ def layout_data_overlay(
             value_text,
             preferred_size=OVERLAY_VALUE_PREFERRED_SIZE,
             minimum_size=OVERLAY_VALUE_MINIMUM_SIZE,
-            maximum_width=114,
+            maximum_width=100,
             role="value",
         )
         label_bounds = draw.textbbox(
@@ -443,7 +451,7 @@ def render_data_overlay(
             placement.label,
             preferred_size=OVERLAY_LABEL_PREFERRED_SIZE,
             minimum_size=OVERLAY_LABEL_MINIMUM_SIZE,
-            maximum_width=106,
+            maximum_width=100,
             role="label",
         )
         value_font = _fit_font(
@@ -451,7 +459,7 @@ def render_data_overlay(
             placement.value_text,
             preferred_size=OVERLAY_VALUE_PREFERRED_SIZE,
             minimum_size=OVERLAY_VALUE_MINIMUM_SIZE,
-            maximum_width=114,
+            maximum_width=100,
             role="value",
         )
         draw.text(
@@ -539,16 +547,13 @@ def _encode_and_validate_frame(
     overlay_slots: OverlaySlots | None = None,
     rotation_degrees: object = 0,
 ) -> tuple[bytes, lcd_transport.JpegInfo]:
-    expected_length = OUTPUT_SIZE[0] * OUTPUT_SIZE[1] * 3
-    if len(base_rgb_bytes) != expected_length:
-        raise ImagePipelineError("Ungültiger interner 320×320-RGB-Basispuffer")
-    base_image = Image.frombytes("RGB", OUTPUT_SIZE, base_rgb_bytes)
-    final_image = (
-        render_temperature_overlay(base_image, temperatures, overlay_config)
-        if overlay_slots is None
-        else render_data_overlay(base_image, overlay_slots, overlay_config)
+    final_image = compose_lcd_frame(
+        base_rgb_bytes,
+        overlay_config,
+        temperatures,
+        overlay_slots=overlay_slots,
+        rotation_degrees=rotation_degrees,
     )
-    final_image = rotate_composition(final_image, rotation_degrees)
     try:
         jpeg_bytes = _encode_jpeg(final_image)
     except OSError as error:
@@ -561,6 +566,27 @@ def _encode_and_validate_frame(
             f"Erzeugtes JPEG verletzt den ASUS-Transportvertrag: {error}"
         ) from error
     return jpeg_bytes, jpeg_info
+
+
+def compose_lcd_frame(
+    base_rgb_bytes: bytes,
+    overlay_config: TemperatureOverlayConfig,
+    temperatures: TemperatureOverlayValues,
+    *,
+    overlay_slots: OverlaySlots | None = None,
+    rotation_degrees: object = 0,
+) -> Image.Image:
+    """Build the one final RGB frame shared by LCD JPEG and GUI preview."""
+    expected_length = OUTPUT_SIZE[0] * OUTPUT_SIZE[1] * 3
+    if len(base_rgb_bytes) != expected_length:
+        raise ImagePipelineError("Ungültiger interner 320×320-RGB-Basispuffer")
+    base_image = Image.frombytes("RGB", OUTPUT_SIZE, base_rgb_bytes)
+    composed = (
+        render_temperature_overlay(base_image, temperatures, overlay_config)
+        if overlay_slots is None
+        else render_data_overlay(base_image, overlay_slots, overlay_config)
+    )
+    return rotate_composition(composed, rotation_degrees)
 
 
 def _prepare_frame(

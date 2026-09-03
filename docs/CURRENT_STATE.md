@@ -1209,20 +1209,30 @@ Workerende und Handle-Close nach Prozessende ausgewertet werden. Der
 
 ### Konfigurierbare LCD-Telemetrie und Rotation
 
-Die GUI rotiert nun die vollständige fertige 320×320-Komposition per Button im
-Uhrzeigersinn durch 0°, 90°, 180° und 270°. Basisbild, Datenoverlay, Labels und
-Werte drehen gemeinsam; erst danach folgen JPEG-Encoding und bestehende
-Validierung. Preview und späterer `LatestFrameBuffer`-Snapshot verwenden
-dieselben Bytes. Winkel, Overlayfarbe/-zustand und die drei Slotbelegungen
-werden in `QSettings` persistiert; ungültige Winkel fallen auf 0°, unbekannte
-Metric-IDs auf den jeweiligen Slotdefault zurück.
+Die GUI rotiert die vollständige fertige 320×320-Komposition per Button im
+Uhrzeigersinn durch 0°, 90°, 180° und 270°. Der eindeutige Renderpfad ist nun
+in `compose_lcd_frame()` zusammengefasst: ungedrehtes 320×320-Basisbild,
+Datenoverlay, einmalige Rotation der gesamten RGB-Komposition, JPEG-Encoding
+und bestehende Validierung. Die separate ungedrehte Originalvorschau wurde
+entfernt; die einzige LCD-Preview decodiert exakt dieselben JPEG-Bytes wie der
+spätere `LatestFrameBuffer`-Snapshot. Asymmetrische Pixeltests bestätigen
+Hintergrund und vier Overlayblöcke gemeinsam und ohne Doppelrotation.
 
-Die drei logischen Positionen oben links, oben rechts und unten Mitte besitzen
-unabhängige Dropdowns. Das allgemeine ID-basierte Metric-Modell bietet CPU- und
-GPU-Auslastung, CPU Package/Tctl, CPU CCD/Tccd1, GPU edge, junction/hotspot,
-mem sowie `Aus`. Fehlende Werte erscheinen als `—`, Lastwerte mit `%` und
-Temperaturen mit `°C`. Der Renderer arbeitet nur mit Metric-Daten und muss für
-spätere RAM-, Lüfter- oder NVMe-Metriken nicht umgebaut werden.
+Das konfigurierbare Overlay besitzt jetzt ein symmetrisches 2×2-Layout mit
+oben links, oben rechts, unten links und unten rechts. Alle vier Positionen
+haben unabhängige Dropdowns und geprüfte, nicht überlappende Grenzen innerhalb
+des runden Sicherheitsbereichs. Neue Defaults sind CPU-Auslastung,
+GPU-Auslastung, CPU Package/Tctl und GPU edge. Das allgemeine ID-basierte
+Metric-Modell bietet außerdem CPU CCD/Tccd1, junction/hotspot, mem sowie `Aus`.
+Fehlende Werte erscheinen als `—`, Lastwerte mit `%` und Temperaturen mit
+`°C`.
+
+Winkel, Overlayfarbe/-zustand und alle vier Slotbelegungen werden in
+`QSettings` persistiert. Bei alten Drei-Slot-Einstellungen bleiben gültige
+Werte für oben links und oben rechts erhalten; `bottom_center` wird nach
+unten links migriert und der neue Slot unten rechts erhält den sicheren
+GPU-Temperatur-Default. Ungültige IDs fallen auf den jeweiligen neuen Default
+zurück.
 
 Gesamt-CPU-Last wird ohne Sleep aus zwei aufeinanderfolgenden `/proc/stat`-
 Samples berechnet. GPU-Last kommt read-only aus `gpu_busy_percent` am dynamisch
@@ -1239,7 +1249,7 @@ standardmäßig ausgeschaltete Entwicklungs-Hardwarefreigabe bleiben bestehen;
 deren späterer Cleanup wird zusammen mit der Dauerbetriebspolitik geprüft.
 Der 30-s-/30-Frame-Hardcap blieb unverändert.
 
-Die vollständige Offline-Suite bestand mit 185 Tests; `git diff --check` und
+Die vollständige Offline-Suite bestand mit 188 Tests; `git diff --check` und
 `compileall` waren sauber. Kein hidraw-Open, kein HID-/USB-Write und kein
 Live-Test fanden statt. Details:
 `research/reports/lcd-configurable-telemetry.md`.
