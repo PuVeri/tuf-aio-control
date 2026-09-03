@@ -452,6 +452,7 @@ class FixedRuntimeTests(unittest.TestCase):
             SRC_ROOT / "lcd_transport.py",
             SRC_ROOT / "lcd_refresh.py",
             SRC_ROOT / "test_lcd_refresh.py",
+            SRC_ROOT / "test_lcd_refresh_fallback.py",
         }
         for path in sorted(refresh_path):
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))

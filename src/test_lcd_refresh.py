@@ -262,6 +262,11 @@ class LoggedPreparedSender:
         self._clock = clock
         self._epoch = clock()
         self._next_frame = 0
+        self._last_completed_at: float | None = None
+
+    @property
+    def last_completed_at(self) -> float | None:
+        return self._last_completed_at
 
     def __call__(self, jpeg: bytes) -> int:
         if jpeg is not self._prepared.jpeg:
@@ -298,7 +303,9 @@ class LoggedPreparedSender:
                 file=sys.stderr,
             )
             raise
-        duration = max(0.0, self._clock() - started)
+        completed_at = self._clock()
+        duration = max(0.0, completed_at - started)
+        self._last_completed_at = completed_at
         print(
             f"Frame {frame_number}: Dauer {duration:.6f} s, "
             f"Writes {writes}/{EXPECTED_SEGMENTS}, Ergebnis vollständig"

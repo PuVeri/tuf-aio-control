@@ -841,6 +841,42 @@ zuverlässige Persistenzrate ist.
 In diesem Dokumentationsticket gab es keine weitere Gerätekommunikation und
 keinen weiteren HID-Write.
 
+## Vorbereiteter Fallback-Zeitmesstest
+
+Der zweite, weiterhin fest begrenzte Live-Einstieg ist offline vorbereitet;
+Design und Evidenzgrenzen stehen in
+`research/reports/lcd-refresh-fallback-timing-test-design.md`. In diesem
+Vorbereitungsticket gab es keine Gerätekommunikation, keinen hidraw-Open,
+keinen HID-Write und keinen neuen Live-Test.
+
+`src/test_lcd_refresh_fallback.py` übernimmt das real bewährte Profil
+unverändert: eingefrorenes 2236-Byte-Referenz-JPEG mit festem SHA-256,
+`N=3`, exakt fünf Frames, 1,0 s zwischen Frame-Startzeitpunkten, maximal
+6,0 s und 15 vollständige Writes. Sämtliche Identitäts-, Descriptor-,
+Endpoint-, Versions-, Referenz- und Konkurrenz-Gates bleiben erhalten. Es
+gibt weiterhin keinen Retry, Catch-up, Recovery-, Interface-0- oder IN-Pfad
+und im erreichbaren Refreshpfad genau eine `os.write()`-Quelltextstelle.
+
+Nach erfolgreicher Rückkehr von Frame 5 ist dessen per Frame geöffnetes
+Devicehandle bereits geschlossen. Erst nach vollständigem Ende des
+Controllers beginnt eine höchstens 20 Sekunden lange, rein passive
+Enter-Beobachtung. `time.monotonic()` erfasst `t_start`, den Abschlusszeitpunkt
+des fünften Frames `t_last` und eine manuelle Fallbackmeldung; ausgegeben
+werden die Zeiten seit Teststart und seit `t_last`. Ohne Meldung wird nur
+festgehalten, dass innerhalb von 20 Sekunden kein Fallback beobachtet wurde.
+Nach Frame 5 finden absolut keine weiteren Writes statt.
+
+Sieben zusätzliche Offline-Tests prüfen Reihenfolge und Handle-Close, den
+gerätefreien Beobachtungspfad, monotone Differenzen, exakten 20-s-Timeout,
+fehlende Writes nach Frame 5 sowie das unveränderte Transportprofil. Die
+vollständige gemockte Suite umfasst nun 116 erfolgreiche Tests.
+
+Der spätere Lauf muss Transporterfolg, sichtbares Referenzbild,
+Default-Unterdrückung während der aktiven Phase und gemessene Fallbackzeit
+weiterhin strikt getrennt dokumentieren. Der Test ist für eine gesonderte
+Autorisierung vorbereitet, aber noch nicht ausgeführt. Andere Intervalle,
+Bilder oder Laufzeiten bleiben nicht freigegeben.
+
 ## Gefährliche und ausgeschlossene Pfade
 
 - `0x88`: SPI-Lesen und bedingtes SPI-Schreiben bei `0x21000`.
