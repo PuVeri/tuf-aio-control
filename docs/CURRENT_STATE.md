@@ -1,5 +1,19 @@
 # Aktueller Projektstand
 
+## CURRENT LIVE HARDWARE STATE
+
+Kanonischer Live-Stand vom 2026-09-03:
+
+- `0x87` wurde auf dem realen Gerät getestet und lieferte `0x0049`.
+- Ein eigener Interface-1-`0x08`-JPEG-Transfer wurde real erfolgreich
+  ausgeführt; das JPEG erschien sichtbar auf dem physischen LCD.
+- Linux-hidraw-Framing, Segmentierung, Nullpadding und sichtbarer JPEG-Commit
+  sind damit für das reale v49-Gerät empirisch bestätigt.
+- UI und Bildpipeline wurden real benutzt. Ein GIF wurde über die Pipeline
+  gesendet; dessen erstes Frame erschien erfolgreich als Standbild auf dem LCD.
+- Danach ersetzte die AIO das Standbild wieder durch ihr ASUS-Standardbild.
+- Echte GIF-Animation ist weder implementiert noch empirisch bestätigt.
+
 Stand: 2026-09-02
 
 ## Ziel und Grenze
