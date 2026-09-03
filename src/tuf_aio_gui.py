@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
 )
 
 import image_pipeline
+import gui_refresh_factory
 import lcd_refresh
 import lcd_transport as transport
 import system_sensors
@@ -142,8 +143,15 @@ class MainWindow(QMainWindow):
         device_text.addWidget(self.device_detail_label)
         self.refresh_button = QPushButton("Gerät aktualisieren")
         self.refresh_button.clicked.connect(self.refresh_device_status)
+        self.hardware_live_checkbox = QCheckBox("Hardware-Livebetrieb freigeben")
+        self.hardware_live_checkbox.setChecked(False)
+        self.hardware_live_checkbox.setToolTip(
+            "Entwicklungsfreigabe für reale HID-Writes; standardmäßig aus"
+        )
+        self.hardware_live_checkbox.toggled.connect(self._apply_refresh_state)
         device_layout.addWidget(self.device_dot)
         device_layout.addLayout(device_text, 1)
+        device_layout.addWidget(self.hardware_live_checkbox)
         device_layout.addWidget(self.refresh_button)
         outer.addWidget(device_card)
 
@@ -671,15 +679,21 @@ class MainWindow(QMainWindow):
         self.overlay_checkbox.setEnabled(editable)
         self.overlay_color_button.setEnabled(editable)
         self.refresh_button.setEnabled(editable)
+        self.hardware_live_checkbox.setEnabled(
+            self._refresh_state is GuiRefreshState.IDLE
+        )
         self.send_button.setEnabled(
             self._refresh_state is GuiRefreshState.IDLE
             and self._prepared is not None
             and self._device_ready
+            and self.hardware_live_checkbox.isChecked()
         )
         self.start_lcd_button.setEnabled(
             self._refresh_state is GuiRefreshState.IDLE
             and self._prepared is not None
+            and self._device_ready
             and self._controller_factory is not None
+            and self.hardware_live_checkbox.isChecked()
         )
         self.stop_lcd_button.setEnabled(
             self._refresh_state is GuiRefreshState.RUNNING
@@ -707,6 +721,12 @@ class MainWindow(QMainWindow):
             return
         if self._prepared is None:
             self.status_label.setText("Status: LCD-Start benötigt einen gültigen Frame")
+            self._apply_refresh_state()
+            return
+        if not self.hardware_live_checkbox.isChecked():
+            self.status_label.setText(
+                "Status: Hardware-Livebetrieb muss ausdrücklich freigegeben werden"
+            )
             self._apply_refresh_state()
             return
         if self._controller_factory is None:
@@ -802,6 +822,11 @@ class MainWindow(QMainWindow):
 
     def send_selected_image(self) -> None:
         """Revalidate the prepared JPEG and request exactly one existing transfer."""
+        if not self.hardware_live_checkbox.isChecked():
+            self._show_send_error(
+                "Hardware-Livebetrieb muss ausdrücklich freigegeben werden."
+            )
+            return
         if self._prepared is None:
             self._show_send_error("Kein validiertes Ausgabebild vorhanden.")
             return
@@ -860,7 +885,9 @@ class MainWindow(QMainWindow):
 
 def main() -> int:
     app = QApplication(sys.argv)
-    window = MainWindow()
+    window = MainWindow(
+        controller_factory=gui_refresh_factory.ProductionControllerFactory()
+    )
     window.show()
     return app.exec()
 

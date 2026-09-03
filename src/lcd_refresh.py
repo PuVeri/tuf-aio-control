@@ -187,12 +187,19 @@ class RefreshResult:
 
 @dataclass(frozen=True)
 class HidrawFrameSender:
-    """Future device adapter; each call retains send_frame_once's finally-close."""
+    """Device adapter; each call retains send_frame_once's finally-close."""
 
     device: lcd_transport.HidrawInterface
+    extra_validator: lcd_transport.DeviceValidator | None = None
 
     def __call__(self, jpeg: bytes) -> int:
-        return lcd_transport.send_frame_once(self.device, jpeg)
+        if self.extra_validator is None:
+            return lcd_transport.send_frame_once(self.device, jpeg)
+        return lcd_transport.send_frame_once(
+            self.device,
+            jpeg,
+            extra_validator=self.extra_validator,
+        )
 
 
 _ACTIVE_REFRESH_LOCK = threading.Lock()

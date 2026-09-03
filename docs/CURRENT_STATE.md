@@ -1065,3 +1065,61 @@ Geräteprüfung, explizitem konservativem Intervall, begrenzter Sessionpolitik u
 GO/NO-GO. Externe Writer und Sichtbarkeitskriterien müssen davor ebenfalls
 festgelegt werden. Interface 0, OpenRGB/`0b05:19af`, GIF-Liveanimation und
 Dauerbetrieb bleiben ausgeschlossen.
+
+### Produktionsverdrahtung des GUI-Refreshpfads
+
+Die Produktionsverdrahtung ist nun implementiert, aber noch nicht live
+ausgeführt. `ProductionControllerFactory` verwendet ausschließlich die
+vorhandene dynamische Suche für `0b05:1c7b`/Interface 1, den bestehenden
+`HidrawFrameSender`, `RefreshController` und die sessionspezifische
+`LatestFrameBuffer`-`FrameSource`. Die GUI erzeugt keine Pakete und verändert
+den bestätigten `0x08`-Transport nicht.
+
+Die gemeinsamen Runtime-Safety-Gates wurden aus dem bewährten Fünfframe-
+Testwerkzeug in `lcd_runtime_safety.py` überführt und werden von beiden Pfaden
+verwendet. Vor dem Start müssen VID/PID, Interface 1, vorhandener Produktname,
+`bcdDevice == 0x0049`, Usage `ff06/01`, unnummerierte Reports, Input 16 Byte,
+Output 1024 Byte, fehlende Feature-Reports, HID-Interface- und Endpointprofil
+sowie ein dynamisch entdeckter `/dev/hidraw*`-Pfad passen. Zusätzlich dürfen
+keine lokal erkennbaren fremden Writer denselben Character Device geöffnet
+halten. Jeder Fehler beendet den Start vor Sender- und Controllererzeugung und
+wird in der GUI ohne Retry als `error` angezeigt.
+
+Für den ersten GUI-Livepfad gilt ein isoliertes temporäres Entwicklungsprofil:
+1,0 s minimale Frame-Startperiode, höchstens 30,0 s und höchstens 30
+vollständige Frames. Die Werte sind nicht konfigurierbar. Der bestehende
+Scheduler verhindert Überlappung und Catch-up; der erste Transportfehler beendet
+die Session. Unbegrenzter Dauerbetrieb und Autostart existieren nicht.
+
+Die neue GUI-Option `Hardware-Livebetrieb freigeben` ist bei jedem Programmstart
+aus und wird nicht persistent wiederhergestellt. Ohne sie sind sowohl
+`LCD starten` als auch der bestehende Einzelbild-Writepfad vor Aufruf der
+Produktions-Factory beziehungsweise vor hidraw-Open und Write gesperrt. Mit
+Freigabe erzeugt der Startklick über die ProductionFactory genau eine begrenzte
+Session. `LCD stoppen` bleibt über
+`request_stop()` nicht blockierend; ein laufender synchroner Frame darf samt
+`finally`-Close sauber enden.
+
+Das bereits implementierte dynamische Publishing bleibt unverändert:
+Sensoränderungen an Tctl, Tccd1 oder primärer GPU-edge, Bild-, Crop/fit-,
+Overlay- und Farbänderungen erzeugen während `running` zunächst ein vollständig
+validiertes JPEG und publizieren dann atomar eine neue Generation. Der
+Refreshworker liest weder sysfs noch Sensorobjekte und verwendet zwischen
+Änderungen denselben immutable Snapshot. Renderfehler lassen den letzten
+gültigen Stand aktiv.
+
+Neun neue Factory- und zwei zusätzliche GUI-Tests prüfen Fake-Device-
+Verdrahtung, sämtliche Safety-Gates, falsche Version, Interface- und
+Reportgrößen, Konkurrenzwriter, exakte Ziel-Discovery, 30-s-/30-Frame-Hardcap,
+Stop, ersten Fehler ohne Retry und die standardmäßig ausgeschaltete
+Hardwarefreigabe. Bestehende Tests decken dynamische Sensor-/Farbpublikation und
+fehlende Paralleltransfers ab. Die vollständige Offline-Suite bestand mit 168
+Tests; `git diff --check` war sauber. Es fanden keine Gerätekommunikation,
+keine HID-/USB-Writes und kein Live-Test statt. Interface 0,
+OpenRGB/`0b05:19af` und die Protokollimplementierung blieben unberührt.
+
+Nächster Schritt ist ausschließlich ein gesondert autorisierter, beaufsichtigter
+GUI-Live-Test mit temporärer Interface-1-Schreibberechtigung, ausgeschlossenem
+Fremdwriter und getrennten Kriterien für Transport, sichtbare Kontinuität,
+Stopverhalten sowie das harte 30-s-/30-Frame-Ende. Daraus folgt weiterhin keine
+Freigabe für andere Intervalle, Animation oder Dauerbetrieb.

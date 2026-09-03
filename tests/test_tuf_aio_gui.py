@@ -6,6 +6,7 @@ import tempfile
 import threading
 import time
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from unittest import mock
 
@@ -20,7 +21,9 @@ from PySide6.QtWidgets import QApplication
 from PIL import Image
 
 import image_pipeline
+import gui_refresh_factory
 import lcd_refresh
+import lcd_runtime_safety
 import lcd_transport
 import system_sensors
 import tuf_aio_gui
@@ -141,8 +144,8 @@ class TufAioGuiOfflineTests(unittest.TestCase):
             device_path="/dev/hidraw-never-opened",
             sysfs_path="/sys/class/hidraw/hidraw-never-opened",
             interface_number=1,
-            manufacturer="ASUS",
-            product="TUF AIO",
+            manufacturer="ASUS Tek",
+            product="TUF GAMING LC III 360 ARGB LCD",
             serial=None,
             vendor_id="0b05",
             product_id="1c7b",
@@ -152,6 +155,15 @@ class TufAioGuiOfflineTests(unittest.TestCase):
             report_ids=(),
             readable=False,
             udev_properties={},
+            usage_page=0xFF06,
+            usage=0x01,
+            bcd_device="0049",
+            alternate_setting=0,
+            interface_class=3,
+            interface_subclass=0,
+            interface_protocol=0,
+            endpoint_count=2,
+            endpoints=lcd_runtime_safety.EXPECTED_ENDPOINTS,
         )
 
     def _window(
@@ -237,6 +249,9 @@ class TufAioGuiOfflineTests(unittest.TestCase):
         window = self._window()
         try:
             self.assertTrue(window.load_image(REFERENCE_PATH))
+            self.assertFalse(window.hardware_live_checkbox.isChecked())
+            self.assertFalse(window.send_button.isEnabled())
+            window.hardware_live_checkbox.setChecked(True)
             self.assertTrue(window.send_button.isEnabled())
             self.assertEqual(window.original_size_value.text(), "320×320")
             self.assertEqual(window.output_size_value.text(), "320×320")
@@ -265,6 +280,7 @@ class TufAioGuiOfflineTests(unittest.TestCase):
         try:
             self.assertEqual(window.device_status_label.text(), "Gerät: nicht verbunden")
             self.assertTrue(window.load_image(REFERENCE_PATH))
+            window.hardware_live_checkbox.setChecked(True)
             send_mock = mock.Mock(side_effect=AssertionError("send called"))
             with (
                 mock.patch.object(window, "refresh_device_status", return_value=None),
@@ -280,6 +296,7 @@ class TufAioGuiOfflineTests(unittest.TestCase):
         window = self._window()
         try:
             self.assertTrue(window.load_image(REFERENCE_PATH))
+            window.hardware_live_checkbox.setChecked(True)
             send_mock = mock.Mock(side_effect=lcd_transport.LcdTransportError("offline"))
             with (
                 mock.patch.object(window, "refresh_device_status", return_value=self._device()),
@@ -296,6 +313,7 @@ class TufAioGuiOfflineTests(unittest.TestCase):
         window = self._window()
         try:
             self.assertTrue(window.load_image(REFERENCE_PATH))
+            window.hardware_live_checkbox.setChecked(True)
             send_mock = mock.Mock(return_value=3)
             with (
                 mock.patch.object(window, "refresh_device_status", return_value=self._device()),
@@ -432,6 +450,8 @@ class TufAioGuiOfflineTests(unittest.TestCase):
             self.assertFalse(window.start_lcd_button.isEnabled())
             self.assertFalse(window.stop_lcd_button.isEnabled())
             self.assertTrue(window.load_image(REFERENCE_PATH))
+            self.assertFalse(window.start_lcd_button.isEnabled())
+            window.hardware_live_checkbox.setChecked(True)
             self.assertTrue(window.start_lcd_button.isEnabled())
 
             window.start_lcd_button.click()
@@ -445,6 +465,57 @@ class TufAioGuiOfflineTests(unittest.TestCase):
                 controllers[0].request_stop()
                 controllers[0].join()
                 window._poll_refresh_controller()
+            window.close()
+
+    def test_hardware_live_approval_defaults_off_and_blocks_all_writes(self) -> None:
+        factory = mock.Mock(side_effect=AssertionError("controller factory called"))
+        window = self._window(controller_factory=factory)
+        try:
+            self.assertTrue(window.load_image(REFERENCE_PATH))
+            self.assertFalse(window.hardware_live_checkbox.isChecked())
+            with (
+                mock.patch.object(
+                    tuf_aio_gui.transport.os,
+                    "open",
+                    side_effect=AssertionError("hidraw open called"),
+                ) as device_open,
+                mock.patch.object(
+                    tuf_aio_gui.transport,
+                    "send_frame_once",
+                    side_effect=AssertionError("HID write path called"),
+                ) as send_once,
+                mock.patch.object(tuf_aio_gui.QMessageBox, "critical"),
+            ):
+                window.start_lcd()
+                window.send_selected_image()
+            factory.assert_not_called()
+            device_open.assert_not_called()
+            send_once.assert_not_called()
+            self.assertEqual(window._refresh_state, tuf_aio_gui.GuiRefreshState.IDLE)
+        finally:
+            window.close()
+
+    def test_production_gate_failure_enters_error_before_device_open(self) -> None:
+        wrong_version = replace(self._device(), bcd_device="0051")
+        factory = gui_refresh_factory.ProductionControllerFactory(
+            device_discovery=mock.Mock(return_value=(wrong_version, "offline fake")),
+            competing_writer_finder=mock.Mock(return_value=()),
+        )
+        window = self._window(controller_factory=factory)
+        try:
+            self.assertTrue(window.load_image(REFERENCE_PATH))
+            window.hardware_live_checkbox.setChecked(True)
+            with mock.patch.object(
+                tuf_aio_gui.transport.os,
+                "open",
+                side_effect=AssertionError("hidraw open called"),
+            ) as device_open:
+                window.start_lcd_button.click()
+            self.assertEqual(window._refresh_state, tuf_aio_gui.GuiRefreshState.ERROR)
+            self.assertIn("bcdDevice", window.status_label.text())
+            self.assertIn("kein Retry", window.status_label.text())
+            device_open.assert_not_called()
+        finally:
             window.close()
 
     def test_fake_end_to_end_publishes_changed_sensor_once_and_stops(self) -> None:
@@ -485,6 +556,7 @@ class TufAioGuiOfflineTests(unittest.TestCase):
                         side_effect=AssertionError("USB sender called"),
                     ) as real_sender,
                 ):
+                    window.hardware_live_checkbox.setChecked(True)
                     window.start_lcd_button.click()
                     controller = controllers[0]
                     self._wait_until(lambda: len(sender.frames) == 1)
@@ -540,6 +612,7 @@ class TufAioGuiOfflineTests(unittest.TestCase):
             window = self._window(settings=settings, controller_factory=factory)
             try:
                 self.assertTrue(window.load_image(REFERENCE_PATH))
+                window.hardware_live_checkbox.setChecked(True)
                 window.start_lcd_button.click()
                 source = window._frame_buffer
                 assert source is not None
@@ -598,6 +671,7 @@ class TufAioGuiOfflineTests(unittest.TestCase):
         window = self._window(controller_factory=factory)
         try:
             self.assertTrue(window.load_image(REFERENCE_PATH))
+            window.hardware_live_checkbox.setChecked(True)
             window.start_lcd_button.click()
             controller = controllers[0]
             controller.join()
@@ -631,6 +705,7 @@ class TufAioGuiOfflineTests(unittest.TestCase):
 
         window = self._window(controller_factory=factory)
         self.assertTrue(window.load_image(REFERENCE_PATH))
+        window.hardware_live_checkbox.setChecked(True)
         window.show()
         window.start_lcd_button.click()
         controller = controllers[0]
