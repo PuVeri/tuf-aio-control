@@ -21,7 +21,6 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMainWindow,
-    QMessageBox,
     QPushButton,
     QSizePolicy,
     QVBoxLayout,
@@ -34,6 +33,7 @@ import lcd_refresh
 import lcd_transport as transport
 import refresh_diagnostics
 import system_sensors
+import telemetry
 
 TemperatureReader = Callable[[], system_sensors.TemperatureSnapshot]
 DiagnosticsFactory = Callable[[], refresh_diagnostics.RefreshDiagnostics]
@@ -56,6 +56,13 @@ SETTINGS_ORGANIZATION = "HeartDriveLab"
 SETTINGS_APPLICATION = "tuf-aio-control"
 OVERLAY_ENABLED_SETTING = "lcd_temperature_overlay/enabled"
 OVERLAY_COLOR_SETTING = "lcd_temperature_overlay/color"
+ROTATION_SETTING = "lcd_output/rotation_degrees"
+SLOT_SETTING_PREFIX = "lcd_data_slots"
+SLOT_DEFAULTS = {
+    "top_left": telemetry.MetricId.CPU_PACKAGE,
+    "top_right": telemetry.MetricId.GPU_TEMPERATURE,
+    "bottom_center": telemetry.MetricId.CPU_CCD,
+}
 
 
 class GuiRefreshState(str, Enum):
@@ -80,7 +87,7 @@ class MainWindow(QMainWindow):
         ),
     ) -> None:
         super().__init__()
-        self._sensor_reader = sensor_reader or system_sensors.read_lcd_temperatures
+        self._sensor_reader = sensor_reader or system_sensors.SystemTelemetryReader()
         self._controller_factory = controller_factory
         self._diagnostics_factory = diagnostics_factory
         self._settings = (
@@ -97,6 +104,20 @@ class MainWindow(QMainWindow):
         if raw_color != self._overlay_color:
             self._settings.setValue(OVERLAY_COLOR_SETTING, self._overlay_color)
             self._settings.sync()
+        self._rotation_degrees = image_pipeline.normalize_rotation(
+            self._settings.value(ROTATION_SETTING, 0)
+        )
+        self._settings.setValue(ROTATION_SETTING, self._rotation_degrees)
+        self._slot_metric_ids = {
+            slot: telemetry.parse_metric_id(
+                self._settings.value(f"{SLOT_SETTING_PREFIX}/{slot}", default.value),
+                default,
+            )
+            for slot, default in SLOT_DEFAULTS.items()
+        }
+        for slot, metric_id in self._slot_metric_ids.items():
+            self._settings.setValue(f"{SLOT_SETTING_PREFIX}/{slot}", metric_id.value)
+        self._settings.sync()
         self._latest_temperature_snapshot = system_sensors.TemperatureSnapshot()
         self._selected_path: Path | None = None
         self._prepared: image_pipeline.PreparedImage | None = None
@@ -169,7 +190,7 @@ class MainWindow(QMainWindow):
         temperature_layout = QGridLayout(temperature_card)
         temperature_layout.setHorizontalSpacing(24)
         temperature_layout.setVerticalSpacing(4)
-        temperature_title = QLabel("Lokale Temperaturen")
+        temperature_title = QLabel("Lokale Telemetrie")
         temperature_title.setObjectName("sectionTitle")
         temperature_layout.addWidget(temperature_title, 0, 0, 1, 3)
         (
@@ -214,7 +235,7 @@ class MainWindow(QMainWindow):
         self.scale_mode.addItem("Einpassen", "fit")
         self.scale_mode.currentIndexChanged.connect(self._scale_mode_changed)
         options_layout.addWidget(self.scale_mode)
-        self.overlay_checkbox = QCheckBox("Temperaturen auf LCD anzeigen")
+        self.overlay_checkbox = QCheckBox("Datenoverlay auf LCD anzeigen")
         self.overlay_checkbox.setChecked(self._overlay_enabled)
         self.overlay_checkbox.toggled.connect(self._overlay_toggled)
         options_layout.addWidget(self.overlay_checkbox)
@@ -222,8 +243,41 @@ class MainWindow(QMainWindow):
         self.overlay_color_button.clicked.connect(self._choose_overlay_color)
         self._update_overlay_color_button()
         options_layout.addWidget(self.overlay_color_button)
+        self.rotation_button = QPushButton()
+        self.rotation_button.clicked.connect(self._rotate_clockwise)
+        self._update_rotation_button()
+        options_layout.addWidget(self.rotation_button)
         options_layout.addStretch(1)
         outer.addWidget(options)
+
+        slots_card = QFrame()
+        slots_card.setObjectName("card")
+        slots_layout = QGridLayout(slots_card)
+        slots_title = QLabel("LCD-Datenpositionen")
+        slots_title.setObjectName("sectionTitle")
+        slots_layout.addWidget(slots_title, 0, 0, 1, 3)
+        self.slot_combos: dict[str, QComboBox] = {}
+        slot_labels = {
+            "top_left": "Oben links",
+            "top_right": "Oben rechts",
+            "bottom_center": "Unten Mitte",
+        }
+        for column, (slot, label) in enumerate(slot_labels.items()):
+            slots_layout.addWidget(QLabel(label), 1, column)
+            combo = QComboBox()
+            for definition in telemetry.METRIC_DEFINITIONS:
+                combo.addItem(definition.display_label, definition.metric_id.value)
+            selected = combo.findData(self._slot_metric_ids[slot].value)
+            combo.setCurrentIndex(selected)
+            combo.currentIndexChanged.connect(
+                lambda _index, selected_slot=slot: self._slot_selection_changed(
+                    selected_slot
+                )
+            )
+            slots_layout.addWidget(combo, 2, column)
+            slots_layout.setColumnStretch(column, 1)
+            self.slot_combos[slot] = combo
+        outer.addWidget(slots_card)
 
         info_card = QFrame()
         info_card.setObjectName("card")
@@ -247,18 +301,14 @@ class MainWindow(QMainWindow):
         buttons.setSpacing(12)
         self.select_button = QPushButton("Bild auswählen")
         self.select_button.clicked.connect(self.choose_image)
-        self.send_button = QPushButton("Auf Display senden")
-        self.send_button.setObjectName("primaryButton")
-        self.send_button.setEnabled(False)
-        self.send_button.clicked.connect(self.send_selected_image)
         self.start_lcd_button = QPushButton("LCD starten")
+        self.start_lcd_button.setObjectName("primaryButton")
         self.start_lcd_button.clicked.connect(self.start_lcd)
         self.stop_lcd_button = QPushButton("LCD stoppen")
         self.stop_lcd_button.clicked.connect(self.stop_lcd)
         self.acknowledge_error_button = QPushButton("Fehler bestätigen")
         self.acknowledge_error_button.clicked.connect(self.acknowledge_refresh_error)
         buttons.addWidget(self.select_button)
-        buttons.addWidget(self.send_button)
         buttons.addWidget(self.start_lcd_button)
         buttons.addWidget(self.stop_lcd_button)
         buttons.addWidget(self.acknowledge_error_button)
@@ -384,6 +434,63 @@ class MainWindow(QMainWindow):
             ),
         )
 
+    def _overlay_slots(
+        self,
+        snapshot: system_sensors.TemperatureSnapshot | None = None,
+    ) -> image_pipeline.OverlaySlots:
+        metrics = system_sensors.metric_values(
+            snapshot or self._latest_temperature_snapshot
+        )
+
+        def selected(slot: str) -> telemetry.MetricValue | None:
+            metric_id = self._slot_metric_ids[slot]
+            return None if metric_id is telemetry.MetricId.OFF else metrics[metric_id]
+
+        return image_pipeline.OverlaySlots(
+            top_left=selected("top_left"),
+            top_right=selected("top_right"),
+            bottom_center=selected("bottom_center"),
+        )
+
+    def _visible_metric_signature(
+        self, snapshot: system_sensors.TemperatureSnapshot
+    ) -> tuple[tuple[str, str] | None, ...]:
+        slots = self._overlay_slots(snapshot)
+        return tuple(
+            None if metric is None else (metric.metric_id.value, metric.display_value)
+            for metric in (slots.top_left, slots.top_right, slots.bottom_center)
+        )
+
+    def _slot_selection_changed(self, slot: str) -> None:
+        if self._refresh_state in {
+            GuiRefreshState.STARTING,
+            GuiRefreshState.STOPPING,
+            GuiRefreshState.ERROR,
+        }:
+            return
+        combo = self.slot_combos[slot]
+        metric_id = telemetry.parse_metric_id(combo.currentData(), SLOT_DEFAULTS[slot])
+        self._slot_metric_ids[slot] = metric_id
+        self._settings.setValue(f"{SLOT_SETTING_PREFIX}/{slot}", metric_id.value)
+        self._settings.sync()
+        self._rerender_temperature_overlay()
+
+    def _rotate_clockwise(self) -> None:
+        if self._refresh_state in {
+            GuiRefreshState.STARTING,
+            GuiRefreshState.STOPPING,
+            GuiRefreshState.ERROR,
+        }:
+            return
+        self._rotation_degrees = (self._rotation_degrees + 90) % 360
+        self._settings.setValue(ROTATION_SETTING, self._rotation_degrees)
+        self._settings.sync()
+        self._update_rotation_button()
+        self._rerender_temperature_overlay()
+
+    def _update_rotation_button(self) -> None:
+        self.rotation_button.setText(f"LCD drehen: {self._rotation_degrees}°")
+
     def _overlay_toggled(self, enabled: bool) -> None:
         if self._refresh_state in {
             GuiRefreshState.STARTING,
@@ -442,8 +549,10 @@ class MainWindow(QMainWindow):
         value_label.setToolTip(f"Quelle: {source} · {reading.sensor.channel}")
 
     def refresh_temperatures(self) -> system_sensors.TemperatureSnapshot:
-        """Sample local hwmon sources once without involving any HID path."""
-        previous_values = self._overlay_values(self._latest_temperature_snapshot)
+        """Sample local telemetry once without involving any HID path."""
+        previous_values = self._visible_metric_signature(
+            self._latest_temperature_snapshot
+        )
         try:
             snapshot = self._sensor_reader()
         except (OSError, RuntimeError, ValueError):
@@ -468,7 +577,7 @@ class MainWindow(QMainWindow):
             self._overlay_enabled
             and self._prepared is not None
             and self._refresh_state in {GuiRefreshState.IDLE, GuiRefreshState.RUNNING}
-            and self._overlay_values(snapshot) != previous_values
+            and self._visible_metric_signature(snapshot) != previous_values
         ):
             self._rerender_temperature_overlay()
         return snapshot
@@ -548,6 +657,8 @@ class MainWindow(QMainWindow):
                 temperatures=self._overlay_values(
                     self._latest_temperature_snapshot
                 ),
+                overlay_slots=self._overlay_slots(),
+                rotation_degrees=self._rotation_degrees,
             )
             self._load_final_preview(prepared.jpeg_bytes)
             self._publish_running_frame(prepared.jpeg_bytes)
@@ -595,7 +706,7 @@ class MainWindow(QMainWindow):
                 f"Status: LCD läuft · Framegeneration {generation} veröffentlicht"
             )
         else:
-            self.status_label.setText("Status: Bild vorbereitet – Senden nur nach Klick")
+            self.status_label.setText("Status: Bild vorbereitet – LCD-Start bereit")
         self._update_send_enabled()
 
     def _rerender_temperature_overlay(self) -> None:
@@ -608,6 +719,8 @@ class MainWindow(QMainWindow):
                 temperatures=self._overlay_values(
                     self._latest_temperature_snapshot
                 ),
+                overlay_slots=self._overlay_slots(),
+                rotation_degrees=self._rotation_degrees,
             )
             self._load_final_preview(prepared.jpeg_bytes)
             self._publish_running_frame(prepared.jpeg_bytes)
@@ -690,15 +803,12 @@ class MainWindow(QMainWindow):
         self.scale_mode.setEnabled(editable)
         self.overlay_checkbox.setEnabled(editable)
         self.overlay_color_button.setEnabled(editable)
+        self.rotation_button.setEnabled(editable)
+        for combo in self.slot_combos.values():
+            combo.setEnabled(editable)
         self.refresh_button.setEnabled(editable)
         self.hardware_live_checkbox.setEnabled(
             self._refresh_state is GuiRefreshState.IDLE
-        )
-        self.send_button.setEnabled(
-            self._refresh_state is GuiRefreshState.IDLE
-            and self._prepared is not None
-            and self._device_ready
-            and self.hardware_live_checkbox.isChecked()
         )
         self.start_lcd_button.setEnabled(
             self._refresh_state is GuiRefreshState.IDLE
@@ -847,51 +957,6 @@ class MainWindow(QMainWindow):
         self._frame_buffer = None
         self._set_refresh_state(GuiRefreshState.IDLE)
         self.status_label.setText("Status: Fehler bestätigt – LCD-Session ist bereit")
-
-    def send_selected_image(self) -> None:
-        """Revalidate the prepared JPEG and request exactly one existing transfer."""
-        if not self.hardware_live_checkbox.isChecked():
-            self._show_send_error(
-                "Hardware-Livebetrieb muss ausdrücklich freigegeben werden."
-            )
-            return
-        if self._prepared is None:
-            self._show_send_error("Kein validiertes Ausgabebild vorhanden.")
-            return
-
-        jpeg = self._prepared.jpeg_bytes
-        try:
-            transport.validate_jpeg(jpeg)
-        except (transport.JpegValidationError, RuntimeError, ValueError) as error:
-            self._prepared = None
-            self._set_invalid_image(str(error))
-            self._show_send_error(f"Ausgabe-JPEG ist nicht mehr sendbar: {error}")
-            return
-
-        device = self.refresh_device_status()
-        if device is None:
-            self._show_send_error("Kein sicher verwendbares LCD-Gerät gefunden.")
-            return
-
-        self.status_label.setText(
-            f"Status: Sende genau einen Frame mit "
-            f"{self._prepared.jpeg_info.segment_count} Segmenten …"
-        )
-        try:
-            written = transport.send_frame_once(device, jpeg)
-        except PermissionError as error:
-            self._show_send_error(f"Schreibberechtigung fehlt: {error}")
-            return
-        except (transport.LcdTransportError, OSError, RuntimeError) as error:
-            self._show_send_error(f"Transfer abgebrochen: {error}")
-            return
-        self.status_label.setText(
-            f"Status: Ein Frame erfolgreich gesendet ({written} Writes, kein Retry)"
-        )
-
-    def _show_send_error(self, message: str) -> None:
-        self.status_label.setText(f"Status: Fehler – {message}")
-        QMessageBox.critical(self, "TUF AIO Control", message)
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802 - Qt API
         super().resizeEvent(event)

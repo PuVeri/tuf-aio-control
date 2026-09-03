@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""Read-only discovery and sampling of local Linux hwmon temperatures."""
+"""Read-only discovery and nonblocking sampling of local Linux telemetry."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
 
+import telemetry
+
 DEFAULT_HWMON_ROOT = Path("/sys/class/hwmon")
 DEFAULT_PRIMARY_GPU_PCI_ADDRESS = "0000:03:00.0"
+DEFAULT_PROC_STAT_PATH = Path("/proc/stat")
 
 
 @dataclass(frozen=True)
@@ -35,11 +38,70 @@ class TemperatureValue:
 
 
 @dataclass(frozen=True)
+class PercentageValue:
+    percent: float
+    source_label: str
+
+
+@dataclass(frozen=True)
 class TemperatureSnapshot:
     cpu: TemperatureValue | None = None
     cpu_package: TemperatureValue | None = None
     cpu_ccd: TemperatureValue | None = None
     gpu: TemperatureValue | None = None
+    gpu_hotspot: TemperatureValue | None = None
+    gpu_memory: TemperatureValue | None = None
+    cpu_usage: PercentageValue | None = None
+    gpu_usage: PercentageValue | None = None
+
+
+@dataclass(frozen=True)
+class CpuTimes:
+    total: int
+    idle: int
+
+
+def parse_cpu_times(text: str) -> CpuTimes | None:
+    """Parse aggregate /proc/stat CPU counters without treating them as percent."""
+    lines = text.splitlines()
+    first_line = lines[0] if lines else ""
+    fields = first_line.split()
+    if len(fields) < 5 or fields[0] != "cpu":
+        return None
+    try:
+        counters = [int(value, 10) for value in fields[1:9]]
+    except ValueError:
+        return None
+    if len(counters) < 4 or any(value < 0 for value in counters):
+        return None
+    idle = counters[3] + (counters[4] if len(counters) > 4 else 0)
+    return CpuTimes(total=sum(counters), idle=idle)
+
+
+class CpuUsageSampler:
+    """Calculate total CPU usage from consecutive nonblocking /proc/stat samples."""
+
+    def __init__(self, path: Path = DEFAULT_PROC_STAT_PATH) -> None:
+        self.path = path
+        self._previous: CpuTimes | None = None
+
+    def sample(self) -> PercentageValue | None:
+        raw = _read_text(self.path)
+        if raw is None:
+            return None
+        current = parse_cpu_times(raw)
+        if current is None:
+            return None
+        previous = self._previous
+        self._previous = current
+        if previous is None:
+            return None
+        total_delta = current.total - previous.total
+        idle_delta = current.idle - previous.idle
+        if total_delta <= 0 or idle_delta < 0:
+            return None
+        percent = 100.0 * (total_delta - min(idle_delta, total_delta)) / total_delta
+        return PercentageValue(max(0.0, min(100.0, percent)), str(self.path))
 
 
 def _read_text(path: Path) -> str | None:
@@ -283,6 +345,12 @@ def read_lcd_temperatures(
 ) -> TemperatureSnapshot:
     """Read the explicit default sources used by the LCD temperature overlay."""
     discovered = discover_temperature_sensors(hwmon_root)
+    primary_gpu_channels = tuple(
+        sensor
+        for sensor in discovered.gpu_channels
+        if sensor.device_path is not None
+        and sensor.device_path.name == primary_gpu_pci_address
+    )
     return TemperatureSnapshot(
         cpu=_first_available(discovered.cpu),
         cpu_package=_read_matching_channel(
@@ -294,8 +362,112 @@ def read_lcd_temperatures(
             label="Tccd1",
         ),
         gpu=_read_matching_channel(
-            discovered.gpu_channels,
+            primary_gpu_channels,
             label="edge",
-            device_name=primary_gpu_pci_address,
         ),
+        gpu_hotspot=_read_matching_channel(primary_gpu_channels, label="junction")
+        or _read_matching_channel(primary_gpu_channels, label="hotspot"),
+        gpu_memory=_read_matching_channel(primary_gpu_channels, label="mem"),
+        gpu_usage=_read_gpu_usage(primary_gpu_channels),
     )
+
+
+def _read_gpu_usage(
+    primary_gpu_channels: tuple[TemperatureSensor, ...],
+) -> PercentageValue | None:
+    device_paths = sorted(
+        {
+            sensor.device_path
+            for sensor in primary_gpu_channels
+            if sensor.device_path is not None
+        },
+        key=str,
+    )
+    if not device_paths:
+        return None
+    path = device_paths[0] / "gpu_busy_percent"
+    raw = _read_text(path)
+    if raw is None:
+        return None
+    try:
+        percent = int(raw, 10)
+    except ValueError:
+        return None
+    if not 0 <= percent <= 100:
+        return None
+    return PercentageValue(float(percent), str(path))
+
+
+class SystemTelemetryReader:
+    """Stateful callable combining hwmon with consecutive CPU counter samples."""
+
+    def __init__(
+        self,
+        hwmon_root: Path = DEFAULT_HWMON_ROOT,
+        *,
+        proc_stat_path: Path = DEFAULT_PROC_STAT_PATH,
+        primary_gpu_pci_address: str = DEFAULT_PRIMARY_GPU_PCI_ADDRESS,
+    ) -> None:
+        self._hwmon_root = hwmon_root
+        self._primary_gpu_pci_address = primary_gpu_pci_address
+        self._cpu_usage = CpuUsageSampler(proc_stat_path)
+
+    def __call__(self) -> TemperatureSnapshot:
+        temperatures = read_lcd_temperatures(
+            self._hwmon_root,
+            primary_gpu_pci_address=self._primary_gpu_pci_address,
+        )
+        return TemperatureSnapshot(
+            cpu=temperatures.cpu,
+            cpu_package=temperatures.cpu_package,
+            cpu_ccd=temperatures.cpu_ccd,
+            gpu=temperatures.gpu,
+            gpu_hotspot=temperatures.gpu_hotspot,
+            gpu_memory=temperatures.gpu_memory,
+            cpu_usage=self._cpu_usage.sample(),
+            gpu_usage=temperatures.gpu_usage,
+        )
+
+
+def metric_values(
+    snapshot: TemperatureSnapshot,
+) -> dict[telemetry.MetricId, telemetry.MetricValue]:
+    """Adapt sensor-specific readings to stable, renderer-independent metrics."""
+    values: dict[telemetry.MetricId, telemetry.MetricValue] = {}
+
+    def temperature_metric(
+        metric_id: telemetry.MetricId,
+        reading: TemperatureValue | None,
+    ) -> None:
+        definition = telemetry.METRIC_BY_ID[metric_id]
+        source = None
+        value = None
+        if reading is not None:
+            value = reading.celsius
+            source = f"{reading.sensor.hwmon_name} · {reading.sensor.label}"
+        values[metric_id] = telemetry.MetricValue(
+            metric_id, definition.display_label, value, definition.unit, source
+        )
+
+    def percentage_metric(
+        metric_id: telemetry.MetricId,
+        reading: PercentageValue | None,
+    ) -> None:
+        definition = telemetry.METRIC_BY_ID[metric_id]
+        values[metric_id] = telemetry.MetricValue(
+            metric_id,
+            definition.display_label,
+            reading.percent if reading is not None else None,
+            definition.unit,
+            reading.source_label if reading is not None else None,
+        )
+
+    percentage_metric(telemetry.MetricId.CPU_USAGE, snapshot.cpu_usage)
+    percentage_metric(telemetry.MetricId.GPU_USAGE, snapshot.gpu_usage)
+    temperature_metric(telemetry.MetricId.CPU_PACKAGE, snapshot.cpu_package)
+    temperature_metric(telemetry.MetricId.CPU_CCD, snapshot.cpu_ccd)
+    temperature_metric(telemetry.MetricId.GPU_TEMPERATURE, snapshot.gpu)
+    temperature_metric(telemetry.MetricId.GPU_HOTSPOT, snapshot.gpu_hotspot)
+    temperature_metric(telemetry.MetricId.GPU_MEMORY, snapshot.gpu_memory)
+    values[telemetry.MetricId.OFF] = telemetry.unavailable(telemetry.MetricId.OFF)
+    return values

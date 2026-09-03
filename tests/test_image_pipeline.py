@@ -358,6 +358,85 @@ class ImagePipelineOfflineTests(unittest.TestCase):
             [frame.jpeg_bytes for frame in prepared.frames],
         )
 
+    def test_complete_composition_rotates_clockwise_in_all_four_steps(self) -> None:
+        base = Image.new("RGB", (320, 320), "black")
+        base.paste("red", (0, 0, 80, 80))
+        base.paste("green", (240, 0, 320, 80))
+        base.paste("blue", (0, 240, 80, 320))
+        base.paste("white", (240, 240, 320, 320))
+        expected_corners = {
+            0: ("red", "green", "blue", "white"),
+            90: ("blue", "red", "white", "green"),
+            180: ("white", "blue", "green", "red"),
+            270: ("green", "white", "red", "blue"),
+        }
+        rgb = {
+            "red": (255, 0, 0),
+            "green": (0, 128, 0),
+            "blue": (0, 0, 255),
+            "white": (255, 255, 255),
+        }
+        for rotation, names in expected_corners.items():
+            with self.subTest(rotation=rotation):
+                result = image_pipeline.rotate_composition(base, rotation)
+                corners = (
+                    result.getpixel((20, 20)),
+                    result.getpixel((300, 20)),
+                    result.getpixel((20, 300)),
+                    result.getpixel((300, 300)),
+                )
+                self.assertEqual(corners, tuple(rgb[name] for name in names))
+
+    def test_arbitrary_metrics_off_and_missing_value_render_in_fixed_slots(self) -> None:
+        import telemetry
+
+        slots = image_pipeline.OverlaySlots(
+            top_left=telemetry.MetricValue(
+                telemetry.MetricId.CPU_USAGE, "CPU", 17.0, "%"
+            ),
+            top_right=telemetry.MetricValue(
+                telemetry.MetricId.GPU_USAGE, "GPU", 82.0, "%"
+            ),
+            bottom_center=None,
+        )
+        placements = image_pipeline.layout_data_overlay(
+            slots, image_pipeline.TemperatureOverlayConfig(enabled=True)
+        )
+        self.assertEqual([item.sensor for item in placements], ["top_left", "top_right"])
+        self.assertEqual([item.value_text for item in placements], ["17 %", "82 %"])
+
+        missing = image_pipeline.layout_data_overlay(
+            image_pipeline.OverlaySlots(
+                top_left=telemetry.MetricValue(
+                    telemetry.MetricId.CPU_PACKAGE, "CPU Package", None, "°C"
+                )
+            ),
+            image_pipeline.TemperatureOverlayConfig(enabled=True),
+        )
+        self.assertEqual(missing[0].value_text, "—")
+
+    def test_overlay_is_composed_before_rotation_and_jpeg_validation(self) -> None:
+        import telemetry
+
+        base = Image.new("RGB", (320, 320), "black")
+        slots = image_pipeline.OverlaySlots(
+            top_left=telemetry.MetricValue(
+                telemetry.MetricId.CPU_USAGE, "CPU", 17.0, "%"
+            )
+        )
+        config = image_pipeline.TemperatureOverlayConfig(enabled=True)
+        composed = image_pipeline.render_data_overlay(base, slots, config)
+        rotated = image_pipeline.rotate_composition(composed, 90)
+        jpeg, info = image_pipeline._encode_and_validate_frame(
+            base.tobytes(),
+            config,
+            image_pipeline.TemperatureOverlayValues(),
+            overlay_slots=slots,
+            rotation_degrees=90,
+        )
+        self.assertEqual(info, image_pipeline.lcd_transport.validate_jpeg(jpeg))
+        self.assertEqual(jpeg, image_pipeline._encode_jpeg(rotated))
+
     def test_exif_orientation_is_applied_before_scaling(self) -> None:
         exif = Image.Exif()
         exif[274] = 6

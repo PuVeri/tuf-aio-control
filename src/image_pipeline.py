@@ -13,6 +13,7 @@ from typing import Literal
 from PIL import Image, ImageDraw, ImageFont, ImageOps, UnidentifiedImageError
 
 import lcd_transport
+import telemetry
 
 OUTPUT_SIZE = (320, 320)
 JPEG_QUALITY = 60
@@ -53,6 +54,7 @@ OVERLAY_FONT_CANDIDATES = {
 ScaleMode = Literal["crop", "fit"]
 OverlaySensor = Literal["cpu_package", "gpu", "cpu_ccd"]
 OverlayFontRole = Literal["label", "value"]
+RotationDegrees = Literal[0, 90, 180, 270]
 
 
 class ImagePipelineError(ValueError):
@@ -94,8 +96,15 @@ class TemperatureOverlayValues:
 
 
 @dataclass(frozen=True)
+class OverlaySlots:
+    top_left: telemetry.MetricValue | None = None
+    top_right: telemetry.MetricValue | None = None
+    bottom_center: telemetry.MetricValue | None = None
+
+
+@dataclass(frozen=True)
 class TemperatureOverlayPlacement:
-    sensor: OverlaySensor
+    sensor: str
     label: str
     label_center: tuple[int, int]
     value_text: str
@@ -115,6 +124,7 @@ class PreparedImage:
     base_rgb_bytes: bytes
     jpeg_bytes: bytes
     jpeg_info: lcd_transport.JpegInfo
+    rotation_degrees: int = 0
 
 
 @dataclass(frozen=True)
@@ -185,6 +195,29 @@ def _format_temperature(value: float | None) -> str:
     if value is None or not math.isfinite(value):
         return "—"
     return f"{value:.0f} °C"
+
+
+def normalize_rotation(value: object) -> int:
+    if isinstance(value, bool):
+        return 0
+    try:
+        rotation = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0
+    return rotation if rotation in {0, 90, 180, 270} else 0
+
+
+def rotate_composition(image: Image.Image, rotation_degrees: object) -> Image.Image:
+    """Rotate a complete 320x320 composition clockwise without resampling."""
+    rotation = normalize_rotation(rotation_degrees)
+    operations = {
+        0: None,
+        90: Image.Transpose.ROTATE_270,
+        180: Image.Transpose.ROTATE_180,
+        270: Image.Transpose.ROTATE_90,
+    }
+    operation = operations[rotation]
+    return image.copy() if operation is None else image.transpose(operation)
 
 
 def _overlay_font(size: int, role: OverlayFontRole) -> ImageFont.FreeTypeFont:
@@ -311,6 +344,137 @@ def layout_temperature_overlay(
     return tuple(placements)
 
 
+def layout_data_overlay(
+    slots: OverlaySlots,
+    config: TemperatureOverlayConfig,
+) -> tuple[TemperatureOverlayPlacement, ...]:
+    """Lay out arbitrary metrics at the three stable logical LCD positions."""
+    canvas = Image.new("RGB", OUTPUT_SIZE)
+    draw = ImageDraw.Draw(canvas)
+    specs = (
+        ("top_left", slots.top_left, (102, 66), (102, 100), config.colors.cpu_package),
+        ("top_right", slots.top_right, (218, 66), (218, 100), config.colors.gpu),
+        (
+            "bottom_center",
+            slots.bottom_center,
+            (160, 216),
+            (160, 250),
+            config.colors.cpu_ccd,
+        ),
+    )
+    placements: list[TemperatureOverlayPlacement] = []
+    for slot_id, metric, label_center, value_center, raw_color in specs:
+        if metric is None or metric.metric_id is telemetry.MetricId.OFF:
+            continue
+        label = metric.display_label
+        value_text = metric.display_value
+        label_font = _fit_font(
+            draw,
+            label,
+            preferred_size=OVERLAY_LABEL_PREFERRED_SIZE,
+            minimum_size=OVERLAY_LABEL_MINIMUM_SIZE,
+            maximum_width=106,
+            role="label",
+        )
+        value_font = _fit_font(
+            draw,
+            value_text,
+            preferred_size=OVERLAY_VALUE_PREFERRED_SIZE,
+            minimum_size=OVERLAY_VALUE_MINIMUM_SIZE,
+            maximum_width=114,
+            role="value",
+        )
+        label_bounds = draw.textbbox(
+            label_center, label, font=label_font, anchor="mm", stroke_width=1
+        )
+        value_bounds = draw.textbbox(
+            value_center, value_text, font=value_font, anchor="mm", stroke_width=1
+        )
+        bounds = (
+            min(label_bounds[0], value_bounds[0]),
+            min(label_bounds[1], value_bounds[1]),
+            max(label_bounds[2], value_bounds[2]),
+            max(label_bounds[3], value_bounds[3]),
+        )
+        left, top, right, bottom = OVERLAY_SAFE_BOUNDS
+        if not (
+            left <= bounds[0] <= bounds[2] <= right
+            and top <= bounds[1] <= bounds[3] <= bottom
+        ):
+            raise ImagePipelineError(
+                f"Overlayblock überschreitet den sicheren Rand: {label}"
+            )
+        for x in (bounds[0], bounds[2]):
+            for y in (bounds[1], bounds[3]):
+                if math.hypot(
+                    x - OVERLAY_ROUND_CENTER[0], y - OVERLAY_ROUND_CENTER[1]
+                ) > OVERLAY_ROUND_SAFE_RADIUS:
+                    raise ImagePipelineError(
+                        f"Overlayblock verlässt den runden Sichtbereich: {label}"
+                    )
+        placements.append(
+            TemperatureOverlayPlacement(
+                sensor=slot_id,
+                label=label,
+                label_center=label_center,
+                value_text=value_text,
+                center=value_center,
+                bounds=bounds,
+                color=normalize_overlay_color(raw_color),
+            )
+        )
+    return tuple(placements)
+
+
+def render_data_overlay(
+    base_image: Image.Image,
+    slots: OverlaySlots,
+    config: TemperatureOverlayConfig,
+) -> Image.Image:
+    if base_image.size != OUTPUT_SIZE:
+        raise ImagePipelineError("Datenoverlay benötigt exakt 320×320 Pixel")
+    rendered = base_image.convert("RGB").copy()
+    if not config.enabled:
+        return rendered
+    draw = ImageDraw.Draw(rendered)
+    for placement in layout_data_overlay(slots, config):
+        label_font = _fit_font(
+            draw,
+            placement.label,
+            preferred_size=OVERLAY_LABEL_PREFERRED_SIZE,
+            minimum_size=OVERLAY_LABEL_MINIMUM_SIZE,
+            maximum_width=106,
+            role="label",
+        )
+        value_font = _fit_font(
+            draw,
+            placement.value_text,
+            preferred_size=OVERLAY_VALUE_PREFERRED_SIZE,
+            minimum_size=OVERLAY_VALUE_MINIMUM_SIZE,
+            maximum_width=114,
+            role="value",
+        )
+        draw.text(
+            placement.label_center,
+            placement.label,
+            fill=placement.color,
+            font=label_font,
+            anchor="mm",
+            stroke_width=1,
+            stroke_fill="#000000",
+        )
+        draw.text(
+            placement.center,
+            placement.value_text,
+            fill=placement.color,
+            font=value_font,
+            anchor="mm",
+            stroke_width=1,
+            stroke_fill="#000000",
+        )
+    return rendered
+
+
 def render_temperature_overlay(
     base_image: Image.Image,
     values: TemperatureOverlayValues,
@@ -371,12 +535,20 @@ def _encode_and_validate_frame(
     base_rgb_bytes: bytes,
     overlay_config: TemperatureOverlayConfig,
     temperatures: TemperatureOverlayValues,
+    *,
+    overlay_slots: OverlaySlots | None = None,
+    rotation_degrees: object = 0,
 ) -> tuple[bytes, lcd_transport.JpegInfo]:
     expected_length = OUTPUT_SIZE[0] * OUTPUT_SIZE[1] * 3
     if len(base_rgb_bytes) != expected_length:
         raise ImagePipelineError("Ungültiger interner 320×320-RGB-Basispuffer")
     base_image = Image.frombytes("RGB", OUTPUT_SIZE, base_rgb_bytes)
-    final_image = render_temperature_overlay(base_image, temperatures, overlay_config)
+    final_image = (
+        render_temperature_overlay(base_image, temperatures, overlay_config)
+        if overlay_slots is None
+        else render_data_overlay(base_image, overlay_slots, overlay_config)
+    )
+    final_image = rotate_composition(final_image, rotation_degrees)
     try:
         jpeg_bytes = _encode_jpeg(final_image)
     except OSError as error:
@@ -396,6 +568,9 @@ def _prepare_frame(
     mode: ScaleMode,
     overlay_config: TemperatureOverlayConfig,
     temperatures: TemperatureOverlayValues,
+    *,
+    overlay_slots: OverlaySlots | None = None,
+    rotation_degrees: object = 0,
 ) -> tuple[tuple[int, int], bytes, bytes, lcd_transport.JpegInfo]:
     oriented = ImageOps.exif_transpose(source_frame)
     oriented_size = oriented.size
@@ -409,6 +584,8 @@ def _prepare_frame(
         base_rgb_bytes,
         overlay_config,
         temperatures,
+        overlay_slots=overlay_slots,
+        rotation_degrees=rotation_degrees,
     )
     return oriented_size, base_rgb_bytes, jpeg_bytes, jpeg_info
 
@@ -419,6 +596,8 @@ def prepare_image(
     mode: ScaleMode = "crop",
     overlay_config: TemperatureOverlayConfig = TemperatureOverlayConfig(),
     temperatures: TemperatureOverlayValues = TemperatureOverlayValues(),
+    overlay_slots: OverlaySlots | None = None,
+    rotation_degrees: object = 0,
 ) -> PreparedImage:
     """Prepare only frame 0 of one supported file entirely in memory."""
     if mode not in ("crop", "fit"):
@@ -456,6 +635,8 @@ def prepare_image(
         mode,
         overlay_config,
         temperatures,
+        overlay_slots=overlay_slots,
+        rotation_degrees=rotation_degrees,
     )
 
     return PreparedImage(
@@ -468,6 +649,7 @@ def prepare_image(
         base_rgb_bytes=base_rgb_bytes,
         jpeg_bytes=jpeg_bytes,
         jpeg_info=jpeg_info,
+        rotation_degrees=normalize_rotation(rotation_degrees),
     )
 
 
@@ -476,14 +658,31 @@ def rerender_prepared_image(
     *,
     overlay_config: TemperatureOverlayConfig,
     temperatures: TemperatureOverlayValues,
+    overlay_slots: OverlaySlots | None = None,
+    rotation_degrees: object | None = None,
 ) -> PreparedImage:
     """Rebuild JPEG bytes from the cached base without reading sensors or source."""
     jpeg_bytes, jpeg_info = _encode_and_validate_frame(
         prepared.base_rgb_bytes,
         overlay_config,
         temperatures,
+        overlay_slots=overlay_slots,
+        rotation_degrees=(
+            prepared.rotation_degrees
+            if rotation_degrees is None
+            else rotation_degrees
+        ),
     )
-    return replace(prepared, jpeg_bytes=jpeg_bytes, jpeg_info=jpeg_info)
+    return replace(
+        prepared,
+        jpeg_bytes=jpeg_bytes,
+        jpeg_info=jpeg_info,
+        rotation_degrees=normalize_rotation(
+            prepared.rotation_degrees
+            if rotation_degrees is None
+            else rotation_degrees
+        ),
+    )
 
 
 def rerender_prepared_animation(

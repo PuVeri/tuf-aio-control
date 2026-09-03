@@ -1206,3 +1206,40 @@ Transferzeiten, tatsächliche Framezahl und Laufzeit, Stopgrund, Exceptions,
 Workerende und Handle-Close nach Prozessende ausgewertet werden. Der
 30-s-/30-Frame-Hardcap bleibt bis zu diesem Nachweis unverändert. Details:
 `research/reports/gui-live-transport-diagnostics.md`.
+
+### Konfigurierbare LCD-Telemetrie und Rotation
+
+Die GUI rotiert nun die vollständige fertige 320×320-Komposition per Button im
+Uhrzeigersinn durch 0°, 90°, 180° und 270°. Basisbild, Datenoverlay, Labels und
+Werte drehen gemeinsam; erst danach folgen JPEG-Encoding und bestehende
+Validierung. Preview und späterer `LatestFrameBuffer`-Snapshot verwenden
+dieselben Bytes. Winkel, Overlayfarbe/-zustand und die drei Slotbelegungen
+werden in `QSettings` persistiert; ungültige Winkel fallen auf 0°, unbekannte
+Metric-IDs auf den jeweiligen Slotdefault zurück.
+
+Die drei logischen Positionen oben links, oben rechts und unten Mitte besitzen
+unabhängige Dropdowns. Das allgemeine ID-basierte Metric-Modell bietet CPU- und
+GPU-Auslastung, CPU Package/Tctl, CPU CCD/Tccd1, GPU edge, junction/hotspot,
+mem sowie `Aus`. Fehlende Werte erscheinen als `—`, Lastwerte mit `%` und
+Temperaturen mit `°C`. Der Renderer arbeitet nur mit Metric-Daten und muss für
+spätere RAM-, Lüfter- oder NVMe-Metriken nicht umgebaut werden.
+
+Gesamt-CPU-Last wird ohne Sleep aus zwei aufeinanderfolgenden `/proc/stat`-
+Samples berechnet. GPU-Last kommt read-only aus `gpu_busy_percent` am dynamisch
+aufgelösten PCI-Gerätepfad derselben primären AMD-GPU wie der edge-Sensor;
+card- und hwmon-Nummern bleiben dynamisch. Nur eine sichtbare Änderung einer
+ausgewählten Metrik erzeugt im ungefähr 1-Hz-Poll ein neues validiertes JPEG.
+Rotation, Slotwahl und Farbe publizieren während `running` sofort eine neue
+Generation, ohne Sessionneustart. Der Worker liest weiterhin keine Sensoren.
+
+Der alte GUI-Button `Auf Display senden` samt direktem Einmal-Sendecode wurde
+entfernt. Der bestätigte Transport und die CLI-/Testwerkzeuge bleiben
+unverändert. `LCD starten`, `LCD stoppen`, `Gerät aktualisieren` und die
+standardmäßig ausgeschaltete Entwicklungs-Hardwarefreigabe bleiben bestehen;
+deren späterer Cleanup wird zusammen mit der Dauerbetriebspolitik geprüft.
+Der 30-s-/30-Frame-Hardcap blieb unverändert.
+
+Die vollständige Offline-Suite bestand mit 185 Tests; `git diff --check` und
+`compileall` waren sauber. Kein hidraw-Open, kein HID-/USB-Write und kein
+Live-Test fanden statt. Details:
+`research/reports/lcd-configurable-telemetry.md`.

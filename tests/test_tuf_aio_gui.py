@@ -18,6 +18,7 @@ REFERENCE_PATH = PROJECT_ROOT / "tests" / "fixtures" / "lcd-0x08-reference.jpg"
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from PySide6.QtCore import QSettings
+from PySide6.QtGui import QImage
 from PySide6.QtWidgets import QApplication
 from PIL import Image
 
@@ -28,6 +29,7 @@ import lcd_runtime_safety
 import lcd_transport
 import refresh_diagnostics
 import system_sensors
+import telemetry
 import tuf_aio_gui
 
 
@@ -252,14 +254,12 @@ class TufAioGuiOfflineTests(unittest.TestCase):
         finally:
             window.close()
 
-    def test_reference_image_is_compatible_and_enables_send(self) -> None:
+    def test_reference_image_is_compatible_and_prepares_lcd_output(self) -> None:
         window = self._window()
         try:
             self.assertTrue(window.load_image(REFERENCE_PATH))
             self.assertFalse(window.hardware_live_checkbox.isChecked())
-            self.assertFalse(window.send_button.isEnabled())
             window.hardware_live_checkbox.setChecked(True)
-            self.assertTrue(window.send_button.isEnabled())
             self.assertEqual(window.original_size_value.text(), "320×320")
             self.assertEqual(window.output_size_value.text(), "320×320")
             self.assertEqual(window.segments_value.text(), "3")
@@ -269,7 +269,7 @@ class TufAioGuiOfflineTests(unittest.TestCase):
         finally:
             window.close()
 
-    def test_incompatible_image_disables_send(self) -> None:
+    def test_incompatible_image_disables_lcd_start(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "invalid.png"
             path.write_bytes(b"not an image")
@@ -277,7 +277,7 @@ class TufAioGuiOfflineTests(unittest.TestCase):
             window = self._window()
             try:
                 self.assertFalse(window.load_image(path))
-                self.assertFalse(window.send_button.isEnabled())
+                self.assertFalse(window.start_lcd_button.isEnabled())
                 self.assertIn("Nicht sendbar", window.status_label.text())
             finally:
                 window.close()
@@ -288,47 +288,7 @@ class TufAioGuiOfflineTests(unittest.TestCase):
             self.assertEqual(window.device_status_label.text(), "Gerät: nicht verbunden")
             self.assertTrue(window.load_image(REFERENCE_PATH))
             window.hardware_live_checkbox.setChecked(True)
-            send_mock = mock.Mock(side_effect=AssertionError("send called"))
-            with (
-                mock.patch.object(window, "refresh_device_status", return_value=None),
-                mock.patch.object(tuf_aio_gui.transport, "send_frame_once", send_mock),
-                mock.patch.object(tuf_aio_gui.QMessageBox, "critical"),
-            ):
-                window.send_button.click()
-            send_mock.assert_not_called()
-        finally:
-            window.close()
-
-    def test_transport_error_is_reported_without_retry(self) -> None:
-        window = self._window()
-        try:
-            self.assertTrue(window.load_image(REFERENCE_PATH))
-            window.hardware_live_checkbox.setChecked(True)
-            send_mock = mock.Mock(side_effect=lcd_transport.LcdTransportError("offline"))
-            with (
-                mock.patch.object(window, "refresh_device_status", return_value=self._device()),
-                mock.patch.object(tuf_aio_gui.transport, "send_frame_once", send_mock),
-                mock.patch.object(tuf_aio_gui.QMessageBox, "critical"),
-            ):
-                window.send_button.click()
-            send_mock.assert_called_once()
-            self.assertIn("Transfer abgebrochen", window.status_label.text())
-        finally:
-            window.close()
-
-    def test_one_click_calls_send_frame_once_exactly_once(self) -> None:
-        window = self._window()
-        try:
-            self.assertTrue(window.load_image(REFERENCE_PATH))
-            window.hardware_live_checkbox.setChecked(True)
-            send_mock = mock.Mock(return_value=3)
-            with (
-                mock.patch.object(window, "refresh_device_status", return_value=self._device()),
-                mock.patch.object(tuf_aio_gui.transport, "send_frame_once", send_mock),
-            ):
-                window.send_button.click()
-            send_mock.assert_called_once()
-            self.assertIn("Ein Frame erfolgreich", window.status_label.text())
+            self.assertFalse(window.start_lcd_button.isEnabled())
         finally:
             window.close()
 
@@ -368,6 +328,8 @@ class TufAioGuiOfflineTests(unittest.TestCase):
                     temperatures=window._overlay_values(
                         window._latest_temperature_snapshot
                     ),
+                    overlay_slots=window._overlay_slots(),
+                    rotation_degrees=window._rotation_degrees,
                 )
                 self.assertEqual(after.jpeg_bytes, expected.jpeg_bytes)
             finally:
@@ -382,6 +344,97 @@ class TufAioGuiOfflineTests(unittest.TestCase):
                 )
             finally:
                 restored.close()
+
+    def test_rotation_cycles_persists_and_preview_matches_final_jpeg(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "settings.ini"
+            window = self._window(settings=self._settings(path))
+            try:
+                self.assertTrue(window.load_image(REFERENCE_PATH))
+                observed = []
+                for _ in range(4):
+                    window.rotation_button.click()
+                    observed.append(window._rotation_degrees)
+                    assert window._prepared is not None
+                    self.assertEqual(
+                        window._prepared.rotation_degrees,
+                        window._rotation_degrees,
+                    )
+                    preview = window._final_pixmap
+                    assert preview is not None
+                    expected = QImage.fromData(window._prepared.jpeg_bytes, "JPEG")
+                    self.assertEqual(preview.toImage(), expected)
+                self.assertEqual(observed, [90, 180, 270, 0])
+            finally:
+                window.close()
+
+            settings = self._settings(path)
+            settings.setValue(tuf_aio_gui.ROTATION_SETTING, 270)
+            settings.sync()
+            restored = self._window(settings=self._settings(path))
+            try:
+                self.assertEqual(restored._rotation_degrees, 270)
+                self.assertIn("270°", restored.rotation_button.text())
+            finally:
+                restored.close()
+
+    def test_invalid_saved_rotation_falls_back_to_zero(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "settings.ini"
+            settings = self._settings(path)
+            settings.setValue(tuf_aio_gui.ROTATION_SETTING, 45)
+            settings.sync()
+            window = self._window(settings=self._settings(path))
+            try:
+                self.assertEqual(window._rotation_degrees, 0)
+                self.assertEqual(
+                    int(window._settings.value(tuf_aio_gui.ROTATION_SETTING)), 0
+                )
+            finally:
+                window.close()
+
+    def test_slot_defaults_independent_selection_persistence_and_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "settings.ini"
+            window = self._window(settings=self._settings(path))
+            try:
+                self.assertEqual(window._slot_metric_ids, tuf_aio_gui.SLOT_DEFAULTS)
+                choices = {
+                    window.slot_combos["top_left"].itemData(index)
+                    for index in range(window.slot_combos["top_left"].count())
+                }
+                self.assertEqual(choices, {metric.value for metric in telemetry.MetricId})
+                selections = {
+                    "top_left": telemetry.MetricId.CPU_USAGE,
+                    "top_right": telemetry.MetricId.GPU_USAGE,
+                    "bottom_center": telemetry.MetricId.OFF,
+                }
+                for slot, metric_id in selections.items():
+                    combo = window.slot_combos[slot]
+                    combo.setCurrentIndex(combo.findData(metric_id.value))
+                self.assertEqual(window._slot_metric_ids, selections)
+            finally:
+                window.close()
+
+            restored = self._window(settings=self._settings(path))
+            try:
+                self.assertEqual(restored._slot_metric_ids, selections)
+            finally:
+                restored.close()
+
+            settings = self._settings(path)
+            settings.setValue(
+                f"{tuf_aio_gui.SLOT_SETTING_PREFIX}/top_right", "retired_metric"
+            )
+            settings.sync()
+            fallback = self._window(settings=self._settings(path))
+            try:
+                self.assertIs(
+                    fallback._slot_metric_ids["top_right"],
+                    telemetry.MetricId.GPU_TEMPERATURE,
+                )
+            finally:
+                fallback.close()
 
     def test_invalid_saved_color_falls_back_to_persisted_white(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -440,6 +493,80 @@ class TufAioGuiOfflineTests(unittest.TestCase):
             finally:
                 window.close()
 
+    def test_selected_usage_change_publishes_once_without_hid_or_restart(self) -> None:
+        snapshots = [
+            system_sensors.TemperatureSnapshot(
+                cpu_usage=system_sensors.PercentageValue(17.0, "/proc/stat")
+            ),
+            system_sensors.TemperatureSnapshot(
+                cpu_usage=system_sensors.PercentageValue(18.0, "/proc/stat")
+            ),
+            system_sensors.TemperatureSnapshot(
+                cpu_usage=system_sensors.PercentageValue(18.0, "/proc/stat")
+            ),
+        ]
+        reader = mock.Mock(side_effect=snapshots)
+        sender = FakeSender()
+        controllers: list[FakeRefreshController] = []
+
+        def factory(source: lcd_refresh.FrameSource) -> FakeRefreshController:
+            controller = FakeRefreshController(source, sender)
+            controllers.append(controller)
+            return controller
+
+        settings = self._settings(Path(self._settings_directory.name) / "usage.ini")
+        settings.setValue(tuf_aio_gui.OVERLAY_ENABLED_SETTING, True)
+        settings.setValue(
+            f"{tuf_aio_gui.SLOT_SETTING_PREFIX}/top_left",
+            telemetry.MetricId.CPU_USAGE.value,
+        )
+        settings.setValue(
+            f"{tuf_aio_gui.SLOT_SETTING_PREFIX}/top_right",
+            telemetry.MetricId.OFF.value,
+        )
+        settings.setValue(
+            f"{tuf_aio_gui.SLOT_SETTING_PREFIX}/bottom_center",
+            telemetry.MetricId.OFF.value,
+        )
+        window = self._window(
+            sensor_reader=reader,
+            settings=settings,
+            controller_factory=factory,
+        )
+        try:
+            self.assertTrue(window.load_image(REFERENCE_PATH))
+            window.hardware_live_checkbox.setChecked(True)
+            with (
+                mock.patch.object(
+                    tuf_aio_gui.transport.os,
+                    "open",
+                    side_effect=AssertionError("HID opened"),
+                ) as hid_open,
+                mock.patch.object(
+                    tuf_aio_gui.transport,
+                    "send_frame_once",
+                    side_effect=AssertionError("USB sender called"),
+                ) as send_once,
+            ):
+                window.start_lcd_button.click()
+                source = window._frame_buffer
+                assert source is not None
+                controller = controllers[0]
+                initial = source.snapshot().generation
+                window.refresh_temperatures()
+                self.assertEqual(source.snapshot().generation, initial + 1)
+                window.refresh_temperatures()
+                self.assertEqual(source.snapshot().generation, initial + 1)
+                self.assertIs(window._refresh_controller, controller)
+                hid_open.assert_not_called()
+                send_once.assert_not_called()
+        finally:
+            if controllers and controllers[0].is_running:
+                controllers[0].request_stop()
+                controllers[0].join()
+                window._poll_refresh_controller()
+            window.close()
+
     def test_live_controls_require_injected_factory_and_valid_frame(self) -> None:
         sender = FakeSender()
         controllers: list[FakeRefreshController] = []
@@ -465,7 +592,6 @@ class TufAioGuiOfflineTests(unittest.TestCase):
             self.assertEqual(window._refresh_state, tuf_aio_gui.GuiRefreshState.RUNNING)
             self.assertFalse(window.start_lcd_button.isEnabled())
             self.assertTrue(window.stop_lcd_button.isEnabled())
-            self.assertFalse(window.send_button.isEnabled())
             self.assertTrue(window.select_button.isEnabled())
         finally:
             if controllers and controllers[0].is_running:
@@ -491,10 +617,8 @@ class TufAioGuiOfflineTests(unittest.TestCase):
                     "send_frame_once",
                     side_effect=AssertionError("HID write path called"),
                 ) as send_once,
-                mock.patch.object(tuf_aio_gui.QMessageBox, "critical"),
             ):
                 window.start_lcd()
-                window.send_selected_image()
             factory.assert_not_called()
             device_open.assert_not_called()
             send_once.assert_not_called()
@@ -764,10 +888,22 @@ class TufAioGuiOfflineTests(unittest.TestCase):
                 window.start_lcd_button.click()
                 source = window._frame_buffer
                 assert source is not None
+                controller = controllers[0]
 
                 generation = source.snapshot().generation
                 window._set_overlay_color("#12ABCD")
                 self.assertEqual(source.snapshot().generation, generation + 1)
+
+                generation = source.snapshot().generation
+                window.rotation_button.click()
+                self.assertEqual(source.snapshot().generation, generation + 1)
+                self.assertIs(window._refresh_controller, controller)
+
+                generation = source.snapshot().generation
+                combo = window.slot_combos["top_left"]
+                combo.setCurrentIndex(combo.findData(telemetry.MetricId.CPU_USAGE.value))
+                self.assertEqual(source.snapshot().generation, generation + 1)
+                self.assertIs(window._refresh_controller, controller)
 
                 generation = source.snapshot().generation
                 window._overlay_toggled(False)
