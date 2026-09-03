@@ -4,11 +4,12 @@
 from __future__ import annotations
 
 import sys
+from enum import Enum
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Protocol
 
 from PySide6.QtCore import QSettings, QTimer, Qt
-from PySide6.QtGui import QColor, QImageReader, QPixmap, QResizeEvent
+from PySide6.QtGui import QColor, QCloseEvent, QImageReader, QPixmap, QResizeEvent
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -28,14 +29,38 @@ from PySide6.QtWidgets import (
 )
 
 import image_pipeline
+import lcd_refresh
 import lcd_transport as transport
 import system_sensors
 
 TemperatureReader = Callable[[], system_sensors.TemperatureSnapshot]
+
+
+class RefreshControllerLike(Protocol):
+    @property
+    def is_running(self) -> bool: ...
+
+    @property
+    def result(self) -> lcd_refresh.RefreshResult | None: ...
+
+    def start(self) -> None: ...
+
+    def request_stop(self) -> None: ...
+
+
+ControllerFactory = Callable[[lcd_refresh.FrameSource], RefreshControllerLike]
 SETTINGS_ORGANIZATION = "HeartDriveLab"
 SETTINGS_APPLICATION = "tuf-aio-control"
 OVERLAY_ENABLED_SETTING = "lcd_temperature_overlay/enabled"
 OVERLAY_COLOR_SETTING = "lcd_temperature_overlay/color"
+
+
+class GuiRefreshState(str, Enum):
+    IDLE = "idle"
+    STARTING = "starting"
+    RUNNING = "running"
+    STOPPING = "stopping"
+    ERROR = "error"
 
 
 class MainWindow(QMainWindow):
@@ -46,9 +71,11 @@ class MainWindow(QMainWindow):
         *,
         sensor_reader: TemperatureReader | None = None,
         settings: QSettings | None = None,
+        controller_factory: ControllerFactory | None = None,
     ) -> None:
         super().__init__()
         self._sensor_reader = sensor_reader or system_sensors.read_lcd_temperatures
+        self._controller_factory = controller_factory
         self._settings = (
             settings
             if settings is not None
@@ -69,6 +96,11 @@ class MainWindow(QMainWindow):
         self._device_ready = False
         self._original_pixmap: QPixmap | None = None
         self._final_pixmap: QPixmap | None = None
+        self._refresh_state = GuiRefreshState.IDLE
+        self._frame_buffer: lcd_refresh.LatestFrameBuffer | None = None
+        self._refresh_controller: RefreshControllerLike | None = None
+        self._last_refresh_result: lcd_refresh.RefreshResult | None = None
+        self._close_when_stopped = False
 
         self.setWindowTitle("TUF AIO Control")
         self.resize(920, 900)
@@ -80,6 +112,11 @@ class MainWindow(QMainWindow):
         self._temperature_timer.setInterval(1000)
         self._temperature_timer.timeout.connect(self.refresh_temperatures)
         self._temperature_timer.start()
+        self._refresh_state_timer = QTimer(self)
+        self._refresh_state_timer.setInterval(25)
+        self._refresh_state_timer.timeout.connect(self._poll_refresh_controller)
+        self._refresh_state_timer.start()
+        self._apply_refresh_state()
 
     def _build_ui(self) -> None:
         central = QWidget(self)
@@ -197,8 +234,17 @@ class MainWindow(QMainWindow):
         self.send_button.setObjectName("primaryButton")
         self.send_button.setEnabled(False)
         self.send_button.clicked.connect(self.send_selected_image)
+        self.start_lcd_button = QPushButton("LCD starten")
+        self.start_lcd_button.clicked.connect(self.start_lcd)
+        self.stop_lcd_button = QPushButton("LCD stoppen")
+        self.stop_lcd_button.clicked.connect(self.stop_lcd)
+        self.acknowledge_error_button = QPushButton("Fehler bestätigen")
+        self.acknowledge_error_button.clicked.connect(self.acknowledge_refresh_error)
         buttons.addWidget(self.select_button)
         buttons.addWidget(self.send_button)
+        buttons.addWidget(self.start_lcd_button)
+        buttons.addWidget(self.stop_lcd_button)
+        buttons.addWidget(self.acknowledge_error_button)
         outer.addLayout(buttons)
 
         self.status_label = QLabel("Status: Bitte ein Bild auswählen")
@@ -322,6 +368,12 @@ class MainWindow(QMainWindow):
         )
 
     def _overlay_toggled(self, enabled: bool) -> None:
+        if self._refresh_state in {
+            GuiRefreshState.STARTING,
+            GuiRefreshState.STOPPING,
+            GuiRefreshState.ERROR,
+        }:
+            return
         self._overlay_enabled = enabled
         self._settings.setValue(OVERLAY_ENABLED_SETTING, enabled)
         self._settings.sync()
@@ -337,6 +389,12 @@ class MainWindow(QMainWindow):
             self._set_overlay_color(selected.name(QColor.NameFormat.HexRgb))
 
     def _set_overlay_color(self, color: object) -> None:
+        if self._refresh_state in {
+            GuiRefreshState.STARTING,
+            GuiRefreshState.STOPPING,
+            GuiRefreshState.ERROR,
+        }:
+            return
         self._overlay_color = image_pipeline.normalize_overlay_color(color)
         self._settings.setValue(OVERLAY_COLOR_SETTING, self._overlay_color)
         self._settings.sync()
@@ -392,6 +450,7 @@ class MainWindow(QMainWindow):
         if (
             self._overlay_enabled
             and self._prepared is not None
+            and self._refresh_state in {GuiRefreshState.IDLE, GuiRefreshState.RUNNING}
             and self._overlay_values(snapshot) != previous_values
         ):
             self._rerender_temperature_overlay()
@@ -439,23 +498,29 @@ class MainWindow(QMainWindow):
             self.load_image(Path(filename))
 
     def _scale_mode_changed(self) -> None:
-        if self._selected_path is not None:
+        if (
+            self._selected_path is not None
+            and self._refresh_state in {GuiRefreshState.IDLE, GuiRefreshState.RUNNING}
+        ):
             self.load_image(self._selected_path)
 
     def load_image(self, path: Path) -> bool:
         """Show frame 0 of the source and prepare one validated output JPEG."""
+        if self._refresh_state not in {GuiRefreshState.IDLE, GuiRefreshState.RUNNING}:
+            return False
         resolved = path.expanduser().resolve()
-        self._selected_path = resolved
         self.path_value.setText(str(resolved))
         preview_size = self._load_original_preview(resolved)
         self.original_size_value.setText(
             f"{preview_size[0]}×{preview_size[1]}" if preview_size else "unbekannt"
         )
-        self._prepared = None
-        self._final_pixmap = None
-        self.final_preview.setPixmap(QPixmap())
-        self.final_preview.setText("Ausgabe wird vorbereitet …")
-        self._update_send_enabled()
+        previous_prepared = self._prepared
+        if self._refresh_state is GuiRefreshState.IDLE:
+            self._prepared = None
+            self._final_pixmap = None
+            self.final_preview.setPixmap(QPixmap())
+            self.final_preview.setText("Ausgabe wird vorbereitet …")
+            self._update_send_enabled()
 
         mode = self.scale_mode.currentData()
         try:
@@ -468,14 +533,20 @@ class MainWindow(QMainWindow):
                 ),
             )
             self._load_final_preview(prepared.jpeg_bytes)
+            self._publish_running_frame(prepared.jpeg_bytes)
         except (image_pipeline.ImagePipelineError, OSError, RuntimeError, ValueError) as error:
-            self._prepared = None
-            self._final_pixmap = None
-            self.final_preview.setPixmap(QPixmap())
-            self.final_preview.setText("Keine kompatible LCD-Ausgabe")
-            self._set_invalid_image(str(error))
+            if self._refresh_state is GuiRefreshState.RUNNING:
+                self._prepared = previous_prepared
+                self._show_render_error(str(error))
+            else:
+                self._prepared = None
+                self._final_pixmap = None
+                self.final_preview.setPixmap(QPixmap())
+                self.final_preview.setText("Keine kompatible LCD-Ausgabe")
+                self._set_invalid_image(str(error))
             return False
 
+        self._selected_path = resolved
         self._show_prepared_image(prepared)
         return True
 
@@ -501,7 +572,13 @@ class MainWindow(QMainWindow):
         )
         self.validation_value.setText("ASUS-JPEG-Validator: PASS")
         self.validation_value.setStyleSheet("color: #55c987;")
-        self.status_label.setText("Status: Bild vorbereitet – Senden nur nach Klick")
+        if self._refresh_state is GuiRefreshState.RUNNING:
+            generation = self._frame_buffer.snapshot().generation if self._frame_buffer else 0
+            self.status_label.setText(
+                f"Status: LCD läuft · Framegeneration {generation} veröffentlicht"
+            )
+        else:
+            self.status_label.setText("Status: Bild vorbereitet – Senden nur nach Klick")
         self._update_send_enabled()
 
     def _rerender_temperature_overlay(self) -> None:
@@ -516,11 +593,23 @@ class MainWindow(QMainWindow):
                 ),
             )
             self._load_final_preview(prepared.jpeg_bytes)
+            self._publish_running_frame(prepared.jpeg_bytes)
         except (image_pipeline.ImagePipelineError, OSError, RuntimeError, ValueError) as error:
-            self._prepared = None
-            self._set_invalid_image(str(error))
+            self._show_render_error(str(error))
             return
         self._show_prepared_image(prepared)
+
+    def _publish_running_frame(self, jpeg_bytes: bytes) -> None:
+        if self._refresh_state is not GuiRefreshState.RUNNING:
+            return
+        if self._frame_buffer is None:
+            raise RuntimeError("Laufende LCD-Session besitzt keinen Framepuffer")
+        self._frame_buffer.publish(jpeg_bytes)
+
+    def _show_render_error(self, reason: str) -> None:
+        self.status_label.setText(
+            f"Status: Frame-Aktualisierung fehlgeschlagen – letzter gültiger Frame bleibt aktiv: {reason}"
+        )
 
     def _load_original_preview(self, path: Path) -> tuple[int, int] | None:
         reader = QImageReader(str(path))
@@ -570,7 +659,146 @@ class MainWindow(QMainWindow):
         self._update_send_enabled()
 
     def _update_send_enabled(self) -> None:
-        self.send_button.setEnabled(self._prepared is not None and self._device_ready)
+        self._apply_refresh_state()
+
+    def _apply_refresh_state(self) -> None:
+        editable = self._refresh_state in {
+            GuiRefreshState.IDLE,
+            GuiRefreshState.RUNNING,
+        }
+        self.select_button.setEnabled(editable)
+        self.scale_mode.setEnabled(editable)
+        self.overlay_checkbox.setEnabled(editable)
+        self.overlay_color_button.setEnabled(editable)
+        self.refresh_button.setEnabled(editable)
+        self.send_button.setEnabled(
+            self._refresh_state is GuiRefreshState.IDLE
+            and self._prepared is not None
+            and self._device_ready
+        )
+        self.start_lcd_button.setEnabled(
+            self._refresh_state is GuiRefreshState.IDLE
+            and self._prepared is not None
+            and self._controller_factory is not None
+        )
+        self.stop_lcd_button.setEnabled(
+            self._refresh_state is GuiRefreshState.RUNNING
+        )
+        self.acknowledge_error_button.setVisible(
+            self._refresh_state is GuiRefreshState.ERROR
+        )
+        self.acknowledge_error_button.setEnabled(
+            self._refresh_state is GuiRefreshState.ERROR
+        )
+        if self._controller_factory is None:
+            self.start_lcd_button.setToolTip(
+                "Noch keine Produktions-Hardwareverdrahtung konfiguriert"
+            )
+        else:
+            self.start_lcd_button.setToolTip("")
+
+    def _set_refresh_state(self, state: GuiRefreshState) -> None:
+        self._refresh_state = state
+        self._apply_refresh_state()
+
+    def start_lcd(self) -> None:
+        """Start exactly one explicitly injected refresh session."""
+        if self._refresh_state is not GuiRefreshState.IDLE:
+            return
+        if self._prepared is None:
+            self.status_label.setText("Status: LCD-Start benötigt einen gültigen Frame")
+            self._apply_refresh_state()
+            return
+        if self._controller_factory is None:
+            self.status_label.setText(
+                "Status: LCD-Livebetrieb ist noch nicht mit Hardware verdrahtet"
+            )
+            self._apply_refresh_state()
+            return
+
+        self._set_refresh_state(GuiRefreshState.STARTING)
+        self.status_label.setText("Status: LCD-Session wird gestartet …")
+        controller: RefreshControllerLike | None = None
+        try:
+            frame_buffer = lcd_refresh.LatestFrameBuffer(self._prepared.jpeg_bytes)
+            controller = self._controller_factory(frame_buffer)
+            self._frame_buffer = frame_buffer
+            self._refresh_controller = controller
+            controller.start()
+        except Exception as error:
+            if controller is not None:
+                controller.request_stop()
+            self._enter_refresh_error(f"LCD-Start fehlgeschlagen: {error}")
+            return
+
+        self._set_refresh_state(GuiRefreshState.RUNNING)
+        self.status_label.setText("Status: LCD-Session läuft · Framegeneration 1")
+
+    def stop_lcd(self) -> None:
+        """Request stop without blocking the Qt event loop."""
+        if self._refresh_state is not GuiRefreshState.RUNNING:
+            return
+        controller = self._refresh_controller
+        if controller is None:
+            self._enter_refresh_error("Laufende LCD-Session besitzt keinen Controller")
+            return
+        try:
+            controller.request_stop()
+        except Exception as error:
+            self.status_label.setText(f"Status: Stopanforderung fehlgeschlagen: {error}")
+            return
+        self._set_refresh_state(GuiRefreshState.STOPPING)
+        self.status_label.setText("Status: LCD-Session wird sauber beendet …")
+
+    def _poll_refresh_controller(self) -> None:
+        if self._refresh_state not in {
+            GuiRefreshState.RUNNING,
+            GuiRefreshState.STOPPING,
+        }:
+            return
+        controller = self._refresh_controller
+        if controller is None:
+            self._enter_refresh_error("LCD-Session endete ohne Controller")
+            return
+        if controller.is_running:
+            return
+
+        result = controller.result
+        self._last_refresh_result = result
+        self._refresh_controller = None
+        if result is None:
+            self._enter_refresh_error("LCD-Refreshworker endete ohne Ergebnis")
+        elif result.stop_reason in {
+            lcd_refresh.RefreshStopReason.SEND_ERROR,
+            lcd_refresh.RefreshStopReason.INTERNAL_ERROR,
+        }:
+            detail = f": {result.error}" if result.error is not None else ""
+            self._enter_refresh_error(
+                f"LCD-Session wegen {result.stop_reason.value} beendet{detail}"
+            )
+        else:
+            self._frame_buffer = None
+            self._set_refresh_state(GuiRefreshState.IDLE)
+            self.status_label.setText(
+                f"Status: LCD-Session beendet ({result.stop_reason.value}, "
+                f"{result.frames_sent} Frames)"
+            )
+        if self._close_when_stopped:
+            self._close_when_stopped = False
+            QTimer.singleShot(0, self.close)
+
+    def _enter_refresh_error(self, message: str) -> None:
+        self._refresh_controller = None
+        self._set_refresh_state(GuiRefreshState.ERROR)
+        self.status_label.setText(f"Status: Fehler – {message} · kein Retry")
+
+    def acknowledge_refresh_error(self) -> None:
+        """Require one explicit user action before another session may start."""
+        if self._refresh_state is not GuiRefreshState.ERROR:
+            return
+        self._frame_buffer = None
+        self._set_refresh_state(GuiRefreshState.IDLE)
+        self.status_label.setText("Status: Fehler bestätigt – LCD-Session ist bereit")
 
     def send_selected_image(self) -> None:
         """Revalidate the prepared JPEG and request exactly one existing transfer."""
@@ -616,6 +844,18 @@ class MainWindow(QMainWindow):
         super().resizeEvent(event)
         self._update_scaled_preview(self.original_preview, self._original_pixmap)
         self._update_scaled_preview(self.final_preview, self._final_pixmap)
+
+    def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802 - Qt API
+        if self._refresh_state is GuiRefreshState.RUNNING:
+            self._close_when_stopped = True
+            self.stop_lcd()
+            event.ignore()
+            return
+        if self._refresh_state is GuiRefreshState.STOPPING:
+            self._close_when_stopped = True
+            event.ignore()
+            return
+        super().closeEvent(event)
 
 
 def main() -> int:

@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 import sys
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -15,10 +17,111 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QApplication
+from PIL import Image
 
+import image_pipeline
+import lcd_refresh
 import lcd_transport
 import system_sensors
 import tuf_aio_gui
+
+
+class FakeSender:
+    def __init__(self, *, error: Exception | None = None) -> None:
+        self.error = error
+        self.frames: list[bytes] = []
+        self.maximum_active = 0
+        self._active = 0
+        self._lock = threading.Lock()
+
+    def __call__(self, jpeg: bytes) -> int:
+        with self._lock:
+            self._active += 1
+            self.maximum_active = max(self.maximum_active, self._active)
+        try:
+            self.frames.append(jpeg)
+            if self.error is not None:
+                raise self.error
+            return lcd_transport.validate_jpeg(jpeg).segment_count
+        finally:
+            with self._lock:
+                self._active -= 1
+
+
+class FakeRefreshController:
+    """Controllable offline worker that consumes only injected snapshots."""
+
+    def __init__(
+        self,
+        source: lcd_refresh.FrameSource,
+        sender: FakeSender,
+        *,
+        block_sender: threading.Event | None = None,
+    ) -> None:
+        self.source = source
+        self.sender = sender
+        self.block_sender = block_sender
+        self.result: lcd_refresh.RefreshResult | None = None
+        self.request_stop_calls = 0
+        self._running = False
+        self._stop = threading.Event()
+        self._transfer = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    @property
+    def is_running(self) -> bool:
+        return self._running
+
+    def start(self) -> None:
+        self._running = True
+        self._transfer.set()
+        self._thread = threading.Thread(target=self._run, daemon=False)
+        self._thread.start()
+
+    def request_transfer(self) -> None:
+        self._transfer.set()
+
+    def request_stop(self) -> None:
+        self.request_stop_calls += 1
+        self._stop.set()
+        self._transfer.set()
+
+    def join(self) -> None:
+        if self._thread is not None:
+            self._thread.join(1.0)
+
+    def _run(self) -> None:
+        frames_sent = 0
+        try:
+            while not self._stop.is_set():
+                self._transfer.wait()
+                self._transfer.clear()
+                if self._stop.is_set():
+                    break
+                snapshot = self.source.snapshot()
+                if self.block_sender is not None:
+                    self.block_sender.wait(1.0)
+                self.sender(snapshot.jpeg_bytes)
+                frames_sent += 1
+        except Exception as error:
+            self.result = lcd_refresh.RefreshResult(
+                lcd_refresh.RefreshStopReason.SEND_ERROR,
+                frames_sent,
+                0.0,
+                (),
+                (),
+                error,
+            )
+        else:
+            self.result = lcd_refresh.RefreshResult(
+                lcd_refresh.RefreshStopReason.EXPLICIT_STOP,
+                frames_sent,
+                0.0,
+                (),
+                (),
+            )
+        finally:
+            self._running = False
 
 
 class TufAioGuiOfflineTests(unittest.TestCase):
@@ -56,6 +159,7 @@ class TufAioGuiOfflineTests(unittest.TestCase):
         discovery: tuple[lcd_transport.HidrawInterface | None, str] | None = None,
         sensor_reader: tuf_aio_gui.TemperatureReader | None = None,
         settings: QSettings | None = None,
+        controller_factory: tuf_aio_gui.ControllerFactory | None = None,
     ) -> tuf_aio_gui.MainWindow:
         result = discovery if discovery is not None else (self._device(), "gültig")
         reader = sensor_reader or system_sensors.TemperatureSnapshot
@@ -66,11 +170,25 @@ class TufAioGuiOfflineTests(unittest.TestCase):
         with mock.patch.object(
             tuf_aio_gui.transport, "discover_lcd_interface", return_value=result
         ):
-            return tuf_aio_gui.MainWindow(sensor_reader=reader, settings=settings)
+            return tuf_aio_gui.MainWindow(
+                sensor_reader=reader,
+                settings=settings,
+                controller_factory=controller_factory,
+            )
 
     @staticmethod
     def _settings(path: Path) -> QSettings:
         return QSettings(str(path), QSettings.Format.IniFormat)
+
+    @staticmethod
+    def _wait_until(predicate: object, timeout: float = 1.0) -> None:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if predicate():  # type: ignore[operator]
+                return
+            QApplication.processEvents()
+            time.sleep(0.005)
+        raise AssertionError("Bedingung wurde nicht rechtzeitig erfüllt")
 
     def test_missing_temperatures_are_shown_as_na(self) -> None:
         window = self._window()
@@ -296,6 +414,239 @@ class TufAioGuiOfflineTests(unittest.TestCase):
                 self.assertEqual(reader.call_count, 2)
             finally:
                 window.close()
+
+    def test_live_controls_require_injected_factory_and_valid_frame(self) -> None:
+        sender = FakeSender()
+        controllers: list[FakeRefreshController] = []
+
+        def factory(source: lcd_refresh.FrameSource) -> FakeRefreshController:
+            self.assertEqual(window._refresh_state, tuf_aio_gui.GuiRefreshState.STARTING)
+            self.assertFalse(window.select_button.isEnabled())
+            controller = FakeRefreshController(source, sender)
+            controllers.append(controller)
+            return controller
+
+        window = self._window(controller_factory=factory)
+        try:
+            self.assertEqual(window._refresh_state, tuf_aio_gui.GuiRefreshState.IDLE)
+            self.assertFalse(window.start_lcd_button.isEnabled())
+            self.assertFalse(window.stop_lcd_button.isEnabled())
+            self.assertTrue(window.load_image(REFERENCE_PATH))
+            self.assertTrue(window.start_lcd_button.isEnabled())
+
+            window.start_lcd_button.click()
+            self.assertEqual(window._refresh_state, tuf_aio_gui.GuiRefreshState.RUNNING)
+            self.assertFalse(window.start_lcd_button.isEnabled())
+            self.assertTrue(window.stop_lcd_button.isEnabled())
+            self.assertFalse(window.send_button.isEnabled())
+            self.assertTrue(window.select_button.isEnabled())
+        finally:
+            if controllers and controllers[0].is_running:
+                controllers[0].request_stop()
+                controllers[0].join()
+                window._poll_refresh_controller()
+            window.close()
+
+    def test_fake_end_to_end_publishes_changed_sensor_once_and_stops(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "hwmon"
+            cpu = root / "hwmon7"
+            cpu.mkdir(parents=True)
+            (cpu / "name").write_text("k10temp\n", encoding="ascii")
+            (cpu / "temp1_label").write_text("Tctl\n", encoding="ascii")
+            sensor_input = cpu / "temp1_input"
+            sensor_input.write_text("50000\n", encoding="ascii")
+            settings = self._settings(Path(directory) / "settings.ini")
+            settings.setValue(tuf_aio_gui.OVERLAY_ENABLED_SETTING, True)
+            sender = FakeSender()
+            controllers: list[FakeRefreshController] = []
+
+            def factory(source: lcd_refresh.FrameSource) -> FakeRefreshController:
+                controller = FakeRefreshController(source, sender)
+                controllers.append(controller)
+                return controller
+
+            window = self._window(
+                sensor_reader=lambda: system_sensors.read_lcd_temperatures(root),
+                settings=settings,
+                controller_factory=factory,
+            )
+            try:
+                self.assertTrue(window.load_image(REFERENCE_PATH))
+                with (
+                    mock.patch.object(
+                        tuf_aio_gui.transport.os,
+                        "open",
+                        side_effect=AssertionError("HID opened"),
+                    ) as hid_open,
+                    mock.patch.object(
+                        tuf_aio_gui.transport,
+                        "send_frame_once",
+                        side_effect=AssertionError("USB sender called"),
+                    ) as real_sender,
+                ):
+                    window.start_lcd_button.click()
+                    controller = controllers[0]
+                    self._wait_until(lambda: len(sender.frames) == 1)
+                    source = window._frame_buffer
+                    assert source is not None
+                    initial = source.snapshot()
+                    self.assertEqual(initial.generation, 1)
+                    self.assertIs(sender.frames[0], initial.jpeg_bytes)
+
+                    sensor_input.write_text("51000\n", encoding="ascii")
+                    window.refresh_temperatures()
+                    changed = source.snapshot()
+                    self.assertEqual(changed.generation, 2)
+                    window.refresh_temperatures()
+                    self.assertEqual(source.snapshot().generation, 2)
+
+                    controller.request_transfer()
+                    self._wait_until(lambda: len(sender.frames) == 2)
+                    self.assertIs(sender.frames[1], changed.jpeg_bytes)
+                    self.assertEqual(sender.maximum_active, 1)
+
+                    window.stop_lcd_button.click()
+                    self.assertEqual(
+                        window._refresh_state, tuf_aio_gui.GuiRefreshState.STOPPING
+                    )
+                    controller.join()
+                    window._poll_refresh_controller()
+                    self.assertEqual(window._refresh_state, tuf_aio_gui.GuiRefreshState.IDLE)
+                    self.assertEqual(controller.request_stop_calls, 1)
+                    hid_open.assert_not_called()
+                    real_sender.assert_not_called()
+            finally:
+                if controllers and controllers[0].is_running:
+                    controllers[0].request_stop()
+                    controllers[0].join()
+                    window._poll_refresh_controller()
+                window.close()
+
+    def test_running_changes_publish_and_render_error_keeps_last_frame(self) -> None:
+        sender = FakeSender()
+        controllers: list[FakeRefreshController] = []
+
+        def factory(source: lcd_refresh.FrameSource) -> FakeRefreshController:
+            controller = FakeRefreshController(source, sender)
+            controllers.append(controller)
+            return controller
+
+        with tempfile.TemporaryDirectory() as directory:
+            settings = self._settings(Path(directory) / "settings.ini")
+            settings.setValue(tuf_aio_gui.OVERLAY_ENABLED_SETTING, True)
+            alternate = Path(directory) / "alternate.png"
+            Image.new("RGB", (480, 240), "navy").save(alternate)
+            window = self._window(settings=settings, controller_factory=factory)
+            try:
+                self.assertTrue(window.load_image(REFERENCE_PATH))
+                window.start_lcd_button.click()
+                source = window._frame_buffer
+                assert source is not None
+
+                generation = source.snapshot().generation
+                window._set_overlay_color("#12ABCD")
+                self.assertEqual(source.snapshot().generation, generation + 1)
+
+                generation = source.snapshot().generation
+                window._overlay_toggled(False)
+                self.assertEqual(source.snapshot().generation, generation + 1)
+
+                generation = source.snapshot().generation
+                self.assertTrue(window.load_image(alternate))
+                self.assertEqual(source.snapshot().generation, generation + 1)
+
+                generation = source.snapshot().generation
+                window.scale_mode.setCurrentIndex(1)
+                self.assertEqual(source.snapshot().generation, generation + 1)
+
+                before = source.snapshot()
+                prepared_before = window._prepared
+                with mock.patch.object(
+                    image_pipeline,
+                    "rerender_prepared_image",
+                    side_effect=image_pipeline.ImagePipelineError("injected render error"),
+                ):
+                    window._overlay_toggled(True)
+                self.assertIs(source.snapshot(), before)
+                self.assertIs(window._prepared, prepared_before)
+                self.assertEqual(window._refresh_state, tuf_aio_gui.GuiRefreshState.RUNNING)
+                self.assertIn("letzter gültiger Frame", window.status_label.text())
+
+                color_before_stop = window._overlay_color
+                window.stop_lcd_button.click()
+                stopping_snapshot = source.snapshot()
+                window._set_overlay_color("#654321")
+                self.assertEqual(window._overlay_color, color_before_stop)
+                self.assertIs(source.snapshot(), stopping_snapshot)
+            finally:
+                if controllers and controllers[0].is_running:
+                    controllers[0].request_stop()
+                    controllers[0].join()
+                    window._poll_refresh_controller()
+                window.close()
+
+    def test_transport_error_enters_error_without_retry_until_acknowledged(self) -> None:
+        sender = FakeSender(error=lcd_transport.LcdTransportError("injected"))
+        controllers: list[FakeRefreshController] = []
+
+        def factory(source: lcd_refresh.FrameSource) -> FakeRefreshController:
+            controller = FakeRefreshController(source, sender)
+            controllers.append(controller)
+            return controller
+
+        window = self._window(controller_factory=factory)
+        try:
+            self.assertTrue(window.load_image(REFERENCE_PATH))
+            window.start_lcd_button.click()
+            controller = controllers[0]
+            controller.join()
+            window._poll_refresh_controller()
+
+            self.assertEqual(window._refresh_state, tuf_aio_gui.GuiRefreshState.ERROR)
+            self.assertEqual(len(sender.frames), 1)
+            self.assertFalse(window.start_lcd_button.isEnabled())
+            self.assertFalse(window.acknowledge_error_button.isHidden())
+            self.assertIn("kein Retry", window.status_label.text())
+
+            window.acknowledge_error_button.click()
+            self.assertEqual(window._refresh_state, tuf_aio_gui.GuiRefreshState.IDLE)
+            self.assertTrue(window.start_lcd_button.isEnabled())
+        finally:
+            window.close()
+
+    def test_close_requests_nonblocking_stop_before_accepting_close(self) -> None:
+        release_sender = threading.Event()
+        sender = FakeSender()
+        controllers: list[FakeRefreshController] = []
+
+        def factory(source: lcd_refresh.FrameSource) -> FakeRefreshController:
+            controller = FakeRefreshController(
+                source,
+                sender,
+                block_sender=release_sender,
+            )
+            controllers.append(controller)
+            return controller
+
+        window = self._window(controller_factory=factory)
+        self.assertTrue(window.load_image(REFERENCE_PATH))
+        window.show()
+        window.start_lcd_button.click()
+        controller = controllers[0]
+        started = time.monotonic()
+        window.close()
+        elapsed = time.monotonic() - started
+        self.assertLess(elapsed, 0.1)
+        self.assertEqual(window._refresh_state, tuf_aio_gui.GuiRefreshState.STOPPING)
+        self.assertEqual(controller.request_stop_calls, 1)
+        self.assertTrue(window.isVisible())
+
+        release_sender.set()
+        controller.join()
+        window._poll_refresh_controller()
+        QApplication.processEvents()
+        self.assertFalse(window.isVisible())
 
 
 if __name__ == "__main__":

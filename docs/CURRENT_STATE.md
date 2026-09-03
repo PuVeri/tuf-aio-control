@@ -1017,3 +1017,51 @@ Konkurrenzläufe, sowie die vollständige Suite mit 152 Tests bestanden offline.
 Es gab keine Gerätekommunikation, keine HID-Writes und keine GUI-Live-
 Verdrahtung. Nächster offener Schritt ist das weiterhin rein offline geplante
 GUI-State-Modell mit injizierbarer Controller-/Senderfabrik.
+
+### GUI-State- und Controller-Integrationslayer
+
+Die Schritte 3 bis 6 des GUI-/Refreshintegrationsplans sind nun offline
+implementiert. `GuiRefreshState` modelliert explizit `idle`, `starting`,
+`running`, `stopping` und `error`; die zentral abgeleitete UI-Freigabe steuert
+`LCD starten`, `LCD stoppen`, den direkten Einzelbildtransfer sowie Bild-,
+Skalierungs- und Overlayänderungen. Es gibt keinen Autostart. Beim Schließen
+einer laufenden Session wird nicht blockierend `request_stop()` angefordert und
+erst nach dem terminalen Workergebnis geschlossen. Ein Transportfehler endet
+ohne Retry in `error`; erst eine ausdrückliche Benutzerbestätigung führt nach
+`idle` zurück.
+
+Die GUI akzeptiert eine injizierbare `ControllerFactory` auf der schmalen
+`RefreshControllerLike`-Schnittstelle. Die Factory erhält ausschließlich die
+`FrameSource` der Session. Es existiert bewusst keine Produktions-Factory:
+Die GUI erzeugt keinen `HidrawFrameSender`, legt kein Transportintervall fest
+und kann ohne explizite Injection keine LCD-Refreshsession starten.
+
+Beim Start wird der vorbereitete, erneut validierte Frame als Generation 1 in
+einem sessionspezifischen `LatestFrameBuffer` publiziert. Während `running`
+führen erfolgreiche Bild-, Crop/fit-, Overlay-, Farb- und tatsächlich relevante
+Sensoränderungen über Basisframe, Overlay, JPEG-Encoding und Validator zu genau
+einer atomaren Publikation. Render- oder Validierungsfehler lassen den letzten
+gültigen Snapshot und dessen Generation unverändert. Während `stopping` wird
+nichts Neues publiziert.
+
+Das vorhandene 1000-ms-Sensorpolling bleibt ausschließlich im GUI-Thread. Nur
+geänderte Tctl-, primäre-GPU-edge- oder Tccd1-Werte erzeugen bei aktivem Overlay
+ein neues JPEG; ein unveränderter Folgepoll publiziert nichts. Der
+Refreshworker liest weder sysfs noch Sensorobjekte.
+
+Fünf neue headless-Qt-Integrationstests verwenden Fake-hwmon,
+Fake-Controller und Fake-Sender. Sie prüfen den vollständigen Start-/Snapshot-/
+Sensorupdate-/Folgetransfer-/Stop-Pfad, exakt eine Generation pro Änderung,
+keine parallelen Transfers, Farb-, Overlay-, Bild- und Skalierungsänderungen,
+den letzten gültigen Frame bei Renderfehlern, `error` ohne Retry sowie den
+nichtblockierenden Fensterschluss. `os.open()` und `send_frame_once()` wurden im
+Fake-End-to-End-Pfad überwacht und nicht erreicht. Die vollständige
+Offline-Suite bestand mit 157 Tests; `git diff --check` war sauber. Es fanden
+keine Gerätekommunikation, keine HID-/USB-Writes und keine Live-Tests statt.
+
+Der nächste offene Schritt ist ein gesondert freizugebendes Hardwareticket:
+eine Produktions-Factory mit realem `HidrawFrameSender`, erneuter sicherer
+Geräteprüfung, explizitem konservativem Intervall, begrenzter Sessionpolitik und
+GO/NO-GO. Externe Writer und Sichtbarkeitskriterien müssen davor ebenfalls
+festgelegt werden. Interface 0, OpenRGB/`0b05:19af`, GIF-Liveanimation und
+Dauerbetrieb bleiben ausgeschlossen.
