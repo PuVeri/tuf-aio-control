@@ -9,7 +9,7 @@ import stat
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
+from typing import Callable, Sequence
 
 from discover_device import HidrawInterface, discover
 
@@ -509,7 +509,17 @@ def _sysfs_device_number(device: HidrawInterface) -> int:
     return os.makedev(int(major_text), int(minor_text))
 
 
-def validate_open_target(fd: int, expected: HidrawInterface) -> None:
+DeviceValidator = Callable[[HidrawInterface], str | None]
+TransferValidator = Callable[[], None]
+WriteObserver = Callable[[TransferSegment], None]
+
+
+def validate_open_target(
+    fd: int,
+    expected: HidrawInterface,
+    *,
+    extra_validator: DeviceValidator | None = None,
+) -> None:
     """Revalidate identity and framing immediately before every write."""
     expected_error = device_validation_error(expected)
     if expected_error is not None:
@@ -531,6 +541,10 @@ def validate_open_target(fd: int, expected: HidrawInterface) -> None:
     ]
     if len(current_matches) != 1:
         raise RuntimeError("Ziel oder HID-Reportstruktur hat sich verändert")
+    if extra_validator is not None:
+        error = extra_validator(current_matches[0])
+        if error is not None:
+            raise RuntimeError(error)
 
 
 def load_jpeg(path: Path, *, max_segments: int = MAX_SEGMENTS) -> bytes:
@@ -558,7 +572,15 @@ def load_jpeg(path: Path, *, max_segments: int = MAX_SEGMENTS) -> bytes:
     return data
 
 
-def send_frame_once(device: HidrawInterface, jpeg: bytes) -> int:
+def send_frame_once(
+    device: HidrawInterface,
+    jpeg: bytes,
+    *,
+    prepared_segments: Sequence[TransferSegment] | None = None,
+    extra_validator: DeviceValidator | None = None,
+    extra_transfer_validator: TransferValidator | None = None,
+    write_observer: WriteObserver | None = None,
+) -> int:
     """Synchronously send exactly one validated frame, without retry or reads.
 
     Returns the number of successful writes. Any failure raises immediately;
@@ -568,10 +590,21 @@ def send_frame_once(device: HidrawInterface, jpeg: bytes) -> int:
         raise LcdTransportError("Ein anderer Frame-Sender ist bereits aktiv")
     try:
         validate_jpeg(jpeg)
-        segments = build_segments(jpeg)
+        segments = (
+            tuple(prepared_segments)
+            if prepared_segments is not None
+            else build_segments(jpeg)
+        )
+        validate_transfer_invariants(jpeg, segments)
+        if extra_transfer_validator is not None:
+            extra_transfer_validator()
         error = device_validation_error(device)
         if error is not None:
             raise LcdTransportError(error)
+        if extra_validator is not None:
+            error = extra_validator(device)
+            if error is not None:
+                raise LcdTransportError(error)
         if not os.access(device.device_path, os.W_OK):
             raise PermissionError(
                 "Keine Schreibberechtigung; Rechte wurden nicht verändert"
@@ -585,7 +618,13 @@ def send_frame_once(device: HidrawInterface, jpeg: bytes) -> int:
         completed = 0
         try:
             for segment in segments:
-                validate_open_target(fd, device)
+                if extra_transfer_validator is not None:
+                    extra_transfer_validator()
+                validate_open_target(
+                    fd,
+                    device,
+                    extra_validator=extra_validator,
+                )
                 validate_transfer_invariants(jpeg, segments)
                 try:
                     written = os.write(fd, segment.hidraw_buffer)
@@ -601,6 +640,8 @@ def send_frame_once(device: HidrawInterface, jpeg: bytes) -> int:
                         f"{written} statt {HIDRAW_WRITE_BYTES} Byte; kein Nachsenden"
                     )
                 completed += 1
+                if write_observer is not None:
+                    write_observer(segment)
             return completed
         finally:
             os.close(fd)

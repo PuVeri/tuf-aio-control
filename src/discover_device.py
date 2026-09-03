@@ -18,6 +18,14 @@ HIDRAW_CLASS = Path("/sys/class/hidraw")
 
 
 @dataclass(frozen=True)
+class UsbEndpoint:
+    address: int
+    attributes: int
+    max_packet_size: int
+    interval: int
+
+
+@dataclass(frozen=True)
 class HidrawInterface:
     device_path: str
     sysfs_path: str
@@ -33,6 +41,15 @@ class HidrawInterface:
     report_ids: tuple[int, ...]
     readable: bool
     udev_properties: dict[str, str]
+    usage_page: int | None = None
+    usage: int | None = None
+    bcd_device: str | None = None
+    alternate_setting: int | None = None
+    interface_class: int | None = None
+    interface_subclass: int | None = None
+    interface_protocol: int | None = None
+    endpoint_count: int | None = None
+    endpoints: tuple[UsbEndpoint, ...] = ()
 
 
 def _read_text(path: Path) -> str | None:
@@ -68,6 +85,64 @@ def _find_interface_number(start: Path, usb_device: Path) -> int | None:
             except ValueError:
                 return None
     return None
+
+
+def _find_usb_interface(start: Path, usb_device: Path) -> Path | None:
+    for candidate in _ancestors(start):
+        if candidate == usb_device:
+            break
+        if _read_text(candidate / "bInterfaceNumber") is not None:
+            return candidate
+    return None
+
+
+def _read_hex(path: Path) -> int | None:
+    value = _read_text(path)
+    if value is None:
+        return None
+    try:
+        return int(value, 16)
+    except ValueError:
+        return None
+
+
+def _read_decimal(path: Path) -> int | None:
+    value = _read_text(path)
+    if value is None:
+        return None
+    digits = "".join(character for character in value if character.isdecimal())
+    if not digits:
+        return None
+    try:
+        return int(digits, 10)
+    except ValueError:
+        return None
+
+
+def _read_endpoints(interface: Path | None) -> tuple[UsbEndpoint, ...]:
+    if interface is None:
+        return ()
+    endpoints: list[UsbEndpoint] = []
+    try:
+        entries = sorted(interface.glob("ep_*"))
+    except OSError:
+        return ()
+    for entry in entries:
+        address = _read_hex(entry / "bEndpointAddress")
+        attributes = _read_hex(entry / "bmAttributes")
+        max_packet_size = _read_hex(entry / "wMaxPacketSize")
+        interval = _read_decimal(entry / "interval")
+        if None in (address, attributes, max_packet_size, interval):
+            continue
+        endpoints.append(
+            UsbEndpoint(
+                address=address,
+                attributes=attributes,
+                max_packet_size=max_packet_size,
+                interval=interval,
+            )
+        )
+    return tuple(endpoints)
 
 
 def _udev_properties(sysfs_class_entry: Path) -> dict[str, str]:
@@ -108,6 +183,8 @@ def parse_report_descriptor(data: bytes) -> dict[str, object]:
     report_count = 0
     report_id = 0
     declared_ids: set[int] = set()
+    usage_page: int | None = None
+    usage: int | None = None
     bits: dict[str, dict[int, int]] = {
         "input": {},
         "output": {},
@@ -136,13 +213,17 @@ def parse_report_descriptor(data: bytes) -> dict[str, object]:
         item_type = (prefix >> 2) & 0x03
         tag = (prefix >> 4) & 0x0F
         if item_type == 1:  # Global item
-            if tag == 7:
+            if tag == 0 and usage_page is None:
+                usage_page = value
+            elif tag == 7:
                 report_size = value
             elif tag == 8:
                 report_id = value
                 declared_ids.add(value)
             elif tag == 9:
                 report_count = value
+        elif item_type == 2 and tag == 0 and usage is None:  # Local Usage
+            usage = value
         elif item_type == 0:  # Main item
             kind = {8: "input", 9: "output", 11: "feature"}.get(tag)
             if kind is not None:
@@ -164,6 +245,8 @@ def parse_report_descriptor(data: bytes) -> dict[str, object]:
         "output_report_bytes": maximum_bytes("output"),
         "feature_report_bytes": maximum_bytes("feature"),
         "report_ids": tuple(sorted(declared_ids)),
+        "usage_page": usage_page,
+        "usage": usage,
     }
 
 
@@ -197,6 +280,8 @@ def discover(
             "output_report_bytes": None,
             "feature_report_bytes": None,
             "report_ids": (),
+            "usage_page": None,
+            "usage": None,
         }
         try:
             descriptor_info = parse_report_descriptor(
@@ -206,6 +291,7 @@ def discover(
             pass
 
         device_path = Path("/dev") / entry.name
+        usb_interface = _find_usb_interface(hid_device, usb_device)
         found.append(
             HidrawInterface(
                 device_path=str(device_path),
@@ -222,6 +308,35 @@ def discover(
                 report_ids=descriptor_info["report_ids"],  # type: ignore[arg-type]
                 readable=os.access(device_path, os.R_OK),
                 udev_properties=_udev_properties(entry) if include_udev else {},
+                usage_page=descriptor_info["usage_page"],  # type: ignore[arg-type]
+                usage=descriptor_info["usage"],  # type: ignore[arg-type]
+                bcd_device=_read_text(usb_device / "bcdDevice"),
+                alternate_setting=(
+                    _read_hex(usb_interface / "bAlternateSetting")
+                    if usb_interface is not None
+                    else None
+                ),
+                interface_class=(
+                    _read_hex(usb_interface / "bInterfaceClass")
+                    if usb_interface is not None
+                    else None
+                ),
+                interface_subclass=(
+                    _read_hex(usb_interface / "bInterfaceSubClass")
+                    if usb_interface is not None
+                    else None
+                ),
+                interface_protocol=(
+                    _read_hex(usb_interface / "bInterfaceProtocol")
+                    if usb_interface is not None
+                    else None
+                ),
+                endpoint_count=(
+                    _read_hex(usb_interface / "bNumEndpoints")
+                    if usb_interface is not None
+                    else None
+                ),
+                endpoints=_read_endpoints(usb_interface),
             )
         )
 
@@ -287,4 +402,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

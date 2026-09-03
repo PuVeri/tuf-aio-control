@@ -12,6 +12,12 @@ Kanonischer Live-Stand vom 2026-09-03:
 - UI und Bildpipeline wurden real benutzt. Ein GIF wurde über die Pipeline
   gesendet; dessen erstes Frame erschien erfolgreich als Standbild auf dem LCD.
 - Danach ersetzte die AIO das Standbild wieder durch ihr ASUS-Standardbild.
+- Der erste begrenzte reale Refresh-Test übertrug das Referenz-JPEG bei 1,0 s
+  Sollintervall exakt fünfmal: 15 vollständige 1025-Byte-Writes, ungefähr
+  108–109 ms Transferdauer je Frame, kein Retry, Fehler oder Catch-up.
+- Das Referenzbild war während dieses Refresh-Laufs real sichtbar. Seine
+  Sichtdauer wurde nicht gemessen; lückenlose Sichtbarkeit, sichere
+  Default-Unterdrückung und eine ausreichende Refreshrate sind nicht bestätigt.
 - Echte GIF-Animation ist weder implementiert noch empirisch bestätigt.
 
 Stand: 2026-09-03
@@ -765,6 +771,76 @@ unmittelbar danach auch im Fehlerfall wiederhergestellt werden. Transporterfolg
 (Referenzbild bleibt während der aktiven Session ohne Default-Unterbrechung)
 sind getrennt zu erfassen; der Code behauptet keinen sichtbaren Erfolg.
 
+## Implementierter Einstieg für den ersten Refresh-Test
+
+Der ausschließlich auf dieses Profil begrenzte Einstieg liegt jetzt in
+`src/test_lcd_refresh.py`; Bedienung und Code-Review stehen in
+`docs/LCD_REFRESH_TEST.md` und
+`research/reports/lcd-first-refresh-test-code-review.md`. In diesem Ticket gab
+es keine Gerätekommunikation, keinen hidraw-Open und keinen HID-Write. Der reale
+Refresh-Test wurde weiterhin nicht ausgeführt.
+
+Standardaufruf und `--dry-run` sind reine Preview. Nur der nicht abkürzbare
+Schalter `--i-understand-the-risk` kann nach vollständig bestandenem Preflight
+den Livepfad erreichen. Bild, Hash, `N=3`, fünf Frames, 15 Writes, 1,0 s
+Startintervall und 6,0 s Sessiongrenze sind nicht konfigurierbar.
+
+Die read-only Discovery erfasst dafür zusätzlich `bcdDevice`, HID Usage Page/
+Usage, USB-Interfaceattribute und beide Endpointprofile. Vor Sessionstart und
+vor jedem Write werden Gerät `0b05:1c7b`, ausschließlich Interface 1,
+`bcdDevice` numerisch exakt `0x0049`, Usage `ff06/01`, Reportgrößen,
+Endpointprofil, Referenzhash,
+JPEG, `N` und alle 5×3 vorbereiteten Reports geprüft. Eine lokale `/proc`-
+Prüfung bricht bei einem sichtbaren fremden Writer auf genau demselben
+Character Device ab; sie beendet keine Prozesse und berührt das getrennte
+OpenRGB-Gerät `0b05:19af` nicht.
+
+Im erreichbaren Refreshpfad existiert weiterhin genau eine `os.write()`-
+Quelltextstelle in `lcd_transport.py` und keine `os.read()`-Stelle. Der erste
+Fehler beendet ohne Retry oder Recovery; jedes per Frame geöffnete Handle wird
+im `finally` geschlossen. Der Code meldet ausschließlich Transporterfolg bei
+fünf Frames und 15 vollständigen Writes. Ob das Referenzbild ohne
+zwischenzeitliches Defaultbild sichtbar bleibt, muss der Benutzer getrennt
+beobachten.
+
+Der erste reale Aufruf dieses Einstiegs wurde im Preflight ohne HID-Write
+abgebrochen, weil sysfs `bcdDevice` als Rohtext `0049` lieferte und der Code
+noch die Darstellungsform `0.49` verglich. Dieser reine Formatfehler ist
+behoben: `0049`, `0x0049` und `0.49` werden zum Wert `0x0049` normalisiert;
+andere oder fehlerhafte Werte bleiben gesperrt. Der damalige Abbruch lag vor
+`run_live()` und konnte die einzige Write-Callsite nicht erreichen.
+
+27 neue Offline-Tests erhöhen die vollständig gemockte Suite auf 109
+erfolgreiche Tests. Wegen des gewünschten Einstiegsnamens wurde die bisherige
+gleichnamige Controller-Testdatei in `test_lcd_refresh_controller.py`
+umbenannt, ohne ihren Inhalt zu ändern. Der Code ist damit für genau den
+gesondert autorisierten Live-Test bereit; er ist weiterhin weder in GUI noch
+in einen automatischen Startpfad eingebunden.
+
+## Erster begrenzter Refresh-Live-Test 01
+
+Der reale Lauf ist in
+`research/reports/lcd-first-refresh-live-test-01.md` dokumentiert. Das Gerät
+war `0b05:1c7b` mit `bcdDevice 0.49`; gesendet wurde ausschließlich über
+Interface 1 das bekannte 2236-Byte-Referenz-JPEG mit `N=3`.
+
+Die fünf Frame-Starts lagen ungefähr bei 0,000126 s, 1,000215 s, 2,000251 s,
+3,000321 s und 4,000398 s. Jeder Transfer dauerte ungefähr 108–109 ms. Alle
+15 Writes waren mit jeweils 1025 Byte vollständig; es gab keinen Retry,
+Fehler, Catch-up oder Recovery. Wiederholter vollständiger `0x08`-Transport
+ist damit für genau diesen Fünfframe-Lauf auf dem realen v49-Gerät empirisch
+bestätigt.
+
+Das Referenzbild war real auf dem physischen LCD sichtbar. Die Sichtdauer
+wurde jedoch nicht mitgemessen. Damit ist ein sichtbarer Commit während des
+Refresh-Laufs bestätigt, nicht aber, dass das Bild das gesamte Testfenster
+lückenlos sichtbar blieb, dass das ASUS-Defaultbild sicher nie dazwischen
+erschien, wie lange das Bild nach Frame 5 sichtbar blieb oder dass 1,0 s eine
+zuverlässige Persistenzrate ist.
+
+In diesem Dokumentationsticket gab es keine weitere Gerätekommunikation und
+keinen weiteren HID-Write.
+
 ## Gefährliche und ausgeschlossene Pfade
 
 - `0x88`: SPI-Lesen und bedingtes SPI-Schreiben bei `0x21000`.
@@ -781,14 +857,15 @@ sind getrennt zu erfassen; der Code behauptet keinen sichtbaren Erfolg.
 
 ## Nächster klarer Arbeitsschritt
 
-Der freigegebene Einmaltransfer und der automatische Pipeline-Live-Test sind
-abgeschlossen und dokumentiert. InfoHubs Hostrefresh ist statisch geschlossen,
-und die eigene begrenzte Refresh-Scheduling-Schicht ist offline implementiert,
-getestet und für genau einen kurzen statischen Folgetest mit **GO** bewertet.
-Der nächste sichere Schritt ist dieser gesondert autorisierte Test mit dem
-fixierten Referenz-JPEG, 1,0 s Intervall, höchstens 6,0 s und höchstens fünf
-Frames. Der Refreshadapter ist weiterhin weder in GUI noch CLI aktiviert.
-Bis zur gesonderten Autorisierung wurde kein eigener Live-Refresh ausgeführt.
-Andere Intervalle oder Bilder, `0x1a`-/`0x1f`-Versuche, echte GIF-Animation,
-Dauerbetrieb und Fehlerpfadtests bleiben nicht freigegeben. Schreibrechte
-bleiben deaktiviert.
+Der Einmaltransfer, der automatische Pipeline-Live-Test und der erste
+begrenzte Fünfframe-Refresh-Test sind abgeschlossen und dokumentiert.
+InfoHubs Hostrefresh ist statisch geschlossen; der eigene wiederholte
+`0x08`-Transport ist bei 1,0 s Sollintervall real transportseitig bestätigt.
+
+Die nächste offene Frage ist nicht mehr die Transportfähigkeit, sondern die
+zeitliche Displaywirkung: Ob und wann das ASUS-Defaultbild zwischen oder nach
+den Refreshframes erscheint, muss in einem später gesondert freigegebenen Lauf
+mit zeitgestempelter Sichtbeobachtung bestimmt werden. Erst danach lässt sich
+eine tatsächlich ausreichende Refreshrate bewerten. Andere Intervalle oder
+Bilder, `0x1a`-/`0x1f`-Versuche, echte GIF-Animation, Dauerbetrieb und
+Fehlerpfadtests bleiben nicht freigegeben. Schreibrechte bleiben deaktiviert.
