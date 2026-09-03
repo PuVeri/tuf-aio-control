@@ -12,6 +12,7 @@ from enum import Enum
 from typing import Callable, Protocol
 
 import lcd_transport
+import refresh_diagnostics
 
 MAX_REFRESH_DURATION_SECONDS = 60.0
 MAX_REFRESH_FRAME_COUNT = 500
@@ -89,9 +90,15 @@ class FrameSource(Protocol):
 class LatestFrameBuffer:
     """Publish validated latest-frame snapshots without maintaining a queue."""
 
-    def __init__(self, initial_jpeg: bytes | None = None) -> None:
+    def __init__(
+        self,
+        initial_jpeg: bytes | None = None,
+        *,
+        diagnostics: refresh_diagnostics.RefreshDiagnostics | None = None,
+    ) -> None:
         self._lock = threading.Lock()
         self._current: FrameSnapshot | None = None
+        self.diagnostics = diagnostics or refresh_diagnostics.NULL_DIAGNOSTICS
         if initial_jpeg is not None:
             self.publish(initial_jpeg)
 
@@ -106,6 +113,12 @@ class LatestFrameBuffer:
                 jpeg_bytes=validated.jpeg_bytes,
                 generation=generation,
                 jpeg_info=validated.jpeg_info,
+            )
+            self.diagnostics.record(
+                "frame_published",
+                generation=generation,
+                jpeg_length=validated.jpeg_info.length,
+                planned_segments=validated.jpeg_info.segment_count,
             )
             self._current = snapshot
             return snapshot
@@ -191,15 +204,72 @@ class HidrawFrameSender:
 
     device: lcd_transport.HidrawInterface
     extra_validator: lcd_transport.DeviceValidator | None = None
+    diagnostics: refresh_diagnostics.RefreshDiagnostics = (
+        refresh_diagnostics.NULL_DIAGNOSTICS
+    )
+    clock: Callable[[], float] = time.monotonic
 
     def __call__(self, jpeg: bytes) -> int:
-        if self.extra_validator is None:
-            return lcd_transport.send_frame_once(self.device, jpeg)
-        return lcd_transport.send_frame_once(
-            self.device,
-            jpeg,
-            extra_validator=self.extra_validator,
+        if self.diagnostics is refresh_diagnostics.NULL_DIAGNOSTICS:
+            if self.extra_validator is None:
+                return lcd_transport.send_frame_once(self.device, jpeg)
+            return lcd_transport.send_frame_once(
+                self.device,
+                jpeg,
+                extra_validator=self.extra_validator,
+            )
+        info = lcd_transport.validate_jpeg(jpeg)
+        started_at = self.clock()
+        completed_segments = 0
+
+        def observe_write(_: lcd_transport.TransferSegment) -> None:
+            nonlocal completed_segments
+            completed_segments += 1
+
+        self.diagnostics.record(
+            "send_frame_once_called",
+            planned_segments=info.segment_count,
         )
+        try:
+            written = lcd_transport.send_frame_once(
+                self.device,
+                jpeg,
+                extra_validator=self.extra_validator,
+                write_observer=observe_write,
+            )
+        except Exception as error:
+            self.diagnostics.record(
+                "send_frame_once_failed",
+                planned_segments=info.segment_count,
+                completed_segments=completed_segments,
+                transfer_duration_seconds=max(0.0, self.clock() - started_at),
+            )
+            self.diagnostics.record_exception("send_frame_once", error)
+            if completed_segments:
+                self.diagnostics.record(
+                    "handle_closed",
+                    confirmed=True,
+                    basis="send_frame_once finally after observed write",
+                )
+            else:
+                self.diagnostics.record(
+                    "handle_close_status",
+                    confirmed=False,
+                    basis="failure may have preceded hidraw open",
+                )
+            raise
+        self.diagnostics.record(
+            "send_frame_once_returned",
+            planned_segments=info.segment_count,
+            completed_segments=completed_segments,
+            transfer_duration_seconds=max(0.0, self.clock() - started_at),
+        )
+        self.diagnostics.record(
+            "handle_closed",
+            confirmed=True,
+            basis="send_frame_once returned after its finally-close",
+        )
+        return written
 
 
 _ACTIVE_REFRESH_LOCK = threading.Lock()
@@ -246,6 +316,7 @@ class RefreshController:
         self._plan = plan
         self._sender = sender
         self._frame_source = frame_source
+        self._diagnostics = refresh_diagnostics.diagnostics_for(frame_source)
         self._clock = clock
         self._wait_function = wait_function
         self._stop_event = threading.Event()
@@ -303,6 +374,8 @@ class RefreshController:
 
     def request_stop(self) -> None:
         """Request a stop without waiting or performing any device operation."""
+        if not self._stop_event.is_set():
+            self._diagnostics.record("stop_requested", requested_reason="user")
         self._stop_event.set()
 
     def wait(self, timeout: float | None = None) -> RefreshResult | None:
@@ -318,9 +391,11 @@ class RefreshController:
 
     def _thread_main(self) -> None:
         result: RefreshResult | None = None
+        self._diagnostics.record("worker_started")
         try:
             result = self._run_loop()
         except Exception as error:
+            self._diagnostics.record_exception("refresh_worker", error)
             result = RefreshResult(
                 stop_reason=RefreshStopReason.INTERNAL_ERROR,
                 frames_sent=0,
@@ -330,6 +405,19 @@ class RefreshController:
                 error=error,
             )
         finally:
+            if result is not None:
+                self._diagnostics.record(
+                    "session_stopped",
+                    stop_reason=_diagnostic_stop_reason(result.stop_reason),
+                    controller_stop_reason=result.stop_reason.value,
+                    frame_count=result.frames_sent,
+                    elapsed_seconds=result.elapsed_seconds,
+                )
+                if result.error is not None:
+                    self._diagnostics.record_exception(
+                        "refresh_result", result.error
+                    )
+            self._diagnostics.record("worker_ended")
             with self._state_lock:
                 self._result = result
             _ACTIVE_REFRESH_LOCK.release()
@@ -385,9 +473,22 @@ class RefreshController:
                 jpeg_info = frame.jpeg_info
             else:
                 snapshot = self._frame_source.snapshot()
+                self._diagnostics.record(
+                    "frame_snapshot",
+                    generation=snapshot.generation,
+                    refresh_number=sent + 1,
+                )
                 jpeg_bytes = snapshot.jpeg_bytes
                 jpeg_info = snapshot.jpeg_info
             transfer_started = self._clock()
+            self._diagnostics.record(
+                "frame_transfer_begun",
+                frame_number=sent + 1,
+                snapshot_generation=(
+                    snapshot.generation if self._frame_source is not None else None
+                ),
+                planned_segments=jpeg_info.segment_count,
+            )
             try:
                 completed_writes = self._sender(jpeg_bytes)
                 if (
@@ -400,6 +501,14 @@ class RefreshController:
                         f"{jpeg_info.segment_count} vollständigen Writes"
                     )
             except Exception as error:
+                self._diagnostics.record(
+                    "frame_transfer_failed",
+                    frame_number=sent + 1,
+                    planned_segments=jpeg_info.segment_count,
+                    transfer_duration_seconds=max(
+                        0.0, self._clock() - transfer_started
+                    ),
+                )
                 return self._result_for(
                     RefreshStopReason.SEND_ERROR,
                     started_at,
@@ -413,6 +522,18 @@ class RefreshController:
             transfer_durations.append(max(0.0, transfer_finished - transfer_started))
             frame_indices.append(frame_index)
             sent += 1
+            self._diagnostics.record(
+                "frame_transfer_succeeded",
+                frame_number=sent,
+                planned_segments=jpeg_info.segment_count,
+                completed_segments=completed_writes,
+                transfer_duration_seconds=transfer_durations[-1],
+            )
+            self._diagnostics.record(
+                "frame_count_advanced",
+                frame_count=sent,
+                transfer_duration_seconds=transfer_durations[-1],
+            )
             if frame_changed:
                 visible_since = transfer_finished
 
@@ -462,3 +583,13 @@ class RefreshController:
             frame_indices=tuple(frame_indices),
             error=error,
         )
+
+
+def _diagnostic_stop_reason(reason: RefreshStopReason) -> str:
+    return {
+        RefreshStopReason.EXPLICIT_STOP: "user",
+        RefreshStopReason.MAX_DURATION: "30 s",
+        RefreshStopReason.MAX_FRAMES: "30 Frames",
+        RefreshStopReason.SEND_ERROR: "transport error",
+        RefreshStopReason.INTERNAL_ERROR: "sonstiger Fehler",
+    }[reason]

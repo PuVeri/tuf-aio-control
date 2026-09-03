@@ -9,6 +9,7 @@ from typing import Callable, Protocol
 import lcd_refresh
 import lcd_runtime_safety
 import lcd_transport
+import refresh_diagnostics
 from discover_device import HidrawInterface
 
 # Temporary development policy for the first GUI live path. Replace this
@@ -23,7 +24,10 @@ class ProductionControllerFactoryError(RuntimeError):
 
 
 DeviceDiscovery = Callable[[], tuple[HidrawInterface | None, str]]
-SenderFactory = Callable[[HidrawInterface], lcd_refresh.FrameSender]
+SenderFactory = Callable[
+    [HidrawInterface, refresh_diagnostics.RefreshDiagnostics],
+    lcd_refresh.FrameSender,
+]
 
 
 class ControllerBuilder(Protocol):
@@ -46,10 +50,14 @@ def build_gui_development_plan(jpeg_bytes: bytes) -> lcd_refresh.RefreshPlan:
     )
 
 
-def _production_sender(device: HidrawInterface) -> lcd_refresh.HidrawFrameSender:
+def _production_sender(
+    device: HidrawInterface,
+    diagnostics: refresh_diagnostics.RefreshDiagnostics,
+) -> lcd_refresh.HidrawFrameSender:
     return lcd_refresh.HidrawFrameSender(
         device,
         extra_validator=lcd_runtime_safety.runtime_device_error,
+        diagnostics=diagnostics,
     )
 
 
@@ -67,31 +75,75 @@ class ProductionControllerFactory:
     def __call__(
         self, frame_source: lcd_refresh.FrameSource
     ) -> lcd_refresh.RefreshController:
+        diagnostics = refresh_diagnostics.diagnostics_for(frame_source)
+        diagnostics.record("production_factory_entered")
         try:
             device, discovery_detail = self.device_discovery()
-        except (OSError, RuntimeError, ValueError) as error:
-            raise ProductionControllerFactoryError(
+        except Exception as error:
+            diagnostics.record("safety_gates_failed", phase="device_discovery")
+            diagnostics.record_exception("device_discovery", error)
+            wrapped = ProductionControllerFactoryError(
                 f"LCD-Gerätesuche fehlgeschlagen: {error}"
-            ) from error
+            )
+            raise wrapped from error
         if device is None:
-            raise ProductionControllerFactoryError(
+            error = ProductionControllerFactoryError(
                 f"Kein eindeutiges LCD-Interface 1: {discovery_detail}"
             )
+            diagnostics.record("safety_gates_failed", phase="device_discovery")
+            diagnostics.record_exception("device_discovery", error)
+            raise error
 
-        gate_error = lcd_runtime_safety.runtime_device_error(
-            device,
-            competing_writer_finder=self.competing_writer_finder,
+        diagnostics.record(
+            "hidraw_path_selected",
+            device_path=device.device_path,
+            vendor_id=device.vendor_id,
+            product_id=device.product_id,
+            interface_number=device.interface_number,
         )
-        if gate_error is not None:
+
+        try:
+            gate_error = lcd_runtime_safety.runtime_device_error(
+                device,
+                competing_writer_finder=self.competing_writer_finder,
+            )
+        except Exception as error:
+            diagnostics.record("safety_gates_failed", phase="runtime_safety")
+            diagnostics.record_exception("runtime_safety", error)
             raise ProductionControllerFactoryError(
+                f"LCD-Safety-Gate konnte nicht geprüft werden: {error}"
+            ) from error
+        if gate_error is not None:
+            error = ProductionControllerFactoryError(
                 f"LCD-Safety-Gate fehlgeschlagen: {gate_error}"
             )
+            diagnostics.record("safety_gates_failed", phase="runtime_safety")
+            diagnostics.record_exception("runtime_safety", error)
+            raise error
+        diagnostics.record("safety_gates_passed")
 
-        snapshot = frame_source.snapshot()
-        plan = build_gui_development_plan(snapshot.jpeg_bytes)
-        sender = self.sender_factory(device)
-        return self.controller_builder(
-            plan,
-            sender,
-            frame_source=frame_source,
-        )
+        try:
+            snapshot = frame_source.snapshot()
+            diagnostics.record(
+                "factory_initial_snapshot",
+                generation=snapshot.generation,
+            )
+            plan = build_gui_development_plan(snapshot.jpeg_bytes)
+            diagnostics.record(
+                "refresh_plan_created",
+                interval_seconds=plan.transport_interval_seconds,
+                max_duration_seconds=plan.max_duration_seconds,
+                max_frames=plan.max_frames,
+            )
+            sender = self.sender_factory(device, diagnostics)
+            diagnostics.record("production_factory_created")
+            controller = self.controller_builder(
+                plan,
+                sender,
+                frame_source=frame_source,
+            )
+            diagnostics.record("refresh_controller_created")
+            return controller
+        except Exception as error:
+            diagnostics.record_exception("controller_creation", error)
+            raise

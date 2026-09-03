@@ -32,9 +32,11 @@ import image_pipeline
 import gui_refresh_factory
 import lcd_refresh
 import lcd_transport as transport
+import refresh_diagnostics
 import system_sensors
 
 TemperatureReader = Callable[[], system_sensors.TemperatureSnapshot]
+DiagnosticsFactory = Callable[[], refresh_diagnostics.RefreshDiagnostics]
 
 
 class RefreshControllerLike(Protocol):
@@ -73,10 +75,14 @@ class MainWindow(QMainWindow):
         sensor_reader: TemperatureReader | None = None,
         settings: QSettings | None = None,
         controller_factory: ControllerFactory | None = None,
+        diagnostics_factory: DiagnosticsFactory = (
+            refresh_diagnostics.create_gui_session_diagnostics
+        ),
     ) -> None:
         super().__init__()
         self._sensor_reader = sensor_reader or system_sensors.read_lcd_temperatures
         self._controller_factory = controller_factory
+        self._diagnostics_factory = diagnostics_factory
         self._settings = (
             settings
             if settings is not None
@@ -101,6 +107,9 @@ class MainWindow(QMainWindow):
         self._frame_buffer: lcd_refresh.LatestFrameBuffer | None = None
         self._refresh_controller: RefreshControllerLike | None = None
         self._last_refresh_result: lcd_refresh.RefreshResult | None = None
+        self._refresh_diagnostics: refresh_diagnostics.RefreshDiagnostics = (
+            refresh_diagnostics.NULL_DIAGNOSTICS
+        )
         self._close_when_stopped = False
 
         self.setWindowTitle("TUF AIO Control")
@@ -545,7 +554,7 @@ class MainWindow(QMainWindow):
         except (image_pipeline.ImagePipelineError, OSError, RuntimeError, ValueError) as error:
             if self._refresh_state is GuiRefreshState.RUNNING:
                 self._prepared = previous_prepared
-                self._show_render_error(str(error))
+                self._show_render_error(error)
             else:
                 self._prepared = None
                 self._final_pixmap = None
@@ -603,7 +612,7 @@ class MainWindow(QMainWindow):
             self._load_final_preview(prepared.jpeg_bytes)
             self._publish_running_frame(prepared.jpeg_bytes)
         except (image_pipeline.ImagePipelineError, OSError, RuntimeError, ValueError) as error:
-            self._show_render_error(str(error))
+            self._show_render_error(error)
             return
         self._show_prepared_image(prepared)
 
@@ -614,9 +623,12 @@ class MainWindow(QMainWindow):
             raise RuntimeError("Laufende LCD-Session besitzt keinen Framepuffer")
         self._frame_buffer.publish(jpeg_bytes)
 
-    def _show_render_error(self, reason: str) -> None:
+    def _show_render_error(self, error: BaseException) -> None:
+        self._refresh_diagnostics.record("render_error", stop_reason="render error")
+        self._refresh_diagnostics.record_exception("frame_render", error)
         self.status_label.setText(
-            f"Status: Frame-Aktualisierung fehlgeschlagen – letzter gültiger Frame bleibt aktiv: {reason}"
+            "Status: Frame-Aktualisierung fehlgeschlagen – letzter gültiger "
+            f"Frame bleibt aktiv: {error}"
         )
 
     def _load_original_preview(self, path: Path) -> tuple[int, int] | None:
@@ -740,12 +752,23 @@ class MainWindow(QMainWindow):
         self.status_label.setText("Status: LCD-Session wird gestartet …")
         controller: RefreshControllerLike | None = None
         try:
-            frame_buffer = lcd_refresh.LatestFrameBuffer(self._prepared.jpeg_bytes)
+            diagnostics = self._diagnostics_factory()
+            self._refresh_diagnostics = diagnostics
+            diagnostics.record("start_requested")
+            frame_buffer = lcd_refresh.LatestFrameBuffer(
+                self._prepared.jpeg_bytes,
+                diagnostics=diagnostics,
+            )
+            diagnostics.record(
+                "initial_frame_snapshot",
+                generation=frame_buffer.snapshot().generation,
+            )
             controller = self._controller_factory(frame_buffer)
             self._frame_buffer = frame_buffer
             self._refresh_controller = controller
             controller.start()
         except Exception as error:
+            self._refresh_diagnostics.record_exception("gui_session_start", error)
             if controller is not None:
                 controller.request_stop()
             self._enter_refresh_error(f"LCD-Start fehlgeschlagen: {error}")
@@ -765,6 +788,7 @@ class MainWindow(QMainWindow):
         try:
             controller.request_stop()
         except Exception as error:
+            self._refresh_diagnostics.record_exception("gui_stop_request", error)
             self.status_label.setText(f"Status: Stopanforderung fehlgeschlagen: {error}")
             return
         self._set_refresh_state(GuiRefreshState.STOPPING)
@@ -808,6 +832,10 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(0, self.close)
 
     def _enter_refresh_error(self, message: str) -> None:
+        self._refresh_diagnostics.record(
+            "gui_error_state",
+            message=message[:500],
+        )
         self._refresh_controller = None
         self._set_refresh_state(GuiRefreshState.ERROR)
         self.status_label.setText(f"Status: Fehler – {message} · kein Retry")

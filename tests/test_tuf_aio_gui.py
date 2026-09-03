@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import sys
 import tempfile
@@ -25,6 +26,7 @@ import gui_refresh_factory
 import lcd_refresh
 import lcd_runtime_safety
 import lcd_transport
+import refresh_diagnostics
 import system_sensors
 import tuf_aio_gui
 
@@ -172,6 +174,7 @@ class TufAioGuiOfflineTests(unittest.TestCase):
         sensor_reader: tuf_aio_gui.TemperatureReader | None = None,
         settings: QSettings | None = None,
         controller_factory: tuf_aio_gui.ControllerFactory | None = None,
+        diagnostics_factory: tuf_aio_gui.DiagnosticsFactory | None = None,
     ) -> tuf_aio_gui.MainWindow:
         result = discovery if discovery is not None else (self._device(), "gültig")
         reader = sensor_reader or system_sensors.TemperatureSnapshot
@@ -186,6 +189,10 @@ class TufAioGuiOfflineTests(unittest.TestCase):
                 sensor_reader=reader,
                 settings=settings,
                 controller_factory=controller_factory,
+                diagnostics_factory=(
+                    diagnostics_factory
+                    or (lambda: refresh_diagnostics.NULL_DIAGNOSTICS)
+                ),
             )
 
     @staticmethod
@@ -593,6 +600,147 @@ class TufAioGuiOfflineTests(unittest.TestCase):
                     controllers[0].request_stop()
                     controllers[0].join()
                     window._poll_refresh_controller()
+                window.close()
+
+    def test_production_diagnostics_reach_send_once_and_fake_writes_30_frames(
+        self,
+    ) -> None:
+        class FastClock:
+            def __init__(self) -> None:
+                self.now = 0.0
+
+            def __call__(self) -> float:
+                return self.now
+
+            def wait(self, event: threading.Event, timeout: float) -> bool:
+                if event.is_set():
+                    return True
+                self.now += timeout
+                return event.is_set()
+
+        with tempfile.TemporaryDirectory() as directory:
+            log_path = Path(directory) / "gui-refresh.jsonl"
+            diagnostics = refresh_diagnostics.JsonlRefreshDiagnostics(log_path)
+            clock = FastClock()
+            controllers: list[lcd_refresh.RefreshController] = []
+            send_calls = 0
+            fake_writes = 0
+            active_sends = 0
+            maximum_active = 0
+
+            def build_controller(
+                plan: lcd_refresh.RefreshPlan,
+                sender: lcd_refresh.FrameSender,
+                *,
+                frame_source: lcd_refresh.FrameSource,
+            ) -> lcd_refresh.RefreshController:
+                controller = lcd_refresh.RefreshController(
+                    plan,
+                    sender,
+                    frame_source=frame_source,
+                    clock=clock,
+                    wait_function=clock.wait,
+                )
+                controllers.append(controller)
+                return controller
+
+            factory = gui_refresh_factory.ProductionControllerFactory(
+                device_discovery=mock.Mock(return_value=(self._device(), "fake")),
+                competing_writer_finder=mock.Mock(return_value=()),
+                controller_builder=build_controller,
+            )
+
+            def fake_send_once(
+                device: lcd_transport.HidrawInterface,
+                jpeg: bytes,
+                **kwargs: object,
+            ) -> int:
+                nonlocal send_calls, fake_writes, active_sends, maximum_active
+                self.assertEqual(device.interface_number, 1)
+                observer = kwargs["write_observer"]
+                segments = lcd_transport.build_segments(jpeg)
+                send_calls += 1
+                active_sends += 1
+                maximum_active = max(maximum_active, active_sends)
+                try:
+                    for segment in segments:
+                        observer(segment)  # type: ignore[operator]
+                        fake_writes += 1
+                finally:
+                    active_sends -= 1
+                return len(segments)
+
+            window = self._window(
+                controller_factory=factory,
+                diagnostics_factory=lambda: diagnostics,
+            )
+            try:
+                self.assertTrue(window.load_image(REFERENCE_PATH))
+                window.hardware_live_checkbox.setChecked(True)
+                with (
+                    mock.patch.object(
+                        lcd_refresh.lcd_transport,
+                        "send_frame_once",
+                        side_effect=fake_send_once,
+                    ),
+                    mock.patch.object(
+                        lcd_transport.os,
+                        "open",
+                        side_effect=AssertionError("real hidraw open called"),
+                    ) as real_open,
+                ):
+                    window.start_lcd_button.click()
+                    self._wait_until(lambda: bool(controllers[0].result))
+                    window._poll_refresh_controller()
+                real_open.assert_not_called()
+
+                result = controllers[0].result
+                assert result is not None
+                self.assertEqual(result.frames_sent, 30)
+                self.assertEqual(
+                    result.stop_reason, lcd_refresh.RefreshStopReason.MAX_FRAMES
+                )
+                self.assertEqual(send_calls, 30)
+                self.assertEqual(fake_writes, 90)
+                self.assertEqual(maximum_active, 1)
+
+                entries = [
+                    json.loads(line)
+                    for line in log_path.read_text(encoding="utf-8").splitlines()
+                ]
+                events = [entry["event"] for entry in entries]
+                self.assertIn("start_requested", events)
+                self.assertIn("production_factory_created", events)
+                self.assertIn("refresh_controller_created", events)
+                self.assertIn("worker_started", events)
+                self.assertEqual(events.count("frame_snapshot"), 30)
+                self.assertEqual(events.count("send_frame_once_called"), 30)
+                returned = [
+                    entry
+                    for entry in entries
+                    if entry["event"] == "send_frame_once_returned"
+                ]
+                self.assertEqual(len(returned), 30)
+                self.assertEqual(
+                    sum(entry["completed_segments"] for entry in returned), 90
+                )
+                self.assertEqual(events.count("frame_count_advanced"), 30)
+                self.assertIn("handle_closed", events)
+                self.assertIn("worker_ended", events)
+                terminal = next(
+                    entry for entry in entries if entry["event"] == "session_stopped"
+                )
+                self.assertEqual(terminal["frame_count"], 30)
+                self.assertEqual(terminal["stop_reason"], "30 Frames")
+                timestamps = [entry["monotonic_seconds"] for entry in entries]
+                self.assertEqual(timestamps, sorted(timestamps))
+                self.assertTrue(
+                    all(
+                        "jpeg_bytes" not in entry and "payload" not in entry
+                        for entry in entries
+                    )
+                )
+            finally:
                 window.close()
 
     def test_running_changes_publish_and_render_error_keeps_last_frame(self) -> None:

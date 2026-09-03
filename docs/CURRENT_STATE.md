@@ -1170,3 +1170,39 @@ zunächst offline persistente Controller-/Transportdiagnostik und eine gezielte
 Auswertung des negativen Sichtbefunds entworfen werden. Andere Intervalle,
 Interface-0-Steuerung, weitere Opcodes, GIF-Liveanimation und Dauerbetrieb
 bleiben nicht freigegeben.
+
+### Persistente Diagnostik vor GUI-Live-Test 02
+
+Der GUI-Produktionspfad besitzt nun eine sessionspezifische JSONL-Diagnostik
+unter `logs/gui-refresh-*.jsonl`. Sie erfasst mit monotonen Zeitstempeln Start,
+Factory und Safety-Gates, dynamischen hidraw-Pfad, Controller und Worker,
+Snapshotgenerationen, jeden `send_frame_once()`-Aufruf, geplante und
+vollständig geschriebene Segmente, Transferergebnis und -dauer, Framezähler,
+normalisierten Stopgrund, Exceptions mit Phase sowie Workerende und den vom
+unveränderten Transport-`finally` bestätigten Handle-Close. JPEG- und
+HID-Payloads werden nicht geloggt; Retry und Recovery wurden nicht ergänzt.
+
+Der statische Vergleich mit `src/test_lcd_refresh.py` fand keinen zweiten oder
+abweichenden Transportaufruf. Beide Pfade enden in demselben
+`lcd_transport.send_frame_once()`. Der erfolgreiche Fünfframe-Test verwendete
+jedoch ein fixes Referenz-JPEG, vorbereitete Drei-Segment-Frames und einen
+lokalen `write_observer`, während die GUI dynamische `LatestFrameBuffer`-
+Snapshots verwendete und ihr Resultat bislang nur im Prozessspeicher hielt.
+Dies ist eine belegte Diagnoselücke, aber kein nachgewiesener funktionaler
+Transportbug.
+
+Der neue Fake-End-to-End-Test durchläuft GUI, echte ProductionFactory,
+RefreshController, `FrameSource.snapshot()`, bestehenden HidrawFrameSender und
+einen Fake an der `send_frame_once()`-Gerätegrenze. Er bestätigt exakt 30
+Senderaufrufe, 90 simulierte vollständige Segment-Writes, Framezähler 30,
+keine Parallelität und terminal `30 Frames`; ein reales `os.open()` ist
+verboten und wurde nicht erreicht. Die vollständige Offline-Suite bestand mit
+171 Tests; `git diff --check` und `compileall` waren sauber. In diesem Ticket
+fanden keine Gerätekommunikation, keine HID-Writes und kein Live-Test statt.
+
+Beim nächsten gesondert freigegebenen manuellen Live-Test können damit
+Transporterreichbarkeit, verwendete Generation, Teil-/Vollwrites,
+Transferzeiten, tatsächliche Framezahl und Laufzeit, Stopgrund, Exceptions,
+Workerende und Handle-Close nach Prozessende ausgewertet werden. Der
+30-s-/30-Frame-Hardcap bleibt bis zu diesem Nachweis unverändert. Details:
+`research/reports/gui-live-transport-diagnostics.md`.
