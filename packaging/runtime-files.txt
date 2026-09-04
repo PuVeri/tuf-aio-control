@@ -1,6 +1,7 @@
 # Relative paths copied into the private installed application directory.
 src/discover_device.py
 src/gui_refresh_factory.py
+src/gif_animation.py
 src/image_pipeline.py
 src/lcd_refresh.py
 src/lcd_runtime_safety.py

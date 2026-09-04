@@ -20,6 +20,7 @@ erzeugt im Standardfall:
   .managed-installation
   app/
     discover_device.py
+    gif_animation.py
     gui_refresh_factory.py
     image_pipeline.py
     lcd_refresh.py
@@ -108,10 +109,12 @@ explizit zu bestätigende Administratoraktion.
 
 ## GIF-Status
 
-GIF kann geladen und vorbereitet werden. Die separate Pipeline kann Frames,
-Framedauern und Loop-Metadaten verarbeiten. Eine echte GIF-Liveanimation auf
-dem LCD ist dennoch nicht implementiert oder bestätigt. Der aktive v0.1-GUI-
-und LCD-Pfad behandelt GIF weiterhin als Standbild und verwendet Frame 0.
+GIF kann geladen und mit Frames, Framedauern und Loop-Metadaten vorbereitet
+werden. Der aktuelle Entwicklungsstand bindet das installierbare
+`gif_animation.py` an den gemeinsamen GUI-/LCD-Kompositionspfad an. Diese
+GIF-Liveanimation ist offline implementiert, aber noch nicht am realen LCD
+bestätigt. Animierte Inhalte verwenden ein transportgeführtes serielles Pacing
+ohne feste App-seitige FPS-Grenze.
 
 ## Offline-Prüfung
 

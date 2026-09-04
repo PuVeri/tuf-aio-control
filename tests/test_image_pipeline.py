@@ -8,7 +8,7 @@ from io import BytesIO
 from pathlib import Path
 from unittest import mock
 
-from PIL import Image, ImageFont
+from PIL import Image, ImageDraw, ImageFont
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(PROJECT_ROOT / "src"))
@@ -226,7 +226,7 @@ class ImagePipelineOfflineTests(unittest.TestCase):
     def test_overlay_font_strategy_prefers_weighted_monospace_with_fallback(self) -> None:
         self.assertEqual(
             image_pipeline.OVERLAY_FONT_CANDIDATES["label"][0],
-            "NotoSansMono-SemiBold.ttf",
+            "NotoSansMono-CondensedSemiBold.ttf",
         )
         self.assertEqual(
             image_pipeline.OVERLAY_FONT_CANDIDATES["value"][0],
@@ -359,6 +359,68 @@ class ImagePipelineOfflineTests(unittest.TestCase):
             [frame.jpeg_bytes for frame in prepared.frames],
         )
 
+    def test_every_gif_frame_uses_shared_four_slot_rotation_pipeline(self) -> None:
+        import telemetry
+
+        images = (
+            Image.new("RGB", (320, 320), "red"),
+            Image.new("RGB", (320, 320), "blue"),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "composed.gif"
+            images[0].save(
+                path,
+                format="GIF",
+                save_all=True,
+                append_images=[images[1]],
+                duration=[250, 400],
+                loop=0,
+            )
+            animation = image_pipeline.prepare_gif(path)
+        slots = image_pipeline.OverlaySlots(
+            *(
+                telemetry.MetricValue(metric_id, label, value, unit)
+                for metric_id, label, value, unit in (
+                    (telemetry.MetricId.CPU_USAGE, "CPU", 11.0, "%"),
+                    (telemetry.MetricId.GPU_USAGE, "GPU", 22.0, "%"),
+                    (telemetry.MetricId.CPU_PACKAGE, "CPU Package", 33.0, "°C"),
+                    (
+                        telemetry.MetricId.GPU_TEMPERATURE,
+                        "GPU Temperatur",
+                        44.0,
+                        "°C",
+                    ),
+                )
+            )
+        )
+        config = image_pipeline.TemperatureOverlayConfig(enabled=True)
+        rendered: list[bytes] = []
+        for index in range(2):
+            for rotation in (0, 90, 180, 270):
+                with self.subTest(index=index, rotation=rotation):
+                    frame = image_pipeline.render_prepared_animation_frame(
+                        animation,
+                        index,
+                        overlay_config=config,
+                        temperatures=image_pipeline.TemperatureOverlayValues(),
+                        overlay_slots=slots,
+                        rotation_degrees=rotation,
+                    )
+                    expected = image_pipeline.compose_lcd_frame(
+                        animation.frames[index].base_rgb_bytes,
+                        config,
+                        image_pipeline.TemperatureOverlayValues(),
+                        overlay_slots=slots,
+                        rotation_degrees=rotation,
+                    )
+                    self.assertEqual(frame.jpeg_bytes, image_pipeline._encode_jpeg(expected))
+                    self.assertEqual(
+                        frame.jpeg_info,
+                        lcd_transport.validate_jpeg(frame.jpeg_bytes),
+                    )
+                    rendered.append(frame.jpeg_bytes)
+        self.assertEqual(len(set(rendered)), 8)
+
     def test_complete_composition_rotates_clockwise_in_all_four_steps(self) -> None:
         base = Image.new("RGB", (320, 320), "black")
         base.paste("red", (0, 0, 80, 80))
@@ -454,10 +516,14 @@ class ImagePipelineOfflineTests(unittest.TestCase):
         )
         self.assertEqual(
             [item.center for item in placements],
-            [(102, 105), (218, 105), (102, 247), (218, 247)],
+            [(94, 91), (226, 91), (94, 252), (226, 252)],
         )
-        self.assertGreater(218 - 102, 212 - 108)
-        self.assertGreater(247 - 105, 242 - 110)
+        self.assertEqual(
+            [item.label_center for item in placements],
+            [(105, 63), (215, 63), (105, 225), (215, 225)],
+        )
+        self.assertEqual(105 + 215, 320)
+        self.assertEqual(94 + 226, 320)
         for index, first in enumerate(placements):
             for second in placements[index + 1 :]:
                 horizontal_gap = max(
@@ -485,6 +551,53 @@ class ImagePipelineOfflineTests(unittest.TestCase):
                 self.assertEqual(len(visible), 3)
                 self.assertNotIn(disabled, {item.sensor for item in visible})
 
+    def test_compact_lcd_labels_all_render_at_the_25px_target(self) -> None:
+        import telemetry
+
+        self.assertEqual(image_pipeline.OVERLAY_DATA_LABEL_PREFERRED_SIZE, 25)
+        self.assertGreater(
+            image_pipeline.OVERLAY_DATA_LABEL_PREFERRED_SIZE,
+            image_pipeline.OVERLAY_LABEL_PREFERRED_SIZE,
+        )
+        draw = ImageDraw.Draw(Image.new("RGB", (320, 320)))
+        labels = {
+            definition.lcd_label
+            for definition in telemetry.METRIC_DEFINITIONS
+            if definition.metric_id is not telemetry.MetricId.OFF
+        }
+        self.assertEqual(
+            labels,
+            {"CPU", "GPU", "CPU PKG", "CPU CCD", "GPU TEMP", "GPU HOT", "GPU MEM"},
+        )
+        for label in labels:
+            with self.subTest(label=label):
+                font = image_pipeline._fit_font(
+                    draw,
+                    label,
+                    preferred_size=image_pipeline.OVERLAY_DATA_LABEL_PREFERRED_SIZE,
+                    minimum_size=image_pipeline.OVERLAY_LABEL_MINIMUM_SIZE,
+                    maximum_width=image_pipeline.OVERLAY_DATA_LABEL_MAXIMUM_WIDTH,
+                    role="label",
+                )
+                bounds = draw.textbbox((0, 0), label, font=font, stroke_width=1)
+                self.assertLessEqual(
+                    bounds[2] - bounds[0],
+                    image_pipeline.OVERLAY_DATA_LABEL_MAXIMUM_WIDTH,
+                )
+                self.assertEqual(
+                    font.size, image_pipeline.OVERLAY_DATA_LABEL_PREFERRED_SIZE
+                )
+
+        safety_font = image_pipeline._fit_font(
+            draw,
+            "UNEXPECTED LABEL",
+            preferred_size=image_pipeline.OVERLAY_DATA_LABEL_PREFERRED_SIZE,
+            minimum_size=image_pipeline.OVERLAY_LABEL_MINIMUM_SIZE,
+            maximum_width=image_pipeline.OVERLAY_DATA_LABEL_MAXIMUM_WIDTH,
+            role="label",
+        )
+        self.assertLess(safety_font.size, image_pipeline.OVERLAY_DATA_LABEL_PREFERRED_SIZE)
+
     def test_every_metric_fits_every_outward_slot_at_extreme_values(self) -> None:
         import telemetry
 
@@ -510,6 +623,43 @@ class ImagePipelineOfflineTests(unittest.TestCase):
                         placement = image_pipeline.layout_data_overlay(
                             slots, config
                         )[0]
+                        draw = ImageDraw.Draw(Image.new("RGB", (320, 320)))
+                        label_font = image_pipeline._fit_font(
+                            draw,
+                            placement.label,
+                            preferred_size=(
+                                image_pipeline.OVERLAY_DATA_LABEL_PREFERRED_SIZE
+                            ),
+                            minimum_size=image_pipeline.OVERLAY_LABEL_MINIMUM_SIZE,
+                            maximum_width=image_pipeline.OVERLAY_DATA_LABEL_MAXIMUM_WIDTH,
+                            role="label",
+                        )
+                        value_font = image_pipeline._fit_font(
+                            draw,
+                            placement.value_text,
+                            preferred_size=image_pipeline.OVERLAY_VALUE_PREFERRED_SIZE,
+                            minimum_size=image_pipeline.OVERLAY_VALUE_MINIMUM_SIZE,
+                            maximum_width=image_pipeline.OVERLAY_DATA_VALUE_MAXIMUM_WIDTH,
+                            role="value",
+                        )
+                        label_bounds = draw.textbbox(
+                            placement.label_center,
+                            placement.label,
+                            font=label_font,
+                            anchor="mm",
+                            stroke_width=1,
+                        )
+                        value_bounds = draw.textbbox(
+                            placement.center,
+                            placement.value_text,
+                            font=value_font,
+                            anchor="mm",
+                            stroke_width=1,
+                        )
+                        self.assertEqual(
+                            value_bounds[1] - label_bounds[3],
+                            image_pipeline.OVERLAY_DATA_LABEL_VALUE_GAP,
+                        )
                         left, top, right, bottom = placement.bounds
                         safe_left, safe_top, safe_right, safe_bottom = (
                             image_pipeline.OVERLAY_SAFE_BOUNDS

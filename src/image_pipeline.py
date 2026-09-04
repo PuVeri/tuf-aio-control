@@ -25,13 +25,19 @@ SUPPORTED_FORMATS = frozenset({"JPEG", "PNG", "WEBP", "BMP", "GIF"})
 DEFAULT_OVERLAY_COLOR = "#FFFFFF"
 OVERLAY_SAFE_BOUNDS = (24, 24, 296, 296)
 OVERLAY_ROUND_CENTER = (160, 160)
-OVERLAY_ROUND_SAFE_RADIUS = 148
+OVERLAY_ROUND_SAFE_RADIUS = 153
 OVERLAY_LABEL_PREFERRED_SIZE = 13
 OVERLAY_LABEL_MINIMUM_SIZE = 8
+OVERLAY_DATA_LABEL_PREFERRED_SIZE = 25
 OVERLAY_VALUE_PREFERRED_SIZE = 33
 OVERLAY_VALUE_MINIMUM_SIZE = 22
+OVERLAY_DATA_LABEL_MAXIMUM_WIDTH = 110
+OVERLAY_DATA_VALUE_MAXIMUM_WIDTH = 85
+OVERLAY_DATA_LABEL_VALUE_GAP = 6
 OVERLAY_FONT_CANDIDATES = {
     "label": (
+        "NotoSansMono-CondensedSemiBold.ttf",
+        "/usr/share/fonts/google-noto/NotoSansMono-CondensedSemiBold.ttf",
         "NotoSansMono-SemiBold.ttf",
         "/usr/share/fonts/google-noto/NotoSansMono-SemiBold.ttf",
         "/usr/share/fonts/truetype/noto/NotoSansMono-SemiBold.ttf",
@@ -356,38 +362,38 @@ def layout_data_overlay(
         (
             "top_left",
             slots.top_left,
-            (102, 73),
-            (102, 105),
+            (105, 63),
+            94,
             config.colors.cpu_package,
         ),
-        ("top_right", slots.top_right, (218, 73), (218, 105), config.colors.gpu),
+        ("top_right", slots.top_right, (215, 63), 226, config.colors.gpu),
         (
             "bottom_left",
             slots.bottom_left,
-            (102, 215),
-            (102, 247),
+            (105, 225),
+            94,
             config.colors.cpu_ccd,
         ),
         (
             "bottom_right",
             slots.bottom_right,
-            (218, 215),
-            (218, 247),
+            (215, 225),
+            226,
             config.colors.cpu_ccd,
         ),
     )
     placements: list[TemperatureOverlayPlacement] = []
-    for slot_id, metric, label_center, value_center, raw_color in specs:
+    for slot_id, metric, label_center, value_x, raw_color in specs:
         if metric is None or metric.metric_id is telemetry.MetricId.OFF:
             continue
-        label = metric.display_label
+        label = metric.lcd_label
         value_text = metric.display_value
         label_font = _fit_font(
             draw,
             label,
-            preferred_size=OVERLAY_LABEL_PREFERRED_SIZE,
+            preferred_size=OVERLAY_DATA_LABEL_PREFERRED_SIZE,
             minimum_size=OVERLAY_LABEL_MINIMUM_SIZE,
-            maximum_width=100,
+            maximum_width=OVERLAY_DATA_LABEL_MAXIMUM_WIDTH,
             role="label",
         )
         value_font = _fit_font(
@@ -395,11 +401,18 @@ def layout_data_overlay(
             value_text,
             preferred_size=OVERLAY_VALUE_PREFERRED_SIZE,
             minimum_size=OVERLAY_VALUE_MINIMUM_SIZE,
-            maximum_width=100,
+            maximum_width=OVERLAY_DATA_VALUE_MAXIMUM_WIDTH,
             role="value",
         )
         label_bounds = draw.textbbox(
             label_center, label, font=label_font, anchor="mm", stroke_width=1
+        )
+        value_probe = draw.textbbox(
+            (value_x, 0), value_text, font=value_font, anchor="mm", stroke_width=1
+        )
+        value_center = (
+            value_x,
+            label_bounds[3] + OVERLAY_DATA_LABEL_VALUE_GAP - value_probe[1],
         )
         value_bounds = draw.textbbox(
             value_center, value_text, font=value_font, anchor="mm", stroke_width=1
@@ -455,9 +468,9 @@ def render_data_overlay(
         label_font = _fit_font(
             draw,
             placement.label,
-            preferred_size=OVERLAY_LABEL_PREFERRED_SIZE,
+            preferred_size=OVERLAY_DATA_LABEL_PREFERRED_SIZE,
             minimum_size=OVERLAY_LABEL_MINIMUM_SIZE,
-            maximum_width=100,
+            maximum_width=OVERLAY_DATA_LABEL_MAXIMUM_WIDTH,
             role="label",
         )
         value_font = _fit_font(
@@ -465,7 +478,7 @@ def render_data_overlay(
             placement.value_text,
             preferred_size=OVERLAY_VALUE_PREFERRED_SIZE,
             minimum_size=OVERLAY_VALUE_MINIMUM_SIZE,
-            maximum_width=100,
+            maximum_width=OVERLAY_DATA_VALUE_MAXIMUM_WIDTH,
             role="value",
         )
         draw.text(
@@ -722,6 +735,8 @@ def rerender_prepared_animation(
     *,
     overlay_config: TemperatureOverlayConfig,
     temperatures: TemperatureOverlayValues,
+    overlay_slots: OverlaySlots | None = None,
+    rotation_degrees: object = 0,
 ) -> PreparedAnimation:
     """Rebuild cached GIF frames while preserving their order and timing."""
     frames: list[PreparedAnimationFrame] = []
@@ -730,6 +745,8 @@ def rerender_prepared_animation(
             frame.base_rgb_bytes,
             overlay_config,
             temperatures,
+            overlay_slots=overlay_slots,
+            rotation_degrees=rotation_degrees,
         )
         frames.append(replace(frame, jpeg_bytes=jpeg_bytes, jpeg_info=jpeg_info))
     return replace(prepared, frames=tuple(frames))
@@ -741,8 +758,10 @@ def prepare_gif(
     mode: ScaleMode = "crop",
     overlay_config: TemperatureOverlayConfig = TemperatureOverlayConfig(),
     temperatures: TemperatureOverlayValues = TemperatureOverlayValues(),
+    overlay_slots: OverlaySlots | None = None,
+    rotation_degrees: object = 0,
 ) -> PreparedAnimation:
-    """Decode and JPEG-prepare every GIF frame without enabling live animation."""
+    """Decode and cache every GIF base frame and its validated composition."""
     if mode not in ("crop", "fit"):
         raise ImagePipelineError(f"Unbekannter Skalierungsmodus: {mode}")
 
@@ -787,6 +806,8 @@ def prepare_gif(
                     mode,
                     overlay_config,
                     temperatures,
+                    overlay_slots=overlay_slots,
+                    rotation_degrees=rotation_degrees,
                 )
                 frames.append(
                     PreparedAnimationFrame(
@@ -808,4 +829,42 @@ def prepare_gif(
         scale_mode=mode,
         loop_count=loop_count,
         frames=tuple(frames),
+    )
+
+
+def render_prepared_animation_frame(
+    prepared: PreparedAnimation,
+    frame_index: int,
+    *,
+    overlay_config: TemperatureOverlayConfig,
+    temperatures: TemperatureOverlayValues,
+    overlay_slots: OverlaySlots | None = None,
+    rotation_degrees: object = 0,
+) -> PreparedImage:
+    """Compose one cached GIF base frame through the shared LCD render path."""
+    if (
+        isinstance(frame_index, bool)
+        or not isinstance(frame_index, int)
+        or not 0 <= frame_index < len(prepared.frames)
+    ):
+        raise ImagePipelineError("GIF-Frameindex liegt außerhalb der Animation")
+    frame = prepared.frames[frame_index]
+    jpeg_bytes, jpeg_info = _encode_and_validate_frame(
+        frame.base_rgb_bytes,
+        overlay_config,
+        temperatures,
+        overlay_slots=overlay_slots,
+        rotation_degrees=rotation_degrees,
+    )
+    return PreparedImage(
+        source_path=prepared.source_path,
+        source_format="GIF",
+        source_size=prepared.source_size,
+        oriented_size=prepared.source_size,
+        scale_mode=prepared.scale_mode,
+        gif_first_frame_only=False,
+        base_rgb_bytes=frame.base_rgb_bytes,
+        jpeg_bytes=jpeg_bytes,
+        jpeg_info=jpeg_info,
+        rotation_degrees=normalize_rotation(rotation_degrees),
     )

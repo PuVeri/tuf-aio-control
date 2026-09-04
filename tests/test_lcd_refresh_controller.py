@@ -473,6 +473,73 @@ class RefreshControllerTests(unittest.TestCase):
         self.assertEqual(starts, [0.0, 0.025, 0.035])
         self.assertEqual(result.transfer_durations, (0.025, 0.0, 0.0))
 
+    def test_transport_guided_source_requests_one_frame_after_each_completed_transfer(
+        self,
+    ) -> None:
+        clock = FakeClock()
+        requests: list[float] = []
+
+        def produce_next() -> None:
+            requests.append(clock())
+            source.publish(self.jpeg)
+
+        source = lcd_refresh.LatestFrameBuffer(
+            self.jpeg,
+            transport_interval_seconds=0.012,
+            next_frame_callback=produce_next,
+            transport_driven=True,
+        )
+        starts: list[float] = []
+        durations = iter((0.005, 0.020, 0.030))
+        active = 0
+        maximum_active = 0
+
+        def sender(_: bytes) -> int:
+            nonlocal active, maximum_active
+            starts.append(clock())
+            active += 1
+            maximum_active = max(maximum_active, active)
+            clock.advance(next(durations))
+            active -= 1
+            return self.segment_count
+
+        controller = lcd_refresh.RefreshController(
+            _plan((lcd_refresh.RefreshFrame(self.jpeg),), max_frames=3),
+            sender,
+            frame_source=source,
+            clock=clock,
+            wait_function=clock.wait,
+        )
+        controller.start()
+        result = controller.wait(timeout=1.0)
+
+        assert result is not None
+        self.assertEqual(result.stop_reason, lcd_refresh.RefreshStopReason.MAX_FRAMES)
+        self.assertEqual(starts, [0.0, 0.012, 0.032])
+        self.assertEqual(requests, [0.005, 0.032])
+        self.assertEqual(maximum_active, 1)
+
+    def test_stop_interrupts_transport_guided_producer_wait(self) -> None:
+        transfer_finished = threading.Event()
+        source = lcd_refresh.LatestFrameBuffer(
+            self.jpeg,
+            transport_interval_seconds=0.012,
+            next_frame_callback=lambda: transfer_finished.set(),
+            transport_driven=True,
+        )
+        controller = lcd_refresh.RefreshController(
+            _plan((lcd_refresh.RefreshFrame(self.jpeg),)),
+            lambda _: self.segment_count,
+            frame_source=source,
+        )
+
+        controller.start()
+        self.assertTrue(transfer_finished.wait(1.0))
+        result = controller.stop(timeout=1.0)
+
+        self.assertEqual(result.stop_reason, lcd_refresh.RefreshStopReason.EXPLICIT_STOP)
+        self.assertEqual(result.frames_sent, 1)
+
     def test_static_frame_bytes_are_reused(self) -> None:
         clock = FakeClock()
         observed: list[bytes] = []

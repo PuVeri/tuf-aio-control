@@ -50,11 +50,15 @@ def build_gui_development_plan(jpeg_bytes: bytes) -> lcd_refresh.RefreshPlan:
     )
 
 
-def build_gui_production_plan(jpeg_bytes: bytes) -> lcd_refresh.RefreshPlan:
-    """Build the 1 Hz GUI plan that runs until stop, close, or first error."""
+def build_gui_production_plan(
+    jpeg_bytes: bytes,
+    *,
+    transport_interval_seconds: float = GUI_PRODUCTION_INTERVAL_SECONDS,
+) -> lcd_refresh.RefreshPlan:
+    """Build an unlimited GUI plan with the selected safe content cadence."""
     return lcd_refresh.RefreshPlan(
         frames=(lcd_refresh.RefreshFrame(jpeg_bytes),),
-        transport_interval_seconds=GUI_PRODUCTION_INTERVAL_SECONDS,
+        transport_interval_seconds=transport_interval_seconds,
         max_duration_seconds=None,
         max_frames=None,
     )
@@ -138,7 +142,19 @@ class ProductionControllerFactory:
                 "factory_initial_snapshot",
                 generation=snapshot.generation,
             )
-            plan = build_gui_production_plan(snapshot.jpeg_bytes)
+            source_interval = getattr(
+                frame_source,
+                "transport_interval_seconds",
+                None,
+            )
+            plan = build_gui_production_plan(
+                snapshot.jpeg_bytes,
+                transport_interval_seconds=(
+                    GUI_PRODUCTION_INTERVAL_SECONDS
+                    if source_interval is None
+                    else source_interval
+                ),
+            )
             diagnostics.record(
                 "refresh_plan_created",
                 interval_seconds=plan.transport_interval_seconds,

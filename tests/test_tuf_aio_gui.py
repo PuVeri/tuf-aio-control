@@ -177,6 +177,7 @@ class TufAioGuiOfflineTests(unittest.TestCase):
         settings: QSettings | None = None,
         controller_factory: tuf_aio_gui.ControllerFactory | None = None,
         diagnostics_factory: tuf_aio_gui.DiagnosticsFactory | None = None,
+        animation_clock: tuf_aio_gui.AnimationClock = time.monotonic,
     ) -> tuf_aio_gui.MainWindow:
         result = discovery if discovery is not None else (self._device(), "gültig")
         reader = sensor_reader or system_sensors.TemperatureSnapshot
@@ -195,6 +196,7 @@ class TufAioGuiOfflineTests(unittest.TestCase):
                     diagnostics_factory
                     or (lambda: refresh_diagnostics.NULL_DIAGNOSTICS)
                 ),
+                animation_clock=animation_clock,
             )
 
     @staticmethod
@@ -210,6 +212,24 @@ class TufAioGuiOfflineTests(unittest.TestCase):
             QApplication.processEvents()
             time.sleep(0.005)
         raise AssertionError("Bedingung wurde nicht rechtzeitig erfüllt")
+
+    @staticmethod
+    def _write_gif(
+        path: Path,
+        colors: tuple[str, ...] = ("red", "green", "blue"),
+        *,
+        durations: tuple[int, ...] = (40, 300, 500),
+        loop: int = 0,
+    ) -> None:
+        frames = tuple(Image.new("RGB", (320, 320), color) for color in colors)
+        frames[0].save(
+            path,
+            format="GIF",
+            save_all=True,
+            append_images=list(frames[1:]),
+            duration=list(durations),
+            loop=loop,
+        )
 
     def test_local_telemetry_section_and_widgets_are_removed(self) -> None:
         window = self._window()
@@ -1198,6 +1218,406 @@ class TufAioGuiOfflineTests(unittest.TestCase):
             self.assertTrue(window.start_lcd_button.isEnabled())
         finally:
             window.close()
+
+    def test_visible_gif_advances_cached_frames_without_redecoding(self) -> None:
+        class Clock:
+            now = 0.0
+
+            def __call__(self) -> float:
+                return self.now
+
+        clock = Clock()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "animation.gif"
+            self._write_gif(path)
+            window = self._window(animation_clock=clock)
+            try:
+                window.show()
+                with mock.patch.object(
+                    image_pipeline,
+                    "prepare_gif",
+                    wraps=image_pipeline.prepare_gif,
+                ) as decode:
+                    self.assertTrue(window.load_image(path))
+                    decode.assert_called_once()
+                    self.assertEqual(window._animation_frame_index, 0)
+                    self.assertEqual(
+                        window._animation_scheduler.effective_durations_ms,
+                        (20, 150, 250),
+                    )
+                    first = window._prepared.base_rgb_bytes
+
+                    clock.now = 0.019
+                    window._advance_gif_animation()
+                    self.assertEqual(window._animation_frame_index, 0)
+                    clock.now = 0.02
+                    window._advance_gif_animation()
+                    self.assertEqual(window._animation_frame_index, 1)
+                    second = window._prepared.base_rgb_bytes
+
+                    clock.now = 0.35
+                    window._advance_gif_animation()
+                    self.assertEqual(window._animation_frame_index, 2)
+                    third = window._prepared.base_rgb_bytes
+                    decode.assert_called_once()
+
+                self.assertEqual(len({first, second, third}), 3)
+                self.assertIsNotNone(window._final_pixmap)
+                self.assertIn("GIF · Animation · 3 Frames", window.input_format_value.text())
+            finally:
+                window.close()
+
+    def test_static_gif_gif_static_switch_reuses_one_scheduler_and_timer(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            gif_a = root / "a.gif"
+            gif_b = root / "b.gif"
+            static = root / "still.png"
+            self._write_gif(gif_a, ("red", "blue"), durations=(250, 250))
+            self._write_gif(gif_b, ("green", "yellow"), durations=(300, 300))
+            Image.new("RGB", (320, 320), "black").save(static)
+            window = self._window()
+            timer = window._animation_timer
+            scheduler = window._animation_scheduler
+            timer_count = len(window.findChildren(tuf_aio_gui.QTimer))
+            try:
+                self.assertTrue(window.load_image(static))
+                self.assertIsNone(window._prepared_animation)
+                self.assertTrue(window.load_image(gif_a))
+                self.assertEqual(window._animation_frame_index, 0)
+                self.assertTrue(window.load_image(gif_b))
+                self.assertEqual(window._animation_frame_index, 0)
+                self.assertTrue(window.load_image(static))
+                self.assertIsNone(window._prepared_animation)
+                self.assertFalse(timer.isActive())
+                self.assertIs(window._animation_timer, timer)
+                self.assertIs(window._animation_scheduler, scheduler)
+                self.assertEqual(len(window.findChildren(tuf_aio_gui.QTimer)), timer_count)
+            finally:
+                window.close()
+
+    def test_gif_speed_defaults_to_two_persists_and_changes_without_decode(self) -> None:
+        settings_path = Path(self._settings_directory.name) / "gif-speed.ini"
+        settings = self._settings(settings_path)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "speed.gif"
+            self._write_gif(path, ("red", "blue"), durations=(200, 100))
+            window = self._window(settings=settings)
+            try:
+                self.assertEqual(window.gif_speed_combo.currentData(), 2.0)
+                self.assertFalse(window.gif_speed_combo.isEnabled())
+                with mock.patch.object(
+                    image_pipeline,
+                    "prepare_gif",
+                    wraps=image_pipeline.prepare_gif,
+                ) as decode:
+                    self.assertTrue(window.load_image(path))
+                    self.assertEqual(
+                        window._animation_scheduler.effective_durations_ms,
+                        (100, 50),
+                    )
+                    for speed, expected in (
+                        (1.0, (200, 100)),
+                        (1.5, (133, 67)),
+                        (2.0, (100, 50)),
+                        (3.0, (67, 33)),
+                    ):
+                        window.gif_speed_combo.setCurrentIndex(
+                            window.gif_speed_combo.findData(speed)
+                        )
+                        self.assertEqual(
+                            window._animation_scheduler.effective_durations_ms,
+                            expected,
+                        )
+                    decode.assert_called_once()
+                self.assertEqual(window._animation_frame_index, 0)
+            finally:
+                window.close()
+
+        restored = self._window(settings=self._settings(settings_path))
+        try:
+            self.assertEqual(restored.gif_speed_combo.currentData(), 3.0)
+            self.assertEqual(
+                float(restored._settings.value(tuf_aio_gui.GIF_PLAYBACK_SPEED_SETTING)),
+                3.0,
+            )
+        finally:
+            restored.close()
+
+    def test_slow_transport_requests_preserve_every_gif_frame_in_order(self) -> None:
+        class Clock:
+            now = 0.0
+
+            def __call__(self) -> float:
+                return self.now
+
+        clock = Clock()
+        sender = FakeSender()
+        controllers: list[FakeRefreshController] = []
+
+        def factory(source: lcd_refresh.FrameSource) -> FakeRefreshController:
+            controller = FakeRefreshController(source, sender)
+            controllers.append(controller)
+            return controller
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "serial.gif"
+            self._write_gif(
+                path,
+                ("red", "green", "blue"),
+                durations=(100, 100, 100),
+            )
+            window = self._window(controller_factory=factory, animation_clock=clock)
+            try:
+                with mock.patch.object(
+                    image_pipeline,
+                    "prepare_gif",
+                    wraps=image_pipeline.prepare_gif,
+                ) as decode:
+                    self.assertTrue(window.load_image(path))
+                    decode.assert_called_once()
+                    window.start_lcd()
+                    window.gif_speed_combo.setCurrentIndex(
+                        window.gif_speed_combo.findData(3.0)
+                    )
+                    self.assertEqual(
+                        window._lcd_animation_scheduler.effective_durations_ms,
+                        (33, 33, 33),
+                    )
+                    decode.assert_called_once()
+                source = window._frame_buffer
+                assert source is not None
+                controller = controllers[0]
+                observed = []
+                for instant in (0.5, 0.7, 0.9):
+                    clock.now = instant
+                    source.request_next_frame()
+                    observed.append(window._lcd_animation_frame_index)
+                self.assertEqual(observed, [1, 2, 0])
+                self.assertEqual(source.snapshot().generation, 4)
+                self.assertIs(window._refresh_controller, controller)
+                self.assertEqual(len(controllers), 1)
+                self.assertFalse(hasattr(window._lcd_animation_scheduler, "_queue"))
+            finally:
+                if controllers and controllers[0].is_running:
+                    controllers[0].request_stop()
+                    controllers[0].join()
+                    window._poll_refresh_controller()
+                window.close()
+
+    def test_hidden_running_gif_publishes_without_preview_repaint_and_stops_wakeup(
+        self,
+    ) -> None:
+        class Clock:
+            now = 0.0
+
+            def __call__(self) -> float:
+                return self.now
+
+        clock = Clock()
+        sender = FakeSender()
+        controllers: list[FakeRefreshController] = []
+
+        def factory(source: lcd_refresh.FrameSource) -> FakeRefreshController:
+            controller = FakeRefreshController(source, sender)
+            controllers.append(controller)
+            return controller
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "hidden.gif"
+            self._write_gif(path, ("red", "blue"), durations=(40, 40))
+            window = self._window(
+                controller_factory=factory,
+                animation_clock=clock,
+            )
+            try:
+                window.show()
+                self.assertTrue(window.load_image(path))
+                window.start_lcd()
+                source = window._frame_buffer
+                assert source is not None
+                self.assertEqual(
+                    source.transport_interval_seconds,
+                    tuf_aio_gui.GIF_NOMINAL_SENDER_INTERVAL_SECONDS,
+                )
+                self.assertEqual(
+                    tuf_aio_gui.GIF_NOMINAL_SENDER_INTERVAL_SECONDS, 0.012
+                )
+                initial_generation = source.snapshot().generation
+                window.close()
+                self.assertFalse(window._animation_timer.isActive())
+
+                with mock.patch.object(window, "_update_scaled_preview") as repaint:
+                    clock.now = 0.05
+                    source.request_next_frame()
+                    self.assertEqual(source.snapshot().generation, initial_generation + 1)
+                    self.assertNotEqual(
+                        window._preview_jpeg,
+                        source.snapshot().jpeg_bytes,
+                    )
+                    self.assertEqual(window._animation_frame_index, 0)
+                    self.assertEqual(window._lcd_animation_frame_index, 1)
+                    repaint.assert_not_called()
+                    scheduler = window._animation_scheduler
+                    window.tray_open_action.trigger()
+                    self.assertIs(window._animation_scheduler, scheduler)
+
+                self.assertEqual(len(controllers), 1)
+                self.assertIs(window._refresh_controller, controllers[0])
+                window.close()
+                window.stop_lcd()
+                controllers[0].join()
+                window._poll_refresh_controller()
+                self.assertFalse(window._animation_timer.isActive())
+                current = window._animation_frame_index
+                clock.now = 5.0
+                window._advance_gif_animation()
+                self.assertEqual(window._animation_frame_index, current)
+            finally:
+                if controllers and controllers[0].is_running:
+                    controllers[0].request_stop()
+                    controllers[0].join()
+                    window._poll_refresh_controller()
+                window.close()
+
+    def test_finite_gif_holds_last_frame_while_lcd_session_keeps_running(self) -> None:
+        class Clock:
+            now = 0.0
+
+            def __call__(self) -> float:
+                return self.now
+
+        clock = Clock()
+        sender = FakeSender()
+        controllers: list[FakeRefreshController] = []
+
+        def factory(source: lcd_refresh.FrameSource) -> FakeRefreshController:
+            controller = FakeRefreshController(source, sender)
+            controllers.append(controller)
+            return controller
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "finite.gif"
+            self._write_gif(
+                path,
+                ("red", "blue"),
+                durations=(250, 250),
+                loop=1,
+            )
+            window = self._window(
+                controller_factory=factory,
+                animation_clock=clock,
+            )
+            try:
+                self.assertTrue(window.load_image(path))
+                window.start_lcd()
+                source = window._frame_buffer
+                assert source is not None
+                for instant in (0.25, 0.50, 0.75, 1.0):
+                    clock.now = instant
+                    source.request_next_frame()
+                self.assertEqual(window._lcd_animation_frame_index, 1)
+                self.assertFalse(window._lcd_animation_scheduler.is_running)
+                self.assertFalse(window._animation_timer.isActive())
+                self.assertEqual(window._refresh_state, tuf_aio_gui.GuiRefreshState.RUNNING)
+                self.assertIs(window._refresh_controller, controllers[0])
+                self.assertEqual(
+                    source.transport_interval_seconds,
+                    tuf_aio_gui.STATIC_TRANSPORT_INTERVAL_SECONDS,
+                )
+            finally:
+                if controllers and controllers[0].is_running:
+                    controllers[0].request_stop()
+                    controllers[0].join()
+                    window._poll_refresh_controller()
+                window.close()
+
+    def test_gif_settings_and_telemetry_rerender_without_restarting_timeline(self) -> None:
+        class Clock:
+            now = 0.0
+
+            def __call__(self) -> float:
+                return self.now
+
+        clock = Clock()
+        reader = mock.Mock(
+            return_value=system_sensors.TemperatureSnapshot(
+                cpu_usage=system_sensors.PercentageValue(73.0, "/proc/stat")
+            )
+        )
+        sender = FakeSender()
+        controllers: list[FakeRefreshController] = []
+
+        def factory(source: lcd_refresh.FrameSource) -> FakeRefreshController:
+            controller = FakeRefreshController(source, sender)
+            controllers.append(controller)
+            return controller
+
+        settings = self._settings(Path(self._settings_directory.name) / "gif.ini")
+        settings.setValue(tuf_aio_gui.OVERLAY_ENABLED_SETTING, True)
+        for slot in tuf_aio_gui.SLOT_DEFAULTS:
+            metric = telemetry.MetricId.CPU_USAGE if slot == "top_left" else telemetry.MetricId.OFF
+            settings.setValue(f"{tuf_aio_gui.SLOT_SETTING_PREFIX}/{slot}", metric.value)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "dynamic.gif"
+            self._write_gif(path, ("red", "blue"), durations=(250, 250))
+            window = self._window(
+                sensor_reader=reader,
+                settings=settings,
+                controller_factory=factory,
+                animation_clock=clock,
+            )
+            try:
+                window.show()
+                self.assertTrue(window.load_image(path))
+                window.start_lcd()
+                source = window._frame_buffer
+                assert source is not None
+                deadline = window._animation_scheduler.next_deadline
+                generation = source.snapshot().generation
+
+                window.refresh_temperatures()
+                window._set_overlay_color("#12ABCD")
+                window._rotate_clockwise()
+                combo = window.slot_combos["top_right"]
+                combo.setCurrentIndex(
+                    combo.findData(telemetry.MetricId.GPU_USAGE.value)
+                )
+                window._overlay_toggled(False)
+                window._overlay_toggled(True)
+
+                self.assertEqual(window._animation_scheduler.next_deadline, deadline)
+                self.assertEqual(window._animation_frame_index, 0)
+                self.assertEqual(source.snapshot().generation, generation)
+                self.assertEqual(len(controllers), 1)
+                self.assertIs(window._refresh_controller, controllers[0])
+
+                clock.now = 0.25
+                source.request_next_frame()
+                self.assertEqual(window._lcd_animation_frame_index, 1)
+                self.assertEqual(source.snapshot().generation, generation + 1)
+                self.assertEqual(window._rotation_degrees, 90)
+            finally:
+                if controllers and controllers[0].is_running:
+                    controllers[0].request_stop()
+                    controllers[0].join()
+                    window._poll_refresh_controller()
+                window.close()
+
+    def test_quit_stops_gif_scheduler(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "quit.gif"
+            self._write_gif(path, ("red", "blue"), durations=(250, 250))
+            window = self._window()
+            window.show()
+            self.assertTrue(window.load_image(path))
+            self.assertTrue(window._animation_scheduler.is_running)
+            with mock.patch.object(QApplication.instance(), "quit") as quit_app:
+                window.quit_application()
+                quit_app.assert_called_once_with()
+            self.assertFalse(window._animation_scheduler.is_running)
+            self.assertFalse(window._lcd_animation_scheduler.is_running)
+            self.assertFalse(window._animation_timer.isActive())
 
     def test_close_hides_without_stopping_and_quit_stops_nonblocking(self) -> None:
         release_sender = threading.Event()

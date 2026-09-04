@@ -8,7 +8,7 @@ Root-Rechte.
 ## Runtime-Abhängigkeiten
 
 Die Laufzeit besteht aus `/usr/bin/python3`, `PySide6` und `Pillow`; alle
-weiteren Python-Imports stammen aus der Standardbibliothek oder den zehn in
+weiteren Python-Imports stammen aus der Standardbibliothek oder den elf in
 `runtime-files.txt` aufgeführten Projektmodulen. Test-, Forschungs- und
 Dokumentationsdateien sowie die Hardware-Testprogramme werden nicht kopiert.
 
@@ -94,7 +94,8 @@ Administratoraktion darf sie nach
 
 ## GIF-Status in v0.1
 
-Die Bildpipeline kann GIF-Dateien laden und separat Frames, Dauern sowie
-Loop-Metadaten vorbereiten. Echte animierte GIF-Wiedergabe auf dem LCD ist
-noch nicht implementiert. Der aktive GUI-/LCD-Pfad verwendet GIF in v0.1
-weiterhin als statisches Standbild aus Frame 0.
+Die Bildpipeline lädt GIF-Dateien einmalig und cached Frames, Dauern sowie
+Loop-Metadaten. Die GUI kann diese Frames über den gemeinsamen Preview-/LCD-
+Kompositionspfad animieren. Die Funktion ist offline implementiert, aber noch
+nicht am realen LCD validiert. Animierte Inhalte verwenden ein
+transportgeführtes serielles Pacing ohne feste App-seitige FPS-Grenze.

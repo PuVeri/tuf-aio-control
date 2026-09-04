@@ -138,6 +138,15 @@ class ProductionControllerFactoryTests(unittest.TestCase):
         self.assertGreater(result.elapsed_seconds, 30.0)
         self.assertEqual(calls, 35)
 
+    def test_production_factory_uses_explicit_animated_source_cadence(self) -> None:
+        source = lcd_refresh.LatestFrameBuffer(
+            REFERENCE_PATH.read_bytes(),
+            transport_interval_seconds=0.012,
+        )
+        controller = self._factory(valid_device())(source)
+        self.assertEqual(controller._plan.transport_interval_seconds, 0.012)
+        self.assertIs(controller._frame_source, source)
+
     def test_bounded_development_policy_remains_available(self) -> None:
         plan = gui_refresh_factory.build_gui_development_plan(
             REFERENCE_PATH.read_bytes()

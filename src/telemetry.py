@@ -23,18 +23,19 @@ class MetricId(str, Enum):
 class MetricDefinition:
     metric_id: MetricId
     display_label: str
+    lcd_label: str
     unit: str
 
 
 METRIC_DEFINITIONS = (
-    MetricDefinition(MetricId.CPU_USAGE, "CPU", "%"),
-    MetricDefinition(MetricId.GPU_USAGE, "GPU", "%"),
-    MetricDefinition(MetricId.CPU_PACKAGE, "CPU Package", "°C"),
-    MetricDefinition(MetricId.CPU_CCD, "CPU CCD", "°C"),
-    MetricDefinition(MetricId.GPU_TEMPERATURE, "GPU Temperatur", "°C"),
-    MetricDefinition(MetricId.GPU_HOTSPOT, "GPU Hotspot", "°C"),
-    MetricDefinition(MetricId.GPU_MEMORY, "GPU Memory", "°C"),
-    MetricDefinition(MetricId.OFF, "Aus", ""),
+    MetricDefinition(MetricId.CPU_USAGE, "CPU", "CPU", "%"),
+    MetricDefinition(MetricId.GPU_USAGE, "GPU", "GPU", "%"),
+    MetricDefinition(MetricId.CPU_PACKAGE, "CPU Package", "CPU PKG", "°C"),
+    MetricDefinition(MetricId.CPU_CCD, "CPU CCD", "CPU CCD", "°C"),
+    MetricDefinition(MetricId.GPU_TEMPERATURE, "GPU Temperatur", "GPU TEMP", "°C"),
+    MetricDefinition(MetricId.GPU_HOTSPOT, "GPU Hotspot", "GPU HOT", "°C"),
+    MetricDefinition(MetricId.GPU_MEMORY, "GPU Memory", "GPU MEM", "°C"),
+    MetricDefinition(MetricId.OFF, "Aus", "Aus", ""),
 )
 METRIC_BY_ID = {definition.metric_id: definition for definition in METRIC_DEFINITIONS}
 
@@ -56,6 +57,12 @@ class MetricValue:
         if not self.available:
             return "—"
         return f"{self.value:.0f} {self.unit}"
+
+    @property
+    def lcd_label(self) -> str:
+        """Return the compact LCD label without coupling logic to visible text."""
+        definition = METRIC_BY_ID.get(self.metric_id)
+        return self.display_label if definition is None else definition.lcd_label
 
 
 def unavailable(metric_id: MetricId) -> MetricValue:

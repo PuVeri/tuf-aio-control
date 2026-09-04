@@ -51,6 +51,7 @@ class FrameSender(Protocol):
 
 
 WaitFunction = Callable[[threading.Event, float], bool]
+NextFrameCallback = Callable[[], None]
 
 
 @dataclass(frozen=True)
@@ -97,9 +98,21 @@ class LatestFrameBuffer:
         initial_jpeg: bytes | None = None,
         *,
         diagnostics: refresh_diagnostics.RefreshDiagnostics | None = None,
+        transport_interval_seconds: float | None = None,
+        next_frame_callback: NextFrameCallback | None = None,
+        transport_driven: bool = False,
     ) -> None:
-        self._lock = threading.Lock()
+        if transport_interval_seconds is not None:
+            _require_positive_finite(transport_interval_seconds, "Transportintervall")
+        if next_frame_callback is not None and not callable(next_frame_callback):
+            raise TypeError("next_frame_callback muss aufrufbar sein")
+        if not isinstance(transport_driven, bool):
+            raise TypeError("transport_driven muss boolesch sein")
+        self._condition = threading.Condition()
         self._current: FrameSnapshot | None = None
+        self._transport_interval_seconds = transport_interval_seconds
+        self._next_frame_callback = next_frame_callback
+        self._transport_driven = transport_driven
         self.diagnostics = diagnostics or refresh_diagnostics.NULL_DIAGNOSTICS
         if initial_jpeg is not None:
             self.publish(initial_jpeg)
@@ -107,7 +120,7 @@ class LatestFrameBuffer:
     def publish(self, jpeg_bytes: bytes) -> FrameSnapshot:
         """Validate before locking, then atomically replace the current frame."""
         validated = RefreshFrame(jpeg_bytes)
-        with self._lock:
+        with self._condition:
             generation = (
                 1 if self._current is None else self._current.generation + 1
             )
@@ -123,14 +136,62 @@ class LatestFrameBuffer:
                 planned_segments=validated.jpeg_info.segment_count,
             )
             self._current = snapshot
+            self._condition.notify_all()
             return snapshot
 
     def snapshot(self) -> FrameSnapshot:
         """Return the current immutable snapshot under only a short read lock."""
-        with self._lock:
+        with self._condition:
             if self._current is None:
                 raise RefreshStateError("Noch kein Refresh-Frame publiziert")
             return self._current
+
+    @property
+    def transport_interval_seconds(self) -> float | None:
+        with self._condition:
+            return self._transport_interval_seconds
+
+    def set_transport_interval_seconds(self, interval_seconds: float) -> None:
+        """Atomically select static or animated cadence without a new session."""
+        _require_positive_finite(interval_seconds, "Transportintervall")
+        with self._condition:
+            self._transport_interval_seconds = interval_seconds
+
+    @property
+    def transport_driven(self) -> bool:
+        with self._condition:
+            return self._transport_driven
+
+    def set_transport_driven(self, enabled: bool) -> None:
+        if not isinstance(enabled, bool):
+            raise TypeError("transport_driven muss boolesch sein")
+        with self._condition:
+            self._transport_driven = enabled
+            self._condition.notify_all()
+
+    def request_next_frame(self) -> None:
+        """Request one coalescible producer update after a completed transfer."""
+        callback = self._next_frame_callback
+        if callback is not None:
+            callback()
+
+    def wait_for_generation_after(
+        self, generation: int, stop_event: threading.Event
+    ) -> bool:
+        """Wait for one newer latest frame; return false when stopping."""
+        with self._condition:
+            while (
+                not stop_event.is_set()
+                and self._transport_driven
+                and self._current is not None
+                and self._current.generation <= generation
+            ):
+                self._condition.wait()
+            return not stop_event.is_set()
+
+    def cancel_waiters(self) -> None:
+        with self._condition:
+            self._condition.notify_all()
 
 
 @dataclass(frozen=True)
@@ -383,6 +444,9 @@ class RefreshController:
         if not self._stop_event.is_set():
             self._diagnostics.record("stop_requested", requested_reason="user")
         self._stop_event.set()
+        cancel_waiters = getattr(self._frame_source, "cancel_waiters", None)
+        if callable(cancel_waiters):
+            cancel_waiters()
 
     def wait(self, timeout: float | None = None) -> RefreshResult | None:
         """Join without requesting stop; return None only when timeout expires."""
@@ -578,7 +642,47 @@ class RefreshController:
                     frame_indices,
                 )
 
-            next_start = transfer_started + self._plan.transport_interval_seconds
+            if self._frame_source is not None and bool(
+                getattr(self._frame_source, "transport_driven", False)
+            ):
+                request_next_frame = getattr(
+                    self._frame_source, "request_next_frame", None
+                )
+                if callable(request_next_frame):
+                    try:
+                        request_next_frame()
+                    except Exception as error:
+                        return self._result_for(
+                            RefreshStopReason.INTERNAL_ERROR,
+                            started_at,
+                            sent,
+                            transfer_durations,
+                            frame_indices,
+                            error=error,
+                        )
+                wait_for_generation = getattr(
+                    self._frame_source, "wait_for_generation_after", None
+                )
+                if callable(wait_for_generation) and not wait_for_generation(
+                    snapshot.generation, self._stop_event
+                ):
+                    return self._result_for(
+                        RefreshStopReason.EXPLICIT_STOP,
+                        started_at,
+                        sent,
+                        transfer_durations,
+                        frame_indices,
+                    )
+
+            transport_interval = self._plan.transport_interval_seconds
+            if self._frame_source is not None:
+                dynamic_interval = getattr(
+                    self._frame_source, "transport_interval_seconds", None
+                )
+                if dynamic_interval is not None:
+                    _require_positive_finite(dynamic_interval, "Transportintervall")
+                    transport_interval = dynamic_interval
+            next_start = transfer_started + transport_interval
             next_wakeup = (
                 next_start if deadline is None else min(next_start, deadline)
             )

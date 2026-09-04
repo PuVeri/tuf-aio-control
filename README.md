@@ -5,22 +5,25 @@ Linux-Anwendung zur Steuerung des LCDs der **ASUS TUF Gaming LC III 360 ARGB
 LCD**. Langfristig soll das Display eigene Bilder oder Animationen sowie reale
 Hardwaretemperaturen anzeigen können.
 
-Der sichere Einzelbildpfad ist statisch geprüft und auf dem realen Gerät
-bestätigt. Die Desktop-UI bereitet JPEG, PNG, WebP, BMP und den ersten
-GIF-Frame automatisch als validiertes 320×320-JPEG vor. Animationen,
-Dauerbetrieb ist noch nicht implementiert. Die GUI zeigt lokale Linux-hwmon-
-Temperaturen für CPU, CPU Package und GPU an, soweit der Kernel getrennte
-passende Sensoren bereitstellt.
+Der sichere JPEG-Pfad und kontinuierliche Betrieb sind auf dem realen Gerät
+bestätigt. Die Desktop-UI bereitet JPEG, PNG, WebP, BMP und vollständige GIF-
+Animationen als validierte 320×320-Kompositionen vor. GIF-Liveanimation ist
+offline implementiert, aber noch nicht real validiert. Vier frei wählbare
+CPU-/GPU-Metrics können als LCD-Overlay angezeigt werden.
 
 ## Desktop-UI starten
 
-Die erste Desktop-Oberfläche verwendet PySide6 und startet mit:
+Die lokal installierte Desktop-/Tray-Anwendung verwendet PySide6 und startet
+mit:
 
 ```text
-python3 -B src/tuf_aio_gui.py
+tuf-aio-control
+tuf-aio-control --background
 ```
 
-Verwendet werden die bereits vorhandenen lokalen Pakete PySide6 6.11.1 und
+Direkte Starts aus `src/` sind ausschließlich Entwicklungsarbeit, nicht der
+produktive Benutzerbetrieb. Verwendet werden die bereits vorhandenen lokalen
+Pakete PySide6 6.11.2 und
 Pillow 12.3.0 mit libjpeg-turbo; das Projekt installiert keine Pakete selbst.
 
 Die UI sendet niemals automatisch. Sie zeigt Original und finale
@@ -29,9 +32,14 @@ Optional legt derselbe Renderer `CPU Package / Tctl`, `GPU / edge` und
 `CPU CCD / Tccd1` dreiecksförmig über Vorschau und finalen JPEG-Frame. Die
 gemeinsame Schriftfarbe ist frei wählbar, wird sofort sichtbar und als
 `#RRGGBB` in den App-Einstellungen gespeichert; Default ist Weiß.
-Erst nach erfolgreicher Konvertierung und erneuter ASUS-JPEG-Validierung kann
-ein ausdrücklicher Klick auf `Auf Display senden` genau einen Frame
-übertragen. GIF wird ausschließlich als Standbild aus Frame 0 verarbeitet.
+Erst nach erfolgreicher Konvertierung und erneuter ASUS-JPEG-Validierung
+startet ein ausdrücklicher Klick auf `LCD starten` die kontrollierte Session.
+GIF-Frames verwenden ein transportgeführtes serielles Pacing ohne feste
+App-seitige FPS-Grenze. Die reale Transferdauer begrenzt die Bildrate
+natürlich; dieses Verhalten muss erneut am realen LCD validiert werden.
+`GIF-Geschwindigkeit` ist persistent auf 1×, 1.5×, 2× oder 3× einstellbar;
+neue und fehlende Einstellungen verwenden 2×. Die sichtbare Preview folgt
+diesem Faktor unabhängig von der LCD-Transportgeschwindigkeit.
 Die Oberfläche verändert keine Geräteberechtigungen.
 
 ## Projektziele
@@ -48,8 +56,8 @@ Die geplante Anwendung soll:
 - Zugriffsfehler und nicht unterstützte Geräte verständlich melden,
 - das ermittelte Protokoll nachvollziehbar und reproduzierbar dokumentieren.
 
-Nicht Ziel der aktuellen Phase sind Animationen, Dauerbetrieb, Autostart oder
-ein Hintergrunddienst.
+Nicht Ziel der aktuellen Phase sind aggressive Animationsraten oder eine
+unbestätigte Änderung des empirisch belegten Transportprotokolls.
 
 ## Aktueller Erkenntnisstand
 
@@ -68,8 +76,8 @@ ein Hintergrunddienst.
 
 ### Noch nicht bestätigt
 
-- Animationen, mehrere Frames und langfristiger Dauerbetrieb.
-- Weitere Eingabeformate außerhalb JPEG, PNG, WebP, BMP und GIF-Frame 0.
+- Reale GIF-Liveanimation und die endgültige sichere Hardware-Framerate.
+- Weitere Eingabeformate außerhalb JPEG, PNG, WebP, BMP und GIF.
 - Fehler-, Timeout- und Recoveryverhalten des realen v49-Geräts.
 - Andere JPEG-Profile und Segmentzahlen als der erfolgreiche Referenztransfer.
 - Weitere Sensorkanäle jenseits der aktuellen CPU-/Package-/GPU-Anzeige.
@@ -238,5 +246,5 @@ offline getestet. Die GUI liest CPU-, Package- und GPU-Werte ausschließlich
 lokal und read-only aus hwmon; fehlende getrennte Werte erscheinen als `N/A`.
 Der vorbereitete LCD-Frame kann Tctl, Tccd1 und `edge` der primären GPU mit
 persistenter gemeinsamer Schriftfarbe darstellen; fehlende Overlaywerte
-erscheinen als `—`. GIF-Animation und weitere Betriebsarten benötigen jeweils
-eine eigene Sicherheitsbewertung und Freigabe.
+erscheinen als `—`. Die offline implementierte GIF-Animation benötigt noch
+eine eigene reale Validierung und Freigabe.

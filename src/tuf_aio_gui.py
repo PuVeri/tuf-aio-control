@@ -4,11 +4,13 @@
 from __future__ import annotations
 
 import sys
+import threading
+import time
 from enum import Enum
 from pathlib import Path
 from typing import Callable, Protocol
 
-from PySide6.QtCore import QSettings, QTimer, Qt
+from PySide6.QtCore import QSettings, QTimer, Qt, Signal
 from PySide6.QtGui import (
     QAction,
     QColor,
@@ -39,6 +41,7 @@ from PySide6.QtWidgets import (
 )
 
 import image_pipeline
+import gif_animation
 import gui_refresh_factory
 import lcd_refresh
 import lcd_transport as transport
@@ -48,6 +51,7 @@ import telemetry
 
 TemperatureReader = Callable[[], system_sensors.TemperatureSnapshot]
 DiagnosticsFactory = Callable[[], refresh_diagnostics.RefreshDiagnostics]
+AnimationClock = Callable[[], float]
 
 
 class RefreshControllerLike(Protocol):
@@ -71,6 +75,9 @@ ROTATION_SETTING = "lcd_output/rotation_degrees"
 SCALE_MODE_SETTING = "lcd_output/scale_mode"
 LAST_IMAGE_SETTING = "lcd_output/last_image"
 LCD_AUTOSTART_SETTING = "lcd_runtime/autostart"
+GIF_PLAYBACK_SPEED_SETTING = "lcd_output/gif_playback_speed"
+GIF_PLAYBACK_SPEED_DEFAULT = 2.0
+GIF_PLAYBACK_SPEEDS = (1.0, 1.5, 2.0, 3.0)
 SLOT_SETTING_PREFIX = "lcd_data_slots"
 SLOT_DEFAULTS = {
     "top_left": telemetry.MetricId.CPU_USAGE,
@@ -78,6 +85,8 @@ SLOT_DEFAULTS = {
     "bottom_left": telemetry.MetricId.CPU_PACKAGE,
     "bottom_right": telemetry.MetricId.GPU_TEMPERATURE,
 }
+STATIC_TRANSPORT_INTERVAL_SECONDS = 1.0
+GIF_NOMINAL_SENDER_INTERVAL_SECONDS = 0.012
 
 
 class GuiRefreshState(str, Enum):
@@ -91,6 +100,8 @@ class GuiRefreshState(str, Enum):
 class MainWindow(QMainWindow):
     """Single-image UI; conversion and transport stay in separate modules."""
 
+    transport_frame_requested = Signal()
+
     def __init__(
         self,
         *,
@@ -100,6 +111,7 @@ class MainWindow(QMainWindow):
         diagnostics_factory: DiagnosticsFactory = (
             refresh_diagnostics.create_gui_session_diagnostics
         ),
+        animation_clock: AnimationClock = time.monotonic,
     ) -> None:
         super().__init__()
         self._sensor_reader = sensor_reader or system_sensors.SystemTelemetryReader()
@@ -124,12 +136,22 @@ class MainWindow(QMainWindow):
         )
         self._settings.setValue(ROTATION_SETTING, self._rotation_degrees)
         self._slot_metric_ids = self._read_slot_settings()
+        self._gif_playback_speed = self._read_gif_playback_speed()
         for slot, metric_id in self._slot_metric_ids.items():
             self._settings.setValue(f"{SLOT_SETTING_PREFIX}/{slot}", metric_id.value)
         self._settings.sync()
         self._latest_temperature_snapshot = system_sensors.TemperatureSnapshot()
         self._selected_path: Path | None = None
         self._prepared: image_pipeline.PreparedImage | None = None
+        self._prepared_animation: image_pipeline.PreparedAnimation | None = None
+        self._animation_frame_index = 0
+        self._animation_clock = animation_clock
+        self._animation_scheduler = gif_animation.GifAnimationScheduler()
+        self._lcd_animation_scheduler = gif_animation.GifAnimationScheduler()
+        self._lcd_animation_frame_index = 0
+        self._lcd_prepared: image_pipeline.PreparedImage | None = None
+        self._transport_frame_request_lock = threading.Lock()
+        self._transport_frame_request_pending = False
         self._device_ready = False
         self._final_pixmap: QPixmap | None = None
         self._refresh_state = GuiRefreshState.IDLE
@@ -156,6 +178,13 @@ class MainWindow(QMainWindow):
         self._refresh_state_timer = QTimer(self)
         self._refresh_state_timer.setInterval(250)
         self._refresh_state_timer.timeout.connect(self._poll_refresh_controller)
+        self._animation_timer = QTimer(self)
+        self._animation_timer.setSingleShot(True)
+        self._animation_timer.timeout.connect(self._advance_gif_animation)
+        self._transport_animation_timer = QTimer(self)
+        self._transport_animation_timer.setSingleShot(True)
+        self._transport_animation_timer.timeout.connect(self._produce_transport_frame)
+        self.transport_frame_requested.connect(self._produce_transport_frame)
         self._apply_refresh_state()
         self._restore_last_image()
         QTimer.singleShot(0, self._maybe_autostart_lcd)
@@ -212,6 +241,18 @@ class MainWindow(QMainWindow):
         self.scale_mode.setCurrentIndex(max(0, saved_scale_index))
         self.scale_mode.currentIndexChanged.connect(self._scale_mode_changed)
         options_layout.addWidget(self.scale_mode)
+        self.gif_speed_label = QLabel("GIF-Geschwindigkeit:")
+        options_layout.addWidget(self.gif_speed_label)
+        self.gif_speed_combo = QComboBox()
+        for speed, label in ((1.0, "1×"), (1.5, "1.5×"), (2.0, "2×"), (3.0, "3×")):
+            self.gif_speed_combo.addItem(label, speed)
+        self.gif_speed_combo.setCurrentIndex(
+            self.gif_speed_combo.findData(self._gif_playback_speed)
+        )
+        self.gif_speed_combo.currentIndexChanged.connect(
+            self._gif_playback_speed_changed
+        )
+        options_layout.addWidget(self.gif_speed_combo)
         self.overlay_checkbox = QCheckBox("Datenoverlay auf LCD anzeigen")
         self.overlay_checkbox.setChecked(self._overlay_enabled)
         self.overlay_checkbox.toggled.connect(self._overlay_toggled)
@@ -388,6 +429,20 @@ class MainWindow(QMainWindow):
     def _store_bool_setting(self, key: str, enabled: bool) -> None:
         self._settings.setValue(key, enabled)
         self._settings.sync()
+
+    def _read_gif_playback_speed(self) -> float:
+        raw = self._settings.value(
+            GIF_PLAYBACK_SPEED_SETTING,
+            GIF_PLAYBACK_SPEED_DEFAULT,
+        )
+        try:
+            speed = float(raw)
+        except (TypeError, ValueError):
+            speed = GIF_PLAYBACK_SPEED_DEFAULT
+        if speed not in GIF_PLAYBACK_SPEEDS:
+            speed = GIF_PLAYBACK_SPEED_DEFAULT
+        self._settings.setValue(GIF_PLAYBACK_SPEED_SETTING, speed)
+        return speed
 
     def _build_tray(self) -> None:
         self.tray_icon = QSystemTrayIcon(self)
@@ -614,6 +669,171 @@ class MainWindow(QMainWindow):
         else:
             self._temperature_timer.stop()
 
+    def _content_transport_interval(self) -> float:
+        return (
+            GIF_NOMINAL_SENDER_INTERVAL_SECONDS
+            if self._prepared_animation is not None
+            and len(self._prepared_animation.frames) > 1
+            and self._lcd_animation_scheduler.is_running
+            else STATIC_TRANSPORT_INTERVAL_SECONDS
+        )
+
+    def _update_frame_buffer_cadence(self) -> None:
+        if self._frame_buffer is not None:
+            self._frame_buffer.set_transport_interval_seconds(
+                self._content_transport_interval()
+            )
+            self._frame_buffer.set_transport_driven(
+                self._prepared_animation is not None
+                and len(self._prepared_animation.frames) > 1
+                and self._lcd_animation_scheduler.is_running
+            )
+
+    def _replace_animation(
+        self, prepared: image_pipeline.PreparedAnimation | None
+    ) -> None:
+        self._animation_timer.stop()
+        self._transport_animation_timer.stop()
+        self._animation_scheduler.stop()
+        self._lcd_animation_scheduler.stop()
+        self._prepared_animation = prepared
+        self._animation_frame_index = 0
+        self._lcd_animation_frame_index = 0
+        self._lcd_prepared = None
+        if prepared is not None and len(prepared.frames) > 1:
+            durations = tuple(frame.duration_ms for frame in prepared.frames)
+            now = self._animation_clock()
+            self._animation_scheduler.start(
+                durations,
+                prepared.loop_count,
+                now=now,
+                playback_speed=self._gif_playback_speed,
+            )
+            self._lcd_animation_scheduler.start(
+                durations,
+                prepared.loop_count,
+                now=now,
+                playback_speed=self._gif_playback_speed,
+            )
+        self._update_frame_buffer_cadence()
+        self._update_animation_scheduling()
+        self._apply_refresh_state()
+
+    def _animation_scheduling_needed(self) -> bool:
+        return (
+            self._prepared_animation is not None
+            and self._animation_scheduler.is_running
+            and self._refresh_state in {GuiRefreshState.IDLE, GuiRefreshState.RUNNING}
+            and self.isVisible()
+        )
+
+    def _update_animation_scheduling(self) -> None:
+        self._animation_timer.stop()
+        if not self._animation_scheduling_needed():
+            return
+        delay_ms = self._animation_scheduler.milliseconds_until_next(
+            now=self._animation_clock()
+        )
+        if delay_ms is not None:
+            self._animation_timer.start(max(1, delay_ms))
+
+    def _prepare_animation_frame(self, frame_index: int) -> image_pipeline.PreparedImage:
+        animation = self._prepared_animation
+        if animation is None:
+            raise RuntimeError("Kein GIF für die Frame-Erzeugung geladen")
+        return image_pipeline.render_prepared_animation_frame(
+            animation,
+            frame_index,
+            overlay_config=self._overlay_config(),
+            temperatures=self._overlay_values(self._latest_temperature_snapshot),
+            overlay_slots=self._overlay_slots(),
+            rotation_degrees=self._rotation_degrees,
+        )
+
+    def _render_preview_animation_frame(
+        self, frame_index: int, *, update_widgets: bool
+    ) -> None:
+        prepared = self._prepare_animation_frame(frame_index)
+        self._animation_frame_index = frame_index
+        self._prepared = prepared
+        self._load_final_preview(prepared.jpeg_bytes)
+        if update_widgets:
+            self._show_prepared_image(prepared)
+
+    def _advance_preview_animation(self, *, update_widgets: bool) -> bool:
+        state = self._animation_scheduler.advance(now=self._animation_clock())
+        rendered = False
+        if state is not None and state.frame_index != self._animation_frame_index:
+            self._render_preview_animation_frame(
+                state.frame_index,
+                update_widgets=update_widgets,
+            )
+            rendered = True
+        return rendered
+
+    def _advance_gif_animation(self) -> None:
+        if not self._animation_scheduling_needed():
+            self._animation_timer.stop()
+            return
+        try:
+            self._advance_preview_animation(update_widgets=True)
+        except (image_pipeline.ImagePipelineError, OSError, RuntimeError, ValueError) as error:
+            self._show_render_error(error)
+        self._update_animation_scheduling()
+
+    def _request_transport_frame(self) -> None:
+        """Coalesce sender completion notices into one GUI-producer request."""
+        if (
+            self._refresh_state
+            not in {GuiRefreshState.STARTING, GuiRefreshState.RUNNING}
+            or self._prepared_animation is None
+            or not self._lcd_animation_scheduler.is_running
+        ):
+            return
+        with self._transport_frame_request_lock:
+            if self._transport_frame_request_pending:
+                return
+            self._transport_frame_request_pending = True
+        self.transport_frame_requested.emit()
+
+    def _produce_transport_frame(self) -> None:
+        """Publish exactly the next sequential frame after transport completion."""
+        keep_pending = False
+        try:
+            if (
+                self._refresh_state is GuiRefreshState.RUNNING
+                and self._prepared_animation is not None
+                and self._lcd_animation_scheduler.is_running
+            ):
+                delay_ms = self._lcd_animation_scheduler.milliseconds_until_next(
+                    now=self._animation_clock()
+                )
+                if delay_ms is not None and delay_ms > 0:
+                    self._transport_animation_timer.start(max(1, delay_ms))
+                    keep_pending = True
+                    return
+                state = self._lcd_animation_scheduler.advance(
+                    now=self._animation_clock()
+                )
+                if state is not None and state.frame_index != self._lcd_animation_frame_index:
+                    prepared = self._prepare_animation_frame(state.frame_index)
+                    self._lcd_animation_frame_index = state.frame_index
+                    self._lcd_prepared = prepared
+                    self._publish_running_frame(prepared.jpeg_bytes)
+                elif self._frame_buffer is not None and self._lcd_prepared is not None:
+                    # The finite final frame is held while the sender returns to
+                    # static cadence; publishing also releases its generation wait.
+                    self._frame_buffer.publish(self._lcd_prepared.jpeg_bytes)
+                if state is not None and state.finished:
+                    self._update_frame_buffer_cadence()
+        except (image_pipeline.ImagePipelineError, OSError, RuntimeError, ValueError) as error:
+            self._show_render_error(error)
+        finally:
+            if not keep_pending:
+                with self._transport_frame_request_lock:
+                    self._transport_frame_request_pending = False
+        self._update_animation_scheduling()
+
     def refresh_temperatures(self) -> system_sensors.TemperatureSnapshot:
         """Sample local telemetry once without involving any HID path."""
         if not self._sensor_polling_needed():
@@ -691,14 +911,30 @@ class MainWindow(QMainWindow):
         ):
             self.load_image(self._selected_path)
 
+    def _gif_playback_speed_changed(self) -> None:
+        speed = float(self.gif_speed_combo.currentData())
+        if speed == self._gif_playback_speed:
+            return
+        self._gif_playback_speed = speed
+        self._settings.setValue(GIF_PLAYBACK_SPEED_SETTING, speed)
+        self._settings.sync()
+        now = self._animation_clock()
+        self._animation_scheduler.set_playback_speed(speed, now=now)
+        self._lcd_animation_scheduler.set_playback_speed(speed, now=now)
+        self._update_animation_scheduling()
+        if self._transport_frame_request_pending:
+            self._transport_animation_timer.stop()
+            self._produce_transport_frame()
+
     def load_image(self, path: Path, *, persist: bool = True) -> bool:
-        """Show frame 0 of the source and prepare one validated output JPEG."""
+        """Prepare one static source or one cached GIF animation."""
         if self._refresh_state not in {GuiRefreshState.IDLE, GuiRefreshState.RUNNING}:
             return False
         resolved = path.expanduser().resolve()
         self.path_value.setText(str(resolved))
         self.original_size_value.setText("wird ermittelt …")
         previous_prepared = self._prepared
+        previous_animation = self._prepared_animation
         if self._refresh_state is GuiRefreshState.IDLE:
             self._prepared = None
             self._final_pixmap = None
@@ -708,24 +944,51 @@ class MainWindow(QMainWindow):
 
         mode = self.scale_mode.currentData()
         try:
-            prepared = image_pipeline.prepare_image(
-                resolved,
-                mode=mode,
-                overlay_config=self._overlay_config(),
-                temperatures=self._overlay_values(
-                    self._latest_temperature_snapshot
-                ),
-                overlay_slots=self._overlay_slots(),
-                rotation_degrees=self._rotation_degrees,
-            )
+            animation: image_pipeline.PreparedAnimation | None = None
+            if resolved.suffix.casefold() == ".gif":
+                animation = image_pipeline.prepare_gif(
+                    resolved,
+                    mode=mode,
+                    overlay_config=self._overlay_config(),
+                    temperatures=self._overlay_values(
+                        self._latest_temperature_snapshot
+                    ),
+                    overlay_slots=self._overlay_slots(),
+                    rotation_degrees=self._rotation_degrees,
+                )
+                prepared = image_pipeline.render_prepared_animation_frame(
+                    animation,
+                    0,
+                    overlay_config=self._overlay_config(),
+                    temperatures=self._overlay_values(
+                        self._latest_temperature_snapshot
+                    ),
+                    overlay_slots=self._overlay_slots(),
+                    rotation_degrees=self._rotation_degrees,
+                )
+            else:
+                prepared = image_pipeline.prepare_image(
+                    resolved,
+                    mode=mode,
+                    overlay_config=self._overlay_config(),
+                    temperatures=self._overlay_values(
+                        self._latest_temperature_snapshot
+                    ),
+                    overlay_slots=self._overlay_slots(),
+                    rotation_degrees=self._rotation_degrees,
+                )
+            self._replace_animation(animation)
+            self._lcd_prepared = prepared
             self._load_final_preview(prepared.jpeg_bytes)
             self._publish_running_frame(prepared.jpeg_bytes)
         except (image_pipeline.ImagePipelineError, OSError, RuntimeError, ValueError) as error:
             if self._refresh_state is GuiRefreshState.RUNNING:
                 self._prepared = previous_prepared
+                self._prepared_animation = previous_animation
                 self._show_render_error(error)
             else:
                 self._prepared = None
+                self._replace_animation(None)
                 self._final_pixmap = None
                 self.final_preview.setPixmap(QPixmap())
                 self.final_preview.setText("Keine kompatible LCD-Ausgabe")
@@ -750,8 +1013,8 @@ class MainWindow(QMainWindow):
             )
         self.original_size_value.setText(oriented_text)
         input_text = prepared.source_format
-        if prepared.gif_first_frame_only:
-            input_text = "GIF · erstes Bild als Standbild"
+        if self._prepared_animation is not None:
+            input_text = f"GIF · Animation · {len(self._prepared_animation.frames)} Frames"
         self.input_format_value.setText(input_text)
         self.output_size_value.setText("320×320")
         self.profile_value.setText("SOF0 · 8 Bit · JFIF-YCbCr 4:2:0 · Qualität 60")
@@ -775,17 +1038,30 @@ class MainWindow(QMainWindow):
         if self._prepared is None:
             return
         try:
-            prepared = image_pipeline.rerender_prepared_image(
-                self._prepared,
-                overlay_config=self._overlay_config(),
-                temperatures=self._overlay_values(
-                    self._latest_temperature_snapshot
-                ),
-                overlay_slots=self._overlay_slots(),
-                rotation_degrees=self._rotation_degrees,
-            )
+            if self._prepared_animation is not None:
+                prepared = self._prepare_animation_frame(self._animation_frame_index)
+                if (
+                    self._refresh_state is GuiRefreshState.RUNNING
+                    and not self._lcd_animation_scheduler.is_running
+                ):
+                    lcd_prepared = self._prepare_animation_frame(
+                        self._lcd_animation_frame_index
+                    )
+                    self._lcd_prepared = lcd_prepared
+                    self._publish_running_frame(lcd_prepared.jpeg_bytes)
+            else:
+                prepared = image_pipeline.rerender_prepared_image(
+                    self._prepared,
+                    overlay_config=self._overlay_config(),
+                    temperatures=self._overlay_values(
+                        self._latest_temperature_snapshot
+                    ),
+                    overlay_slots=self._overlay_slots(),
+                    rotation_degrees=self._rotation_degrees,
+                )
             self._load_final_preview(prepared.jpeg_bytes)
-            self._publish_running_frame(prepared.jpeg_bytes)
+            if self._prepared_animation is None:
+                self._publish_running_frame(prepared.jpeg_bytes)
         except (image_pipeline.ImagePipelineError, OSError, RuntimeError, ValueError) as error:
             self._show_render_error(error)
             return
@@ -863,6 +1139,9 @@ class MainWindow(QMainWindow):
         }
         self.select_button.setEnabled(editable)
         self.scale_mode.setEnabled(editable)
+        gif_controls_enabled = editable and self._prepared_animation is not None
+        self.gif_speed_label.setEnabled(gif_controls_enabled)
+        self.gif_speed_combo.setEnabled(gif_controls_enabled)
         self.overlay_checkbox.setEnabled(editable)
         self.overlay_color_button.setEnabled(editable)
         self.rotation_button.setEnabled(editable)
@@ -904,6 +1183,7 @@ class MainWindow(QMainWindow):
             self._refresh_state_timer.stop()
         self._apply_refresh_state()
         self._update_sensor_polling()
+        self._update_animation_scheduling()
 
     def start_lcd(self) -> None:
         """Start exactly one explicitly injected refresh session."""
@@ -920,6 +1200,19 @@ class MainWindow(QMainWindow):
             self._apply_refresh_state()
             return
 
+        initial_prepared = self._prepared
+        if self._prepared_animation is not None and len(self._prepared_animation.frames) > 1:
+            self._lcd_animation_scheduler.stop()
+            self._lcd_animation_scheduler.start(
+                tuple(frame.duration_ms for frame in self._prepared_animation.frames),
+                self._prepared_animation.loop_count,
+                now=self._animation_clock(),
+                playback_speed=self._gif_playback_speed,
+            )
+            self._lcd_animation_frame_index = 0
+            initial_prepared = self._prepare_animation_frame(0)
+            self._lcd_prepared = initial_prepared
+
         self._set_refresh_state(GuiRefreshState.STARTING)
         self.status_label.setText("Status: LCD-Session wird gestartet …")
         controller: RefreshControllerLike | None = None
@@ -928,8 +1221,15 @@ class MainWindow(QMainWindow):
             self._refresh_diagnostics = diagnostics
             diagnostics.record("start_requested")
             frame_buffer = lcd_refresh.LatestFrameBuffer(
-                self._prepared.jpeg_bytes,
+                initial_prepared.jpeg_bytes,
                 diagnostics=diagnostics,
+                transport_interval_seconds=self._content_transport_interval(),
+                next_frame_callback=self._request_transport_frame,
+                transport_driven=(
+                    self._prepared_animation is not None
+                    and len(self._prepared_animation.frames) > 1
+                    and self._lcd_animation_scheduler.is_running
+                ),
             )
             diagnostics.record(
                 "initial_frame_snapshot",
@@ -963,6 +1263,10 @@ class MainWindow(QMainWindow):
             self._refresh_diagnostics.record_exception("gui_stop_request", error)
             self.status_label.setText(f"Status: Stopanforderung fehlgeschlagen: {error}")
             return
+        self._transport_animation_timer.stop()
+        self._lcd_animation_scheduler.stop()
+        with self._transport_frame_request_lock:
+            self._transport_frame_request_pending = False
         self._set_refresh_state(GuiRefreshState.STOPPING)
         self.status_label.setText("Status: LCD-Session wird sauber beendet …")
 
@@ -1029,10 +1333,12 @@ class MainWindow(QMainWindow):
         super().showEvent(event)
         self._refresh_preview_if_needed()
         self._update_sensor_polling()
+        self._update_animation_scheduling()
 
     def hideEvent(self, event: QHideEvent) -> None:  # noqa: N802 - Qt API
         super().hideEvent(event)
         self._update_sensor_polling()
+        self._update_animation_scheduling()
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802 - Qt API
         if self._quit_requested:
@@ -1059,6 +1365,10 @@ class MainWindow(QMainWindow):
     def _finish_quit(self) -> None:
         self._temperature_timer.stop()
         self._refresh_state_timer.stop()
+        self._animation_timer.stop()
+        self._transport_animation_timer.stop()
+        self._animation_scheduler.stop()
+        self._lcd_animation_scheduler.stop()
         self.tray_icon.hide()
         application = QApplication.instance()
         if application is not None:

@@ -18,7 +18,8 @@ Kanonischer Live-Stand vom 2026-09-03:
 - Das Referenzbild war während dieses Refresh-Laufs real sichtbar. Seine
   Sichtdauer wurde nicht gemessen; lückenlose Sichtbarkeit, sichere
   Default-Unterdrückung und eine ausreichende Refreshrate sind nicht bestätigt.
-- Echte GIF-Animation ist weder implementiert noch empirisch bestätigt.
+- Echte GIF-Animation ist inzwischen offline implementiert, aber weiterhin
+  nicht empirisch am realen LCD bestätigt.
 
 Stand: 2026-09-03
 
@@ -53,12 +54,14 @@ Reportgrößen, keine Feature-Reports, dynamischer hidraw-Pfad und Prüfung auf
 konkurrierende Writer. `lcd_transport.py` und das bestätigte `0x08`-Protokoll
 wurden nicht verändert.
 
-Das symmetrische 2×2-Telemetrielayout liegt nun weiter außen. Die
-Wertmittelpunkte sind oben `(102, 105)` und `(218, 105)`, unten `(102, 247)`
-und `(218, 247)`; die zugehörigen Labelmittelpunkte liegen bei y=73 und y=215.
-Alle verfügbaren Metrics einschließlich längerer Labels, Prozentwerten und
-Temperaturen bleiben geprüft innerhalb des runden Sicherheitsbereichs. Die
-vollständige Komposition rotiert weiterhin erst nach Basisbild und allen vier
+Das symmetrische 2×2-Telemetrielayout verwendet getrennte kurze LCD-Labels:
+`CPU`, `GPU`, `CPU PKG`, `CPU CCD`, `GPU TEMP`, `GPU HOT` und `GPU MEM`.
+Die vollständigen GUI-Dropdown-Namen und Metric-IDs bleiben unverändert. Alle
+regulären LCD-Labels erreichen mit der technischen Condensed-Mono-Schrift die
+einheitliche Zielgröße 25 px. Label und Wert werden anhand ihrer tatsächlichen
+Bounding-Boxes mit exakt 6 px sichtbarem Abstand angeordnet, ungefähr 4 px
+mehr als zuvor. Alle Kombinationen bleiben geprüft innerhalb des runden
+Sicherheitsbereichs. Die vollständige Komposition rotiert weiterhin erst nach Basisbild und allen vier
 Overlays gemeinsam um 0°, 90°, 180° oder 270°. Preview und LCD-Snapshot
 verwenden weiterhin dieselben validierten JPEG-Bytes.
 
@@ -144,7 +147,7 @@ Stand: 2026-09-04
 
 Die produktive Anwendung ist jetzt als eigenständige XDG-Benutzerinstallation
 vorbereitet. `packaging/manage-user-installation.sh` kopiert ausschließlich die
-zehn erforderlichen Python-Runtimedateien nach
+elf erforderlichen Python-Runtimedateien nach
 `${XDG_DATA_HOME:-$HOME/.local/share}/tuf-aio-control/app`, erzeugt
 `$HOME/.local/bin/tuf-aio-control` sowie die normale Desktopdatei und optional
 die Login-Autostartdatei. Es werden keine Tests, Research-Daten,
@@ -174,10 +177,10 @@ Abhängigkeiten; er prüft nur deren lokale Importierbarkeit. Die vorhandene
 udev-Regel bleibt ein vollständig getrennter administrativer Schritt und wird
 vom Benutzerinstaller weder kopiert noch aktiviert.
 
-Der GIF-Status ist unverändert und ausdrücklich begrenzt: GIF-Dateien können
-geladen und vorbereitet werden; Frames, Dauern und Loop-Metadaten lassen sich
-verarbeiten. Echte GIF-Liveanimation auf dem LCD ist noch nicht implementiert.
-Der aktive v0.1-GUI-/LCD-Pfad verwendet weiterhin den statischen Frame-0-Pfad.
+GIF-Dateien werden weiterhin vollständig im Voraus geladen; Frames, Dauern und
+Loop-Metadaten bleiben gecacht. Der aktuelle Entwicklungsstand bindet diese
+Frames nun an den gemeinsamen GUI-/LCD-Renderpfad an. Diese Liveanimation ist
+offline implementiert, aber noch nicht am realen LCD validiert.
 
 Die neuen Installations- und Logpfadtests verwenden ausschließlich temporäre
 HOME-/XDG-Verzeichnisse. Es fanden keine echte Installation, keine
@@ -186,6 +189,67 @@ vollständige Offline-Suite bestand mit 210 Tests; außerdem bestanden `sh -n`,
 `compileall`, `desktop-file-validate` für beide erzeugten Desktopdateien und
 `git diff --check`. Details:
 `research/reports/local-installation-layout.md`.
+
+## Offline-Stand: GIF-Liveanimation und weiter außen liegende Slots
+
+Stand: 2026-09-04
+
+Die GUI verwendet für Mehrframe-GIFs nun ein einziges gecachtes
+`PreparedAnimation`-Modell und einen kleinen queuefreien Timeline-Scheduler.
+Die Quelldatei wird beim Bildwechsel vorbereitet und während der Wiedergabe
+nicht erneut dekodiert. Jeder fällige Basisframe läuft zusammen mit den
+aktuellen vier Telemetrieslots durch den bestehenden gemeinsamen
+Kompositions-, Rotations-, JPEG- und Validierungspfad. Preview und LCD nutzen
+denselben Renderer, werden für ihre unterschiedlichen Taktquellen aber
+unabhängig fortgeschaltet.
+
+Die frühere 125-ms-/8-FPS-Policy wurde nach dem realen Sichttest verworfen.
+Animierte Mehrframe-GIFs verwenden nun ein transportgeführtes serielles Modell
+mit nomineller 12-ms-Senderperiode: Nach jedem synchron abgeschlossenen
+Transfer fordert der Worker genau den sequenziellen Folgeframe an. Ist dessen
+skalierte Dauer bereits verstrichen, beginnt er ohne Zusatzpause; andernfalls
+wartet ein Single-Shot-Timer nur die Restdauer. Auch bei Verzögerung bleibt die
+Reihenfolge N→N+1 erhalten, ohne Catch-up-Schleife oder absoluten
+Timeline-Sprung. Der bekannte reale JPEG-Transfer von ungefähr 108–109 ms
+begrenzt die Bildrate daher natürlich auf ungefähr 9 FPS, ist aber nicht
+hartcodiert. Es gibt keine zweite Session, Framequeue, Überlappung,
+Burstwrites, Retry oder Reconnect. Der statische LCD-Refresh bleibt bei 1,0 s.
+
+Die persistente Einstellung `GIF-Geschwindigkeit` bietet 1×, 1.5×, 2× und 3×;
+Default für neue oder fehlende Settings ist 2×. Effektive Dauern sind
+`Originaldauer / Faktor`, lediglich auf technisch notwendige 1 ms begrenzt.
+Eine Änderung wirkt sofort auf beide bestehenden Scheduler, ohne erneutes
+GIF-Decoding oder Neustart der LCD-Session. Die sichtbare Preview folgt der
+gewählten Geschwindigkeit unabhängig vom seriellen LCD-Backpressure.
+
+`loop=0` läuft endlos. Fehlende Loop-Metadaten bedeuten einen Durchlauf;
+positive Werte zählen Wiederholungen nach diesem ersten Durchlauf. Endliche
+GIFs halten anschließend ihren letzten validierten Frame, während der
+LCD-Refresh mit 1,0 s weiterläuft. Änderungen von Telemetrie, Farbe,
+Slotbelegung, Rotation und Overlaystatus starten weder Timeline noch Session
+neu. Statisch/GIF/GIF-Wechsel verwenden weiterhin dieselben zwei vorhandenen
+Scheduler und Single-Shot-Timer; es entstehen keine weiteren Worker.
+
+Im versteckten Zustand läuft eine für das LCD benötigte Animation weiter, ohne
+Preview-Decodes, Repaints oder Widgetupdates. Beim Öffnen erscheint der
+aktuelle Frame ohne Neustart. Versteckt plus gestoppt bedeutet keinen
+Animationstimer-Wakeup und weiterhin kein Sensorpolling.
+
+Die Labelanker liegen oben bei `(105, 63)` und `(215, 63)`, unten bei
+`(105, 225)` und `(215, 225)`. Die Wertspalten bleiben bei x=94 und x=226;
+ihre y-Position wird pro Text aus den tatsächlichen Bounding-Boxes so
+berechnet, dass der sichtbare Label-/Wert-Abstand exakt 6 px beträgt. Alle
+kurzen LCD-Labels erreichen 25 px. Wertschrift und Farben sind unverändert.
+Tatsächliche Font-Bounding-Boxes aller Labels, Prozent-/
+Temperaturwerte und `—` bleiben innerhalb des runden Sicherheitsradius; die
+Gesamtkomposition rotiert weiterhin erst danach gemeinsam.
+
+Die vollständige Offline-Suite bestand nach dieser Änderung mit 230 Tests; `compileall` und
+`git diff --check` waren sauber. `lcd_transport.py`,
+`lcd_runtime_safety.py`, das bestätigte `0x08`-Protokoll und die
+Production-Safety-Gates wurden nicht verändert. In diesem Ticket gab es keine
+Gerätekommunikation, HID-/USB-Writes oder Live-Tests. Details:
+`research/reports/lcd-gif-animation.md`.
 
 ## Ziel und Grenze
 

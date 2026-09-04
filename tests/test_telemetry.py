@@ -22,6 +22,22 @@ class TelemetryModelTests(unittest.TestCase):
             len({item.metric_id.value for item in telemetry.METRIC_DEFINITIONS}),
             len(telemetry.METRIC_DEFINITIONS),
         )
+        self.assertEqual(
+            [definition.lcd_label for definition in telemetry.METRIC_DEFINITIONS[:-1]],
+            ["CPU", "GPU", "CPU PKG", "CPU CCD", "GPU TEMP", "GPU HOT", "GPU MEM"],
+        )
+        self.assertEqual(
+            [definition.display_label for definition in telemetry.METRIC_DEFINITIONS[:-1]],
+            [
+                "CPU",
+                "GPU",
+                "CPU Package",
+                "CPU CCD",
+                "GPU Temperatur",
+                "GPU Hotspot",
+                "GPU Memory",
+            ],
+        )
 
     def test_units_availability_and_display_values(self) -> None:
         snapshot = system_sensors.TemperatureSnapshot(
