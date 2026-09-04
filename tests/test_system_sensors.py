@@ -10,6 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 import system_sensors
+import telemetry
 
 
 class FakeHwmon:
@@ -293,6 +294,55 @@ class SystemSensorsTests(unittest.TestCase):
 
         with mock.patch.object(system_sensors, "_read_text", side_effect=unreadable):
             self.assertIsNone(system_sensors.read_lcd_temperatures(self.root).gpu_usage)
+
+    def test_system_reader_skips_hwmon_for_cpu_usage_only(self) -> None:
+        reader = system_sensors.SystemTelemetryReader(
+            self.root, proc_stat_path=self.root / "proc-stat"
+        )
+        usage = system_sensors.PercentageValue(25.0, "/proc/stat")
+        with (
+            mock.patch.object(
+                reader._cpu_usage, "sample", return_value=usage
+            ) as cpu_sample,
+            mock.patch.object(
+                system_sensors,
+                "read_lcd_metrics",
+                side_effect=AssertionError("hwmon metrics read"),
+            ) as read_metrics,
+        ):
+            snapshot = reader.sample(frozenset({telemetry.MetricId.CPU_USAGE}))
+
+        self.assertIs(snapshot.cpu_usage, usage)
+        cpu_sample.assert_called_once_with()
+        read_metrics.assert_not_called()
+
+    def test_selective_hwmon_read_touches_only_requested_metric_value(self) -> None:
+        self.hwmon.add(
+            9,
+            "amdgpu",
+            ((1, "edge", "48000"), (2, "junction", "71000"), (3, "mem", "62000")),
+            device_name="0000:03:00.0",
+        )
+        observed_labels: list[str] = []
+        original = system_sensors.read_temperature
+
+        def observe(sensor: system_sensors.TemperatureSensor):
+            observed_labels.append(sensor.label)
+            return original(sensor)
+
+        with mock.patch.object(
+            system_sensors, "read_temperature", side_effect=observe
+        ):
+            snapshot = system_sensors.read_lcd_metrics(
+                self.root, frozenset({telemetry.MetricId.GPU_MEMORY})
+            )
+
+        assert snapshot.gpu_memory is not None
+        self.assertEqual(snapshot.gpu_memory.celsius, 62.0)
+        self.assertEqual(observed_labels, ["mem"])
+        self.assertIsNone(snapshot.gpu)
+        self.assertIsNone(snapshot.gpu_hotspot)
+        self.assertIsNone(snapshot.gpu_usage)
 
 
 if __name__ == "__main__":

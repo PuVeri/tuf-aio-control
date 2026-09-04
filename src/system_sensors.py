@@ -428,6 +428,91 @@ class SystemTelemetryReader:
             gpu_usage=temperatures.gpu_usage,
         )
 
+    def sample(
+        self, metric_ids: frozenset[telemetry.MetricId]
+    ) -> TemperatureSnapshot:
+        """Read only the sensor values required by the selected LCD metrics."""
+        temperature_ids = {
+            telemetry.MetricId.CPU_PACKAGE,
+            telemetry.MetricId.CPU_CCD,
+            telemetry.MetricId.GPU_TEMPERATURE,
+            telemetry.MetricId.GPU_HOTSPOT,
+            telemetry.MetricId.GPU_MEMORY,
+            telemetry.MetricId.GPU_USAGE,
+        }
+        needed_temperatures = metric_ids & temperature_ids
+        temperatures = (
+            read_lcd_metrics(
+                self._hwmon_root,
+                needed_temperatures,
+                primary_gpu_pci_address=self._primary_gpu_pci_address,
+            )
+            if needed_temperatures
+            else TemperatureSnapshot()
+        )
+        return TemperatureSnapshot(
+            cpu_package=temperatures.cpu_package,
+            cpu_ccd=temperatures.cpu_ccd,
+            gpu=temperatures.gpu,
+            gpu_hotspot=temperatures.gpu_hotspot,
+            gpu_memory=temperatures.gpu_memory,
+            cpu_usage=(
+                self._cpu_usage.sample()
+                if telemetry.MetricId.CPU_USAGE in metric_ids
+                else None
+            ),
+            gpu_usage=temperatures.gpu_usage,
+        )
+
+
+def read_lcd_metrics(
+    hwmon_root: Path,
+    metric_ids: frozenset[telemetry.MetricId],
+    *,
+    primary_gpu_pci_address: str = DEFAULT_PRIMARY_GPU_PCI_ADDRESS,
+) -> TemperatureSnapshot:
+    """Read only requested LCD metrics after one shared hwmon discovery."""
+    discovered = discover_temperature_sensors(hwmon_root)
+    primary_gpu_channels = tuple(
+        sensor
+        for sensor in discovered.gpu_channels
+        if sensor.device_path is not None
+        and sensor.device_path.name == primary_gpu_pci_address
+    )
+    return TemperatureSnapshot(
+        cpu_package=(
+            _read_matching_channel(discovered.cpu_channels, label="Tctl")
+            if telemetry.MetricId.CPU_PACKAGE in metric_ids
+            else None
+        ),
+        cpu_ccd=(
+            _read_matching_channel(discovered.cpu_channels, label="Tccd1")
+            if telemetry.MetricId.CPU_CCD in metric_ids
+            else None
+        ),
+        gpu=(
+            _read_matching_channel(primary_gpu_channels, label="edge")
+            if telemetry.MetricId.GPU_TEMPERATURE in metric_ids
+            else None
+        ),
+        gpu_hotspot=(
+            _read_matching_channel(primary_gpu_channels, label="junction")
+            or _read_matching_channel(primary_gpu_channels, label="hotspot")
+            if telemetry.MetricId.GPU_HOTSPOT in metric_ids
+            else None
+        ),
+        gpu_memory=(
+            _read_matching_channel(primary_gpu_channels, label="mem")
+            if telemetry.MetricId.GPU_MEMORY in metric_ids
+            else None
+        ),
+        gpu_usage=(
+            _read_gpu_usage(primary_gpu_channels)
+            if telemetry.MetricId.GPU_USAGE in metric_ids
+            else None
+        ),
+    )
+
 
 def metric_values(
     snapshot: TemperatureSnapshot,

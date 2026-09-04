@@ -211,52 +211,27 @@ class TufAioGuiOfflineTests(unittest.TestCase):
             time.sleep(0.005)
         raise AssertionError("Bedingung wurde nicht rechtzeitig erfüllt")
 
-    def test_missing_temperatures_are_shown_as_na(self) -> None:
+    def test_local_telemetry_section_and_widgets_are_removed(self) -> None:
         window = self._window()
         try:
-            self.assertEqual(window.cpu_temperature_value.text(), "N/A")
-            self.assertEqual(window.cpu_package_temperature_value.text(), "N/A")
-            self.assertEqual(window.gpu_temperature_value.text(), "N/A")
+            visible_text = {
+                label.text() for label in window.findChildren(tuf_aio_gui.QLabel)
+            }
+            self.assertNotIn("Lokale Telemetrie", visible_text)
+            self.assertFalse(hasattr(window, "cpu_temperature_value"))
+            self.assertFalse(hasattr(window, "cpu_package_temperature_value"))
+            self.assertFalse(hasattr(window, "gpu_temperature_value"))
             self.assertEqual(window._temperature_timer.interval(), 1000)
-            self.assertTrue(window._temperature_timer.isActive())
-        finally:
-            window.close()
-
-    def test_temperatures_show_values_and_become_unavailable_cleanly(self) -> None:
-        def value(
-            label: str, channel: str, celsius: float
-        ) -> system_sensors.TemperatureValue:
-            sensor = system_sensors.TemperatureSensor(
-                "k10temp" if label != "edge" else "amdgpu",
-                label,
-                Path(f"/fake/{channel}_input"),
-                channel,
-            )
-            return system_sensors.TemperatureValue(celsius, sensor)
-
-        present = system_sensors.TemperatureSnapshot(
-            cpu=value("Tdie", "temp2", 47.25),
-            cpu_package=value("Tctl", "temp1", 50.0),
-            gpu=value("edge", "temp1", 43.5),
-        )
-        reader = mock.Mock(
-            side_effect=[present, system_sensors.TemperatureSnapshot()]
-        )
-        window = self._window(sensor_reader=reader)
-        try:
-            self.assertEqual(window.cpu_temperature_value.text(), "47.2 °C")
-            self.assertEqual(window.cpu_package_temperature_value.text(), "50.0 °C")
-            self.assertEqual(window.gpu_temperature_value.text(), "43.5 °C")
-            window.refresh_temperatures()
-            self.assertEqual(window.cpu_temperature_value.text(), "N/A")
-            self.assertEqual(window.cpu_package_temperature_value.text(), "N/A")
-            self.assertEqual(window.gpu_temperature_value.text(), "N/A")
+            self.assertFalse(window._temperature_timer.isActive())
+            self.assertTrue(hasattr(system_sensors, "SystemTelemetryReader"))
+            self.assertTrue(hasattr(telemetry, "MetricId"))
         finally:
             window.close()
 
     def test_reference_image_is_compatible_and_prepares_lcd_output(self) -> None:
         window = self._window()
         try:
+            window.show()
             self.assertTrue(window.load_image(REFERENCE_PATH))
             self.assertFalse(hasattr(window, "hardware_live_checkbox"))
             self.assertEqual(window.original_size_value.text(), "320×320")
@@ -311,6 +286,7 @@ class TufAioGuiOfflineTests(unittest.TestCase):
             settings.setValue(tuf_aio_gui.OVERLAY_ENABLED_SETTING, True)
             window = self._window(settings=settings)
             try:
+                window.show()
                 self.assertTrue(window.load_image(REFERENCE_PATH))
                 before = window._prepared
                 assert before is not None
@@ -354,6 +330,7 @@ class TufAioGuiOfflineTests(unittest.TestCase):
             source.save(source_path)
             window = self._window(settings=settings)
             try:
+                window.show()
                 self.assertTrue(window.load_image(source_path))
                 observed = []
                 for _ in range(4):
@@ -503,18 +480,16 @@ class TufAioGuiOfflineTests(unittest.TestCase):
             "temp1",
         )
         reader = mock.Mock(
-            side_effect=[
-                system_sensors.TemperatureSnapshot(),
-                system_sensors.TemperatureSnapshot(
-                    cpu_package=system_sensors.TemperatureValue(51.0, sensor)
-                ),
-            ]
+            return_value=system_sensors.TemperatureSnapshot(
+                cpu_package=system_sensors.TemperatureValue(51.0, sensor)
+            )
         )
         with tempfile.TemporaryDirectory() as directory:
             settings = self._settings(Path(directory) / "settings.ini")
             settings.setValue(tuf_aio_gui.OVERLAY_ENABLED_SETTING, True)
             window = self._window(sensor_reader=reader, settings=settings)
             try:
+                window.show()
                 self.assertTrue(window.load_image(REFERENCE_PATH))
                 rerender = mock.Mock(wraps=window._rerender_temperature_overlay)
                 with (
@@ -531,16 +506,13 @@ class TufAioGuiOfflineTests(unittest.TestCase):
                     ),
                 ):
                     window.refresh_temperatures()
-                rerender.assert_called_once_with()
-                self.assertEqual(reader.call_count, 2)
+                rerender.assert_called_once_with(update_widgets=True)
+                self.assertEqual(reader.call_count, 1)
             finally:
                 window.close()
 
     def test_selected_usage_change_publishes_once_without_hid_or_restart(self) -> None:
         snapshots = [
-            system_sensors.TemperatureSnapshot(
-                cpu_usage=system_sensors.PercentageValue(17.0, "/proc/stat")
-            ),
             system_sensors.TemperatureSnapshot(
                 cpu_usage=system_sensors.PercentageValue(18.0, "/proc/stat")
             ),
@@ -666,6 +638,8 @@ class TufAioGuiOfflineTests(unittest.TestCase):
             )
             self.assertTrue(window.start_lcd_button.isEnabled())
             factory.assert_not_called()
+            QApplication.processEvents()
+            factory.assert_not_called()
             with (
                 mock.patch.object(
                     tuf_aio_gui.transport.os,
@@ -689,6 +663,194 @@ class TufAioGuiOfflineTests(unittest.TestCase):
                 controllers[0].join()
                 window._poll_refresh_controller()
             window.close()
+
+    def test_hidden_idle_stops_sensor_timer_and_reuses_same_timers(self) -> None:
+        class SelectiveReader:
+            def __init__(self) -> None:
+                self.calls = 0
+
+            def sample(
+                self, metric_ids: frozenset[telemetry.MetricId]
+            ) -> system_sensors.TemperatureSnapshot:
+                del metric_ids
+                self.calls += 1
+                return system_sensors.TemperatureSnapshot()
+
+        reader = SelectiveReader()
+        settings = self._settings(Path(self._settings_directory.name) / "timers.ini")
+        settings.setValue(tuf_aio_gui.OVERLAY_ENABLED_SETTING, True)
+        window = self._window(sensor_reader=reader, settings=settings)
+        window.show()
+        self.assertTrue(window.load_image(REFERENCE_PATH))
+        temperature_timer = window._temperature_timer
+        refresh_timer = window._refresh_state_timer
+        timer_count = len(window.findChildren(tuf_aio_gui.QTimer))
+        self.assertTrue(temperature_timer.isActive())
+        self.assertFalse(refresh_timer.isActive())
+
+        for _ in range(3):
+            window.close()
+            self.assertFalse(window.isVisible())
+            self.assertFalse(temperature_timer.isActive())
+            window.refresh_temperatures()
+            window.tray_open_action.trigger()
+            self.assertTrue(window.isVisible())
+            self.assertTrue(temperature_timer.isActive())
+
+        self.assertEqual(reader.calls, 0)
+        self.assertIs(window._temperature_timer, temperature_timer)
+        self.assertIs(window._refresh_state_timer, refresh_timer)
+        self.assertEqual(len(window.findChildren(tuf_aio_gui.QTimer)), timer_count)
+        window.close()
+
+    def test_hidden_running_polls_only_selected_metric_without_preview_repaint(
+        self,
+    ) -> None:
+        class SelectiveReader:
+            def __init__(self) -> None:
+                self.calls: list[frozenset[telemetry.MetricId]] = []
+
+            def sample(
+                self, metric_ids: frozenset[telemetry.MetricId]
+            ) -> system_sensors.TemperatureSnapshot:
+                self.calls.append(metric_ids)
+                return system_sensors.TemperatureSnapshot(
+                    cpu_usage=system_sensors.PercentageValue(42.0, "/proc/stat")
+                )
+
+        reader = SelectiveReader()
+        sender = FakeSender()
+        controllers: list[FakeRefreshController] = []
+
+        def factory(source: lcd_refresh.FrameSource) -> FakeRefreshController:
+            controller = FakeRefreshController(source, sender)
+            controllers.append(controller)
+            return controller
+
+        settings = self._settings(Path(self._settings_directory.name) / "hidden.ini")
+        settings.setValue(tuf_aio_gui.OVERLAY_ENABLED_SETTING, True)
+        for slot in tuf_aio_gui.SLOT_DEFAULTS:
+            metric = (
+                telemetry.MetricId.CPU_USAGE
+                if slot == "top_left"
+                else telemetry.MetricId.OFF
+            )
+            settings.setValue(f"{tuf_aio_gui.SLOT_SETTING_PREFIX}/{slot}", metric.value)
+        window = self._window(
+            sensor_reader=reader,
+            settings=settings,
+            controller_factory=factory,
+        )
+        try:
+            window.show()
+            self.assertTrue(window.load_image(REFERENCE_PATH))
+            window.tray_start_action.trigger()
+            source = window._frame_buffer
+            assert source is not None
+            initial_generation = source.snapshot().generation
+            window.close()
+            self.assertFalse(window.isVisible())
+            self.assertTrue(window._temperature_timer.isActive())
+
+            with mock.patch.object(window, "_update_scaled_preview") as repaint:
+                window.refresh_temperatures()
+                self.assertEqual(source.snapshot().generation, initial_generation + 1)
+                window.refresh_temperatures()
+                self.assertEqual(source.snapshot().generation, initial_generation + 1)
+                repaint.assert_not_called()
+                window.tray_open_action.trigger()
+                repaint.assert_called_once()
+
+            self.assertEqual(
+                reader.calls,
+                [
+                    frozenset({telemetry.MetricId.CPU_USAGE}),
+                    frozenset({telemetry.MetricId.CPU_USAGE}),
+                ],
+            )
+            self.assertEqual(len(controllers), 1)
+            self.assertIs(window._refresh_controller, controllers[0])
+        finally:
+            if controllers and controllers[0].is_running:
+                controllers[0].request_stop()
+                controllers[0].join()
+                window._poll_refresh_controller()
+            window.close()
+
+    def test_tray_start_and_stop_follow_single_session_state(self) -> None:
+        sender = FakeSender()
+        controllers: list[FakeRefreshController] = []
+
+        def factory(source: lcd_refresh.FrameSource) -> FakeRefreshController:
+            controller = FakeRefreshController(source, sender)
+            controllers.append(controller)
+            return controller
+
+        window = self._window(controller_factory=factory)
+        try:
+            self.assertTrue(window.load_image(REFERENCE_PATH))
+            self.assertTrue(window.tray_start_action.isEnabled())
+            self.assertFalse(window.tray_stop_action.isEnabled())
+            window.tray_start_action.trigger()
+            self.assertEqual(len(controllers), 1)
+            self.assertFalse(window.tray_start_action.isEnabled())
+            self.assertTrue(window.tray_stop_action.isEnabled())
+            window.tray_start_action.trigger()
+            self.assertEqual(len(controllers), 1)
+
+            window.tray_stop_action.trigger()
+            controllers[0].join()
+            window._poll_refresh_controller()
+            self.assertEqual(window._refresh_state, tuf_aio_gui.GuiRefreshState.IDLE)
+            self.assertTrue(window.tray_start_action.isEnabled())
+            self.assertFalse(window.tray_stop_action.isEnabled())
+        finally:
+            window.close()
+
+    def test_lcd_autostart_defaults_off_and_gate_failure_has_no_retry(self) -> None:
+        default_factory = mock.Mock(
+            side_effect=AssertionError("default-off autostart called factory")
+        )
+        default_window = self._window(controller_factory=default_factory)
+        try:
+            self.assertFalse(default_window.lcd_autostart_checkbox.isChecked())
+            QApplication.processEvents()
+            default_factory.assert_not_called()
+        finally:
+            default_window.close()
+
+        settings_path = Path(self._settings_directory.name) / "autostart.ini"
+        settings = self._settings(settings_path)
+        settings.setValue(tuf_aio_gui.LCD_AUTOSTART_SETTING, True)
+        settings.setValue(tuf_aio_gui.LAST_IMAGE_SETTING, str(REFERENCE_PATH))
+        settings.sync()
+        discovery = mock.Mock(
+            return_value=(replace(self._device(), bcd_device="0051"), "fake")
+        )
+        factory = gui_refresh_factory.ProductionControllerFactory(
+            device_discovery=discovery,
+            competing_writer_finder=mock.Mock(return_value=()),
+        )
+        with mock.patch.object(
+            tuf_aio_gui.transport.os,
+            "open",
+            side_effect=AssertionError("hidraw open called"),
+        ) as device_open:
+            window = self._window(
+                settings=self._settings(settings_path), controller_factory=factory
+            )
+            try:
+                QApplication.processEvents()
+                self.assertEqual(
+                    window._refresh_state, tuf_aio_gui.GuiRefreshState.ERROR
+                )
+                self.assertIn("bcdDevice", window.status_label.text())
+                self.assertIn("kein Retry", window.status_label.text())
+                self.assertTrue(window.tray_icon.isVisible())
+                self.assertEqual(discovery.call_count, 1)
+                device_open.assert_not_called()
+            finally:
+                window.close()
 
     def test_production_gate_failure_enters_error_before_device_open(self) -> None:
         wrong_version = replace(self._device(), bcd_device="0051")
@@ -1037,7 +1199,7 @@ class TufAioGuiOfflineTests(unittest.TestCase):
         finally:
             window.close()
 
-    def test_close_requests_nonblocking_stop_before_accepting_close(self) -> None:
+    def test_close_hides_without_stopping_and_quit_stops_nonblocking(self) -> None:
         release_sender = threading.Event()
         sender = FakeSender()
         controllers: list[FakeRefreshController] = []
@@ -1060,15 +1222,31 @@ class TufAioGuiOfflineTests(unittest.TestCase):
         window.close()
         elapsed = time.monotonic() - started
         self.assertLess(elapsed, 0.1)
-        self.assertEqual(window._refresh_state, tuf_aio_gui.GuiRefreshState.STOPPING)
-        self.assertEqual(controller.request_stop_calls, 1)
-        self.assertTrue(window.isVisible())
-
-        release_sender.set()
-        controller.join()
-        window._poll_refresh_controller()
-        QApplication.processEvents()
+        self.assertEqual(window._refresh_state, tuf_aio_gui.GuiRefreshState.RUNNING)
+        self.assertEqual(controller.request_stop_calls, 0)
         self.assertFalse(window.isVisible())
+
+        window.tray_open_action.trigger()
+        self.assertTrue(window.isVisible())
+        self.assertIs(window._refresh_controller, controller)
+        self.assertEqual(len(controllers), 1)
+
+        with mock.patch.object(QApplication.instance(), "quit") as quit_app:
+            started = time.monotonic()
+            window.tray_quit_action.trigger()
+            self.assertLess(time.monotonic() - started, 0.1)
+            self.assertEqual(
+                window._refresh_state, tuf_aio_gui.GuiRefreshState.STOPPING
+            )
+            self.assertEqual(controller.request_stop_calls, 1)
+            quit_app.assert_not_called()
+
+            release_sender.set()
+            controller.join()
+            window._poll_refresh_controller()
+            QApplication.processEvents()
+            quit_app.assert_called_once_with()
+            self.assertFalse(window.isVisible())
 
 
 if __name__ == "__main__":

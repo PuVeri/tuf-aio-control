@@ -7,6 +7,7 @@ import hashlib
 import math
 import threading
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Callable, Protocol
@@ -16,6 +17,7 @@ import refresh_diagnostics
 
 MAX_REFRESH_DURATION_SECONDS = 60.0
 MAX_REFRESH_FRAME_COUNT = 500
+MAX_RESULT_HISTORY_FRAMES = 1024
 
 # Offline safety profile for the separately authorized first live refresh test.
 # Constructing this plan performs no device access and starts no worker.
@@ -436,8 +438,8 @@ class RefreshController:
         sent = 0
         frame_index = 0
         visible_since: float | None = None
-        transfer_durations: list[float] = []
-        frame_indices: list[int] = []
+        transfer_durations: deque[float] = deque(maxlen=MAX_RESULT_HISTORY_FRAMES)
+        frame_indices: deque[int] = deque(maxlen=MAX_RESULT_HISTORY_FRAMES)
 
         while True:
             now = self._clock()
@@ -595,8 +597,8 @@ class RefreshController:
         reason: RefreshStopReason,
         started_at: float,
         sent: int,
-        transfer_durations: list[float],
-        frame_indices: list[int],
+        transfer_durations: deque[float],
+        frame_indices: deque[int],
         *,
         error: Exception | None = None,
     ) -> RefreshResult:

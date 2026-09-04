@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=TUF AIO Control
+Comment=ASUS TUF AIO LCD background and tray control
+Exec=/usr/bin/python3 -B "@PROJECT_ROOT@/src/tuf_aio_gui.py" --background
+TryExec=/usr/bin/python3
+Icon=video-display
+Terminal=false
+Categories=Utility;
+StartupNotify=false
+X-GNOME-Autostart-enabled=true
+X-TufAioControl-Managed=true

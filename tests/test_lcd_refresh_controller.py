@@ -403,6 +403,42 @@ class RefreshControllerTests(unittest.TestCase):
         self.assertEqual(starts, [float(index) for index in range(35)])
         self.assertGreater(result.elapsed_seconds, 30.0)
 
+    def test_unbounded_result_history_has_constant_memory_bound(self) -> None:
+        clock = FakeClock()
+        controller: lcd_refresh.RefreshController
+        target = lcd_refresh.MAX_RESULT_HISTORY_FRAMES + 10
+        calls = 0
+
+        def sender(_: bytes) -> int:
+            nonlocal calls
+            calls += 1
+            if calls == target:
+                controller.request_stop()
+            return self.segment_count
+
+        controller = lcd_refresh.RefreshController(
+            lcd_refresh.RefreshPlan(
+                frames=(lcd_refresh.RefreshFrame(self.jpeg),),
+                transport_interval_seconds=0.001,
+                max_duration_seconds=None,
+                max_frames=None,
+            ),
+            sender,
+            clock=clock,
+            wait_function=clock.wait,
+        )
+        controller.start()
+        result = controller.wait(timeout=1.0)
+
+        assert result is not None
+        self.assertEqual(result.frames_sent, target)
+        self.assertEqual(
+            len(result.transfer_durations), lcd_refresh.MAX_RESULT_HISTORY_FRAMES
+        )
+        self.assertEqual(
+            len(result.frame_indices), lcd_refresh.MAX_RESULT_HISTORY_FRAMES
+        )
+
     def test_slow_transfer_never_overlaps_and_has_no_catch_up_burst(self) -> None:
         clock = FakeClock()
         starts: list[float] = []

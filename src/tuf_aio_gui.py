@@ -9,7 +9,15 @@ from pathlib import Path
 from typing import Callable, Protocol
 
 from PySide6.QtCore import QSettings, QTimer, Qt
-from PySide6.QtGui import QColor, QCloseEvent, QPixmap, QResizeEvent
+from PySide6.QtGui import (
+    QAction,
+    QColor,
+    QCloseEvent,
+    QHideEvent,
+    QPixmap,
+    QResizeEvent,
+    QShowEvent,
+)
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -21,8 +29,11 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QMenu,
     QPushButton,
     QSizePolicy,
+    QStyle,
+    QSystemTrayIcon,
     QVBoxLayout,
     QWidget,
 )
@@ -57,6 +68,9 @@ SETTINGS_APPLICATION = "tuf-aio-control"
 OVERLAY_ENABLED_SETTING = "lcd_temperature_overlay/enabled"
 OVERLAY_COLOR_SETTING = "lcd_temperature_overlay/color"
 ROTATION_SETTING = "lcd_output/rotation_degrees"
+SCALE_MODE_SETTING = "lcd_output/scale_mode"
+LAST_IMAGE_SETTING = "lcd_output/last_image"
+LCD_AUTOSTART_SETTING = "lcd_runtime/autostart"
 SLOT_SETTING_PREFIX = "lcd_data_slots"
 SLOT_DEFAULTS = {
     "top_left": telemetry.MetricId.CPU_USAGE,
@@ -125,23 +139,26 @@ class MainWindow(QMainWindow):
         self._refresh_diagnostics: refresh_diagnostics.RefreshDiagnostics = (
             refresh_diagnostics.NULL_DIAGNOSTICS
         )
-        self._close_when_stopped = False
+        self._preview_jpeg: bytes | None = None
+        self._preview_dirty = False
+        self._quit_when_stopped = False
+        self._quit_requested = False
 
         self.setWindowTitle("TUF AIO Control")
         self.resize(920, 900)
         self._build_ui()
+        self._build_tray()
         self._apply_style()
         self.refresh_device_status()
-        self.refresh_temperatures()
         self._temperature_timer = QTimer(self)
         self._temperature_timer.setInterval(1000)
         self._temperature_timer.timeout.connect(self.refresh_temperatures)
-        self._temperature_timer.start()
         self._refresh_state_timer = QTimer(self)
-        self._refresh_state_timer.setInterval(25)
+        self._refresh_state_timer.setInterval(250)
         self._refresh_state_timer.timeout.connect(self._poll_refresh_controller)
-        self._refresh_state_timer.start()
         self._apply_refresh_state()
+        self._restore_last_image()
+        QTimer.singleShot(0, self._maybe_autostart_lcd)
 
     def _build_ui(self) -> None:
         central = QWidget(self)
@@ -172,32 +189,6 @@ class MainWindow(QMainWindow):
         device_layout.addWidget(self.refresh_button)
         outer.addWidget(device_card)
 
-        temperature_card = QFrame()
-        temperature_card.setObjectName("card")
-        temperature_layout = QGridLayout(temperature_card)
-        temperature_layout.setHorizontalSpacing(24)
-        temperature_layout.setVerticalSpacing(4)
-        temperature_title = QLabel("Lokale Telemetrie")
-        temperature_title.setObjectName("sectionTitle")
-        temperature_layout.addWidget(temperature_title, 0, 0, 1, 3)
-        (
-            self.cpu_temperature_value,
-            self.cpu_temperature_source,
-        ) = self._add_temperature_column(temperature_layout, 1, 0, "CPU")
-        (
-            self.cpu_package_temperature_value,
-            self.cpu_package_temperature_source,
-        ) = self._add_temperature_column(
-            temperature_layout, 1, 1, "CPU Package"
-        )
-        (
-            self.gpu_temperature_value,
-            self.gpu_temperature_source,
-        ) = self._add_temperature_column(temperature_layout, 1, 2, "GPU")
-        for column in range(3):
-            temperature_layout.setColumnStretch(column, 1)
-        outer.addWidget(temperature_card)
-
         previews = QFrame()
         previews.setObjectName("previewCard")
         preview_grid = QGridLayout(previews)
@@ -216,6 +207,9 @@ class MainWindow(QMainWindow):
         self.scale_mode = QComboBox()
         self.scale_mode.addItem("Zuschneiden", "crop")
         self.scale_mode.addItem("Einpassen", "fit")
+        saved_scale_mode = self._settings.value(SCALE_MODE_SETTING, "crop")
+        saved_scale_index = self.scale_mode.findData(saved_scale_mode)
+        self.scale_mode.setCurrentIndex(max(0, saved_scale_index))
         self.scale_mode.currentIndexChanged.connect(self._scale_mode_changed)
         options_layout.addWidget(self.scale_mode)
         self.overlay_checkbox = QCheckBox("Datenoverlay auf LCD anzeigen")
@@ -230,6 +224,18 @@ class MainWindow(QMainWindow):
         self.rotation_button.clicked.connect(self._rotate_clockwise)
         self._update_rotation_button()
         options_layout.addWidget(self.rotation_button)
+        self.lcd_autostart_checkbox = QCheckBox(
+            "LCD beim Programmstart automatisch starten"
+        )
+        self.lcd_autostart_checkbox.setChecked(
+            self._read_bool_setting(LCD_AUTOSTART_SETTING)
+        )
+        self.lcd_autostart_checkbox.toggled.connect(
+            lambda enabled: self._store_bool_setting(
+                LCD_AUTOSTART_SETTING, enabled
+            )
+        )
+        options_layout.addWidget(self.lcd_autostart_checkbox)
         options_layout.addStretch(1)
         outer.addWidget(options)
 
@@ -332,21 +338,6 @@ class MainWindow(QMainWindow):
         layout.setColumnStretch(1, 1)
         return value
 
-    @staticmethod
-    def _add_temperature_column(
-        layout: QGridLayout, row: int, column: int, name: str
-    ) -> tuple[QLabel, QLabel]:
-        key = QLabel(name)
-        key.setObjectName("temperatureKey")
-        value = QLabel("N/A")
-        value.setObjectName("temperatureValue")
-        source = QLabel("nicht verfügbar")
-        source.setObjectName("muted")
-        layout.addWidget(key, row, column)
-        layout.addWidget(value, row + 1, column)
-        layout.addWidget(source, row + 2, column)
-        return value, source
-
     def _apply_style(self) -> None:
         self.setStyleSheet(
             """
@@ -363,8 +354,6 @@ class MainWindow(QMainWindow):
                 font-weight: 600; font-size: 15px;
             }
             QLabel#muted, QLabel#infoKey { color: #9ca5b1; }
-            QLabel#temperatureKey { color: #9ca5b1; font-weight: 600; }
-            QLabel#temperatureValue { font-size: 22px; font-weight: 700; color: #f4f5f7; }
             QLabel#preview {
                 background: #0d1014; border: 1px dashed #343c48;
                 border-radius: 7px; color: #747f8c;
@@ -395,6 +384,68 @@ class MainWindow(QMainWindow):
         if isinstance(value, str):
             return value.casefold() in {"1", "true", "yes", "on"}
         return False
+
+    def _store_bool_setting(self, key: str, enabled: bool) -> None:
+        self._settings.setValue(key, enabled)
+        self._settings.sync()
+
+    def _build_tray(self) -> None:
+        self.tray_icon = QSystemTrayIcon(self)
+        icon = self.windowIcon()
+        if icon.isNull():
+            icon = self.style().standardIcon(QStyle.StandardPixmap.SP_ComputerIcon)
+        self.tray_icon.setIcon(icon)
+        self.tray_icon.setToolTip("TUF AIO Control")
+        self.tray_menu = QMenu(self)
+        self.tray_open_action = QAction("Öffnen", self)
+        self.tray_start_action = QAction("LCD starten", self)
+        self.tray_stop_action = QAction("LCD stoppen", self)
+        self.tray_quit_action = QAction("Beenden", self)
+        self.tray_open_action.triggered.connect(self.open_window)
+        self.tray_start_action.triggered.connect(self.start_lcd)
+        self.tray_stop_action.triggered.connect(self.stop_lcd)
+        self.tray_quit_action.triggered.connect(self.quit_application)
+        self.tray_menu.addAction(self.tray_open_action)
+        self.tray_menu.addSeparator()
+        self.tray_menu.addAction(self.tray_start_action)
+        self.tray_menu.addAction(self.tray_stop_action)
+        self.tray_menu.addSeparator()
+        self.tray_menu.addAction(self.tray_quit_action)
+        self.tray_icon.setContextMenu(self.tray_menu)
+        self.tray_icon.activated.connect(self._tray_activated)
+        self.tray_icon.show()
+
+    def _tray_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
+        if reason in {
+            QSystemTrayIcon.ActivationReason.Trigger,
+            QSystemTrayIcon.ActivationReason.DoubleClick,
+        }:
+            self.open_window()
+
+    def open_window(self) -> None:
+        """Show and raise this existing window without creating another instance."""
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+        self._refresh_preview_if_needed()
+        if self._prepared is not None:
+            self._show_prepared_image(self._prepared)
+        self._update_sensor_polling()
+
+    def _restore_last_image(self) -> None:
+        raw_path = self._settings.value(LAST_IMAGE_SETTING)
+        if isinstance(raw_path, str) and raw_path:
+            self.load_image(Path(raw_path), persist=False)
+
+    def _maybe_autostart_lcd(self) -> None:
+        if not self._read_bool_setting(LCD_AUTOSTART_SETTING):
+            return
+        if self._prepared is None:
+            self.status_label.setText(
+                "Status: LCD-Autostart benötigt ein weiterhin verfügbares Bild"
+            )
+            return
+        self.start_lcd()
 
     def _read_slot_settings(self) -> dict[str, telemetry.MetricId]:
         values: dict[str, telemetry.MetricId] = {}
@@ -482,6 +533,7 @@ class MainWindow(QMainWindow):
         self._settings.setValue(f"{SLOT_SETTING_PREFIX}/{slot}", metric_id.value)
         self._settings.sync()
         self._rerender_temperature_overlay()
+        self._update_sensor_polling()
 
     def _rotate_clockwise(self) -> None:
         if self._refresh_state in {
@@ -510,6 +562,7 @@ class MainWindow(QMainWindow):
         self._settings.setValue(OVERLAY_ENABLED_SETTING, enabled)
         self._settings.sync()
         self._rerender_temperature_overlay()
+        self._update_sensor_polling()
 
     def _choose_overlay_color(self) -> None:
         selected = QColorDialog.getColor(
@@ -540,46 +593,44 @@ class MainWindow(QMainWindow):
             f"background: {self._overlay_color}; color: {foreground};"
         )
 
-    @staticmethod
-    def _show_temperature(
-        value_label: QLabel,
-        source_label: QLabel,
-        reading: system_sensors.TemperatureValue | None,
-    ) -> None:
-        if reading is None:
-            value_label.setText("N/A")
-            source_label.setText("nicht verfügbar")
-            value_label.setToolTip("Keine passende lokale hwmon-Quelle verfügbar")
-            return
-        value_label.setText(f"{reading.celsius:.1f} °C")
-        source = f"{reading.sensor.hwmon_name} · {reading.sensor.label}"
-        source_label.setText(source)
-        value_label.setToolTip(f"Quelle: {source} · {reading.sensor.channel}")
+    def _selected_dynamic_metrics(self) -> frozenset[telemetry.MetricId]:
+        if not self._overlay_enabled:
+            return frozenset()
+        return frozenset(
+            metric_id
+            for metric_id in self._slot_metric_ids.values()
+            if metric_id is not telemetry.MetricId.OFF
+        )
+
+    def _sensor_polling_needed(self) -> bool:
+        if self._prepared is None or not self._selected_dynamic_metrics():
+            return False
+        return self._refresh_state is GuiRefreshState.RUNNING or self.isVisible()
+
+    def _update_sensor_polling(self) -> None:
+        if self._sensor_polling_needed():
+            if not self._temperature_timer.isActive():
+                self._temperature_timer.start()
+        else:
+            self._temperature_timer.stop()
 
     def refresh_temperatures(self) -> system_sensors.TemperatureSnapshot:
         """Sample local telemetry once without involving any HID path."""
+        if not self._sensor_polling_needed():
+            return self._latest_temperature_snapshot
         previous_values = self._visible_metric_signature(
             self._latest_temperature_snapshot
         )
         try:
-            snapshot = self._sensor_reader()
+            selected_metrics = self._selected_dynamic_metrics()
+            selective_reader = getattr(type(self._sensor_reader), "sample", None)
+            snapshot = (
+                selective_reader(self._sensor_reader, selected_metrics)
+                if callable(selective_reader)
+                else self._sensor_reader()
+            )
         except (OSError, RuntimeError, ValueError):
             snapshot = system_sensors.TemperatureSnapshot()
-        self._show_temperature(
-            self.cpu_temperature_value,
-            self.cpu_temperature_source,
-            snapshot.cpu,
-        )
-        self._show_temperature(
-            self.cpu_package_temperature_value,
-            self.cpu_package_temperature_source,
-            snapshot.cpu_package,
-        )
-        self._show_temperature(
-            self.gpu_temperature_value,
-            self.gpu_temperature_source,
-            snapshot.gpu,
-        )
         self._latest_temperature_snapshot = snapshot
         if (
             self._overlay_enabled
@@ -587,7 +638,7 @@ class MainWindow(QMainWindow):
             and self._refresh_state in {GuiRefreshState.IDLE, GuiRefreshState.RUNNING}
             and self._visible_metric_signature(snapshot) != previous_values
         ):
-            self._rerender_temperature_overlay()
+            self._rerender_temperature_overlay(update_widgets=self.isVisible())
         return snapshot
 
     def refresh_device_status(self) -> transport.HidrawInterface | None:
@@ -632,13 +683,15 @@ class MainWindow(QMainWindow):
             self.load_image(Path(filename))
 
     def _scale_mode_changed(self) -> None:
+        self._settings.setValue(SCALE_MODE_SETTING, self.scale_mode.currentData())
+        self._settings.sync()
         if (
             self._selected_path is not None
             and self._refresh_state in {GuiRefreshState.IDLE, GuiRefreshState.RUNNING}
         ):
             self.load_image(self._selected_path)
 
-    def load_image(self, path: Path) -> bool:
+    def load_image(self, path: Path, *, persist: bool = True) -> bool:
         """Show frame 0 of the source and prepare one validated output JPEG."""
         if self._refresh_state not in {GuiRefreshState.IDLE, GuiRefreshState.RUNNING}:
             return False
@@ -680,7 +733,11 @@ class MainWindow(QMainWindow):
             return False
 
         self._selected_path = resolved
+        if persist:
+            self._settings.setValue(LAST_IMAGE_SETTING, str(resolved))
+            self._settings.sync()
         self._show_prepared_image(prepared)
+        self._update_sensor_polling()
         return True
 
     def _show_prepared_image(self, prepared: image_pipeline.PreparedImage) -> None:
@@ -714,7 +771,7 @@ class MainWindow(QMainWindow):
             self.status_label.setText("Status: Bild vorbereitet – LCD-Start bereit")
         self._update_send_enabled()
 
-    def _rerender_temperature_overlay(self) -> None:
+    def _rerender_temperature_overlay(self, *, update_widgets: bool = True) -> None:
         if self._prepared is None:
             return
         try:
@@ -732,7 +789,10 @@ class MainWindow(QMainWindow):
         except (image_pipeline.ImagePipelineError, OSError, RuntimeError, ValueError) as error:
             self._show_render_error(error)
             return
-        self._show_prepared_image(prepared)
+        if update_widgets:
+            self._show_prepared_image(prepared)
+        else:
+            self._prepared = prepared
 
     def _publish_running_frame(self, jpeg_bytes: bytes) -> None:
         if self._refresh_state is not GuiRefreshState.RUNNING:
@@ -750,12 +810,22 @@ class MainWindow(QMainWindow):
         )
 
     def _load_final_preview(self, jpeg: bytes) -> None:
+        self._preview_jpeg = jpeg
+        self._preview_dirty = True
+        if not self.isVisible():
+            return
+        self._refresh_preview_if_needed()
+
+    def _refresh_preview_if_needed(self) -> None:
+        if not self._preview_dirty or self._preview_jpeg is None:
+            return
         pixmap = QPixmap()
-        if not pixmap.loadFromData(jpeg, "JPEG"):
+        if not pixmap.loadFromData(self._preview_jpeg, "JPEG"):
             raise image_pipeline.ImagePipelineError(
                 "Das validierte JPEG konnte nicht als Vorschau geladen werden"
             )
         self._final_pixmap = pixmap
+        self._preview_dirty = False
         self._update_scaled_preview(self.final_preview, pixmap)
 
     @staticmethod
@@ -799,12 +869,13 @@ class MainWindow(QMainWindow):
         for combo in self.slot_combos.values():
             combo.setEnabled(editable)
         self.refresh_button.setEnabled(editable)
-        self.start_lcd_button.setEnabled(
+        start_enabled = (
             self._refresh_state is GuiRefreshState.IDLE
             and self._prepared is not None
             and self._device_ready
             and self._controller_factory is not None
         )
+        self.start_lcd_button.setEnabled(start_enabled)
         self.stop_lcd_button.setEnabled(
             self._refresh_state is GuiRefreshState.RUNNING
         )
@@ -813,6 +884,10 @@ class MainWindow(QMainWindow):
         )
         self.acknowledge_error_button.setEnabled(
             self._refresh_state is GuiRefreshState.ERROR
+        )
+        self.tray_start_action.setEnabled(start_enabled)
+        self.tray_stop_action.setEnabled(
+            self._refresh_state is GuiRefreshState.RUNNING
         )
         if self._controller_factory is None:
             self.start_lcd_button.setToolTip(
@@ -823,7 +898,12 @@ class MainWindow(QMainWindow):
 
     def _set_refresh_state(self, state: GuiRefreshState) -> None:
         self._refresh_state = state
+        if state in {GuiRefreshState.RUNNING, GuiRefreshState.STOPPING}:
+            self._refresh_state_timer.start()
+        else:
+            self._refresh_state_timer.stop()
         self._apply_refresh_state()
+        self._update_sensor_polling()
 
     def start_lcd(self) -> None:
         """Start exactly one explicitly injected refresh session."""
@@ -919,9 +999,9 @@ class MainWindow(QMainWindow):
                 f"Status: LCD-Session beendet ({result.stop_reason.value}, "
                 f"{result.frames_sent} Frames)"
             )
-        if self._close_when_stopped:
-            self._close_when_stopped = False
-            QTimer.singleShot(0, self.close)
+        if self._quit_when_stopped:
+            self._quit_when_stopped = False
+            QTimer.singleShot(0, self._finish_quit)
 
     def _enter_refresh_error(self, message: str) -> None:
         self._refresh_diagnostics.record(
@@ -942,27 +1022,59 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802 - Qt API
         super().resizeEvent(event)
-        self._update_scaled_preview(self.final_preview, self._final_pixmap)
+        if self.isVisible():
+            self._update_scaled_preview(self.final_preview, self._final_pixmap)
+
+    def showEvent(self, event: QShowEvent) -> None:  # noqa: N802 - Qt API
+        super().showEvent(event)
+        self._refresh_preview_if_needed()
+        self._update_sensor_polling()
+
+    def hideEvent(self, event: QHideEvent) -> None:  # noqa: N802 - Qt API
+        super().hideEvent(event)
+        self._update_sensor_polling()
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802 - Qt API
+        if self._quit_requested:
+            event.accept()
+            return
+        event.ignore()
+        self.hide()
+
+    def quit_application(self) -> None:
+        """Stop an active session, then terminate only by explicit request."""
+        if self._quit_requested:
+            return
+        self._quit_requested = True
+        self.hide()
         if self._refresh_state is GuiRefreshState.RUNNING:
-            self._close_when_stopped = True
+            self._quit_when_stopped = True
             self.stop_lcd()
-            event.ignore()
             return
         if self._refresh_state is GuiRefreshState.STOPPING:
-            self._close_when_stopped = True
-            event.ignore()
+            self._quit_when_stopped = True
             return
-        super().closeEvent(event)
+        self._finish_quit()
+
+    def _finish_quit(self) -> None:
+        self._temperature_timer.stop()
+        self._refresh_state_timer.stop()
+        self.tray_icon.hide()
+        application = QApplication.instance()
+        if application is not None:
+            application.quit()
 
 
 def main() -> int:
-    app = QApplication(sys.argv)
+    background = "--background" in sys.argv[1:]
+    qt_arguments = [argument for argument in sys.argv if argument != "--background"]
+    app = QApplication(qt_arguments)
+    app.setQuitOnLastWindowClosed(False)
     window = MainWindow(
         controller_factory=gui_refresh_factory.ProductionControllerFactory()
     )
-    window.show()
+    if not background:
+        window.show()
     return app.exec()
 
 

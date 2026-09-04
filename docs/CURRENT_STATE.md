@@ -78,6 +78,65 @@ Rotationen und die Logbegrenzung. In diesem Ticket fanden keine
 Gerätekommunikation, keine HID-/USB-Writes und kein Live-Test statt. Details:
 `research/reports/lcd-continuous-runtime.md`.
 
+## Offline-Stand: Hintergrund- und Tray-Betrieb
+
+Stand: 2026-09-04
+
+Die Anwendung besitzt nun genau ein dauerhaftes `QSystemTrayIcon` mit
+`Öffnen`, `LCD starten`, `LCD stoppen` und `Beenden`. Das Fenster-X blendet das
+vorhandene Fenster nur aus; Prozess, laufende Refreshsession und erforderliche
+LCD-Telemetrie laufen weiter. `Öffnen` verwendet dasselbe Fenster und dieselbe
+Session. Nur `Beenden` fordert einen sauberen Stop an und verlässt die
+Anwendung nach Workerende und Handle-Close.
+
+Die komplette sichtbare Sektion `Lokale Telemetrie` einschließlich CPU-,
+CPU-Package-, GPU- und Quellwidgets wurde entfernt. `system_sensors.py`,
+`telemetry.py`, die vier LCD-Metric-Dropdowns und der Overlayrenderer bleiben
+erhalten.
+
+Der einzige 1-Hz-Sensortimer läuft nur noch bei aktivem Overlay, mindestens
+einer ausgewählten dynamischen Metric und entweder laufender LCD-Session oder
+sichtbarer vorbereiteter Preview. Versteckt plus gestoppt bedeutet keinerlei
+kontinuierliches hwmon-, `/proc/stat`- oder `gpu_busy_percent`-Polling. Der
+Production-Sensorreader liest nur die tatsächlich ausgewählten Metric-IDs; ein
+reines CPU-Auslastungslayout überspringt hwmon vollständig.
+
+Nur geänderte sichtbare Metrics erzeugen weiterhin ein neues validiertes JPEG.
+Im versteckten Zustand wird ein erforderliches LCD-Update publiziert, aber keine
+Qt-Preview decodiert, skaliert oder neu gezeichnet und kein verstecktes
+Metadatenwidget periodisch aktualisiert. Beim nächsten Öffnen wird die aktuelle
+Preview genau einmal nachgezogen. Der Controllerstatus-Timer läuft nur während
+`running`/`stopping`; seine Periode beträgt ressourcenschonende 250 ms. Die
+Ergebnishistorie hält maximal die letzten 1024 Transfers, der Gesamtframezähler
+bleibt vollständig.
+
+Die validierte XDG-Vorlage
+`packaging/tuf-aio-control-autostart.desktop` startet die App mit
+`--background`. Das optionale Hilfsskript installiert sie nur nach bewusstem
+Benutzeraufruf. App-Autostart und LCD-Autostart bleiben getrennt: Die neue
+persistente GUI-Option `LCD beim Programmstart automatisch starten` ist
+standardmäßig aus. Aktiviert verwendet sie die wiederhergestellte letzte
+Bildquelle und exakt die vorhandene ProductionFactory mit allen Safety-Gates;
+Fehler enden ohne Retry/Reconnect in `error`, während Tray und GUI verfügbar
+bleiben.
+
+`packaging/99-tuf-aio-control.rules` bereitet die permanente Berechtigung vor:
+nur `0b05:1c7b`, Basiszugriff `0640` für Gruppe `input` und ausschließlich
+Interface 1 (`ID_USB_INTERFACE_NUM=01`) mit `0660`. Interface 0 bleibt
+gruppen-read-only, `0b05:19af` bleibt unberührt. Anwendung und Tests installieren
+weder udev- noch Autostartdateien und rufen kein `sudo` auf.
+
+Die bestehende JSONL-Begrenzung bleibt aktiv. Es werden weder JPEG-Payloads
+noch vollständige Sensordaten pro Poll geloggt und kein `fsync()` pro Frame
+ausgeführt. Das bestätigte `0x08`-Protokoll, der 1,0-s-Refresh und sämtliche
+Production-Safety-Gates wurden nicht verändert.
+
+Die vollständige Offline-Suite bestand mit 202 Tests. Außerdem bestanden
+`compileall`, `git diff --check`, `desktop-file-validate`, `sh -n` und
+`udevadm verify`. In diesem Ticket fanden keine Gerätekommunikation, keine
+HID-/USB-Writes, keine Installation und kein Live-Test statt. Details:
+`research/reports/background-runtime-and-tray.md`.
+
 ## Ziel und Grenze
 
 Ziel ist eine native Linux-Steuerung für das LCD der ASUS TUF Gaming LC III
