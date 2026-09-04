@@ -251,7 +251,7 @@ Production-Safety-Gates wurden nicht verändert. In diesem Ticket gab es keine
 Gerätekommunikation, HID-/USB-Writes oder Live-Tests. Details:
 `research/reports/lcd-gif-animation.md`.
 
-## Offline-Stand: persistente hidraw-Produktionssession
+## Live-validierter Stand: persistente hidraw-Produktionssession
 
 Stand: 2026-09-04
 
@@ -290,6 +290,18 @@ Zeiten sowie pro Frame alle einzelnen Writezeiten, Write-Summe und komplette
 Framezeit. Segmentzeiten werden im Speicher gesammelt und erst nach dem Frame
 geschrieben; zwischen Writes gibt es kein Log-I/O und kein `fsync()`.
 
+Der persistente Produktionspfad wurde anschließend manuell auf einer ASUS TUF
+GAMING LC III 360 ARGB LCD erfolgreich mit GIF-Wiedergabe validiert. Die
+Animation war sichtbar flüssig und wie gewünscht. Gegenüber 3,0939 FPS mit dem
+alten Lifecycle ergab der beobachtete Ausschnitt ungefähr 29 FPS im Mittel und
+etwa 32 FPS im Median für den End-to-End-Frametakt. Einzelne `os.write()`-
+Dauern lagen typischerweise bei ungefähr 0,12–0,13 ms (rund 125 µs); vollständige
+Transfers lagen bei 9 Segmenten bei ungefähr 1,7–2,1 ms, bei 14 Segmenten bei
+2,6–3,4 ms und bei 15 Segmenten bei 2,8–3,2 ms. USB/hidraw ist damit nicht
+mehr der V1-Engpass; die verbleibende Zeit liegt überwiegend außerhalb der
+eigentlichen Writes, insbesondere bei Rendering, JPEG und Producer-Timing.
+Ein weiterer Transport-Performance-Umbau ist für V1 nicht erforderlich.
+
 Der Encoder bleibt Qualität 60, 4:2:0, Baseline, non-progressive und ohne
 Optimierung. Eine reine Offline-Stichprobe bei Qualität 60/50/40 ist
 dokumentiert, der Default wurde nicht verändert. sysfs meldet für Interface 1
@@ -298,9 +310,9 @@ Gerät mit `speed=480`. Das ist nur ein Descriptorbefund, keine Erklärung der
 realen hidraw-Leistung.
 
 Die vollständige Offline-Suite bestand nach dieser Änderung mit 237 Tests;
-`compileall` und `git diff --check` waren sauber. Es gab keine reale
-Gerätekommunikation, keinen HID-/USB-Write und keinen Live-Test. Details:
-`research/reports/hidraw-transport-performance.md`.
+`compileall` und `git diff --check` waren sauber. Die spätere manuelle
+Live-Validierung änderte weder das 0x08-Protokoll noch die Safety-Gates.
+Details: `research/reports/hidraw-transport-performance.md`.
 
 ## Ziel und Grenze
 

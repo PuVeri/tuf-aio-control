@@ -1,14 +1,14 @@
-# LCD-GIF-Liveanimation – Offline-Implementierung
+# LCD-GIF-Liveanimation
 
 Stand: 2026-09-04
 
 ## Ergebnis und Sicherheitsgrenze
 
-Die GUI kann vorbereitete GIF-Frames nun zeitlich nacheinander als aktuelle
-LCD-Komposition veröffentlichen. Diese Funktion ist vollständig offline
-implementiert und getestet, aber noch nicht am realen LCD validiert. In diesem
-Ticket fanden keine Gerätekommunikation, keine HID-/USB-Writes und kein
-Live-Test statt. Das bestätigte `0x08`-Protokoll und alle
+Die GUI kann vorbereitete GIF-Frames zeitlich nacheinander als aktuelle
+LCD-Komposition veröffentlichen. Die Funktion wurde offline implementiert und
+getestet und anschließend manuell auf einer ASUS TUF GAMING LC III 360 ARGB
+LCD erfolgreich live-validiert. Die GIF-Wiedergabe war sichtbar flüssig und
+wie gewünscht. Das bestätigte `0x08`-Protokoll und alle
 Production-Safety-Gates blieben unverändert.
 
 ## Einheitliches 4-Slot-Layout
@@ -98,11 +98,13 @@ LCD-Session neu.
 Die nominelle Senderperiode für GIF beträgt wie beim rekonstruierten
 InfoHub-Verhalten 12 ms. Dauert ein synchroner Transfer länger, gibt es danach
 keine zusätzliche Taktpause. Der reale Lauf vom 2026-09-04 erreichte mit dem
-damaligen per-Frame-Open/Close-Pfad nur 3,0939 FPS. Der Produktionssender hält
-den validierten hidraw-FD deshalb nun über die Refreshsession offen; die damit
-erreichbare reale Rate ist noch nicht gemessen. Transferüberlappung, Queue,
-Retry, Reconnect und Catch-up bleiben ausgeschlossen. Statische Bilder und
-beendete endliche GIFs verwenden weiterhin den konservativen 1,0-s-Refresh.
+damaligen per-Frame-Open/Close-Pfad nur 3,0939 FPS. Mit dem persistenten
+Produktionssender ergab der beobachtete Live-Ausschnitt ungefähr 29 FPS im
+Mittel und etwa 32 FPS im Median für den End-to-End-Frametakt. Einzelne
+Segmentwrites lagen typischerweise bei rund 125 µs; USB/hidraw ist damit nicht
+mehr der V1-Engpass. Transferüberlappung, Queue, Retry, Reconnect und Catch-up
+bleiben ausgeschlossen. Statische Bilder und beendete endliche GIFs verwenden
+weiterhin den konservativen 1,0-s-Refresh.
 
 Der persistente Transport ändert den Producer-/Sender-Handshake nicht: Erst
 nach dem vollständigen seriellen Transfer wird der Folgeframe angefordert.

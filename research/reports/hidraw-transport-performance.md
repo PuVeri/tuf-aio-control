@@ -13,9 +13,10 @@ Legacy-/Einzelbildpfad verfügbar. Segmentierung, Controlbytes,
 Reportreihenfolge, 1025-Byte-hidraw-
 Framing und JPEG-Payload werden von beiden Lifecycles gemeinsam benutzt.
 
-Dieses Ticket enthielt keinen realen HID-/USB-Write und keinen Live-Test. Es
-führt keine neuen Opcodes, kein Interface 0, kein `0b05:19af`, keinen Retry,
-Reconnect, Nonblocking-Versuch, Paralleltransfer oder Write-Queue ein.
+Die anschließende manuelle GIF-Wiedergabe auf einer ASUS TUF GAMING LC III 360
+ARGB LCD hat diesen persistierenden Produktionspfad erfolgreich live-validiert.
+Der Test führte keine neuen Opcodes, kein Interface 0, kein `0b05:19af`, keinen
+Retry, Reconnect, Nonblocking-Versuch, Paralleltransfer oder Write-Queue ein.
 
 ## Read-only-Auswertung des realen Ausgangslogs
 
@@ -164,6 +165,26 @@ Damit lassen sich erster, mittlerer und letzter Write direkt vergleichen. Die
 Differenz zwischen `send_frame_duration` und `write_total_duration` zeigt den
 verbleibenden reinen Frame-Overhead; einmalige Open-/Closewerte sind separat.
 
+## Manuelle Live-Validierung
+
+Der persistente Produktionspfad wurde manuell auf einer ASUS TUF GAMING LC III
+360 ARGB LCD mit GIF-Wiedergabe erfolgreich getestet. Die Animation war
+subjektiv sichtbar flüssig und wie gewünscht. Der beobachtete Ausschnitt ergab
+für den End-to-End-Frametakt ungefähr 29 FPS im Mittel und etwa 32 FPS im
+Median, gegenüber 3,0939 FPS mit dem alten per-Frame-Open/Close-Lifecycle.
+
+Die einzelnen `os.write()`-Dauern lagen typischerweise bei ungefähr
+0,12–0,13 ms (rund 125 µs). Vollständige Frame-Transfers lagen bei 9 Segmenten
+bei ungefähr 1,7–2,1 ms, bei 14 Segmenten bei ungefähr 2,6–3,4 ms und bei
+15 Segmenten bei ungefähr 2,8–3,2 ms. Der frühere Transport-Flaschenhals ist
+damit praktisch beseitigt. USB/hidraw ist für V1 nicht mehr der Engpass; die
+verbleibende Zeit liegt überwiegend außerhalb der eigentlichen Writes,
+insbesondere bei Rendering, JPEG und Producer-Timing.
+
+Der Befund begründet keinen weiteren Transport-Performance-Umbau für V1. Er
+ändert weder den bestätigten 0x08-Reportpfad noch die bestehenden
+Safety-Eigenschaften.
+
 ## JPEG-Encoder und reine Offline-Größenstichprobe
 
 Der Defaultencoder bleibt unverändert bei Pillow/libjpeg-turbo, Qualität 60,
@@ -207,20 +228,9 @@ Geräteverhaltens. Aus `speed=480` folgt ausdrücklich nicht, dass USB High
 Speed selbst der beobachtete Engpass ist. Es wurden weder `lsusb -v` noch
 Control Transfers oder HID-Writes ausgeführt.
 
-## Offene Fragen für den nächsten manuellen Live-Test
+## Abschluss
 
-Ein normal manuell gestarteter GUI-GIF-Lauf wird ohne separates
-Benchmarkprotokoll beantworten:
-
-1. Dauer des einmaligen Session-Open und des abschließenden Close;
-2. Dauer jedes einzelnen Segmentwrites und Lage eines First-/Last-Write-
-   Effekts;
-3. vollständige Framezeiten insbesondere für 10, 12 und 14 Segmente;
-4. Differenz zu den oben dokumentierten alten per-Frame-Zeiten;
-5. reale persistente End-to-End-FPS und Nutzdatendurchsatz;
-6. Verhältnis `write_total_duration` zu kompletter Framezeit und damit, ob
-   der verbleibende Engpass überwiegend in `os.write()` oder außerhalb liegt.
-
-Bis diese Werte real vorliegen, gibt es keine Aussage über den tatsächlichen
-Gewinn und keine Grundlage für Async-USB, Pipelining, Batching oder niedrigere
-JPEG-Qualität.
+Die Live-Validierung bestätigt den tatsächlichen Gewinn des persistenten
+Lifecycles für die getestete GIF-Wiedergabe. Sie ist keine Grundlage für
+Async-USB, Pipelining, Batching oder niedrigere JPEG-Qualität; solche Änderungen
+sind für V1 nicht erforderlich.
