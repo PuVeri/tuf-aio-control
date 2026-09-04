@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import os
+import signal
 import sys
 import threading
 import time
@@ -10,7 +12,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Callable, Protocol
 
-from PySide6.QtCore import QSettings, QTimer, Qt, Signal
+from PySide6.QtCore import QSettings, QSocketNotifier, QTimer, Qt, Signal
 from PySide6.QtGui import (
     QAction,
     QColor,
@@ -97,10 +99,97 @@ class GuiRefreshState(str, Enum):
     ERROR = "error"
 
 
+class QtSignalShutdownBridge:
+    """Route terminal signals into the Qt event loop without KeyboardInterrupt."""
+
+    def __init__(self, request_shutdown: Callable[[], None]) -> None:
+        self._request_shutdown = request_shutdown
+        self._read_fd: int | None = None
+        self._write_fd: int | None = None
+        self._notifier: QSocketNotifier | None = None
+        self._previous_wakeup_fd: int | None = None
+        self._previous_handlers: dict[int, object] = {}
+        self._signal_pending = False
+        self._shutdown_dispatched = False
+
+    def install(self) -> None:
+        """Install only from the Python main thread after QApplication exists."""
+        if self._read_fd is not None:
+            raise RuntimeError("Signal-Bridge wurde bereits installiert")
+        read_fd, write_fd = os.pipe2(os.O_NONBLOCK | os.O_CLOEXEC)
+        previous_wakeup_fd: int | None = None
+        previous_handlers: dict[int, object] = {}
+        try:
+            previous_wakeup_fd = signal.set_wakeup_fd(write_fd)
+            previous_handlers = {
+                signum: signal.getsignal(signum)
+                for signum in (signal.SIGINT, signal.SIGTERM)
+            }
+            for signum in previous_handlers:
+                signal.signal(signum, self._handle_signal)
+            notifier = QSocketNotifier(read_fd, QSocketNotifier.Type.Read)
+            notifier.activated.connect(self._dispatch_pending_signal)
+        except BaseException:
+            if previous_wakeup_fd is not None:
+                signal.set_wakeup_fd(previous_wakeup_fd)
+            for signum, handler in previous_handlers.items():
+                signal.signal(signum, handler)  # type: ignore[arg-type]
+            os.close(read_fd)
+            os.close(write_fd)
+            raise
+
+        self._read_fd = read_fd
+        self._write_fd = write_fd
+        self._previous_wakeup_fd = previous_wakeup_fd
+        self._previous_handlers = previous_handlers
+        self._notifier = notifier
+
+    def close(self) -> None:
+        """Restore the process signal state after the Qt event loop has ended."""
+        notifier = self._notifier
+        if notifier is not None:
+            notifier.setEnabled(False)
+            notifier.deleteLater()
+            self._notifier = None
+        if self._read_fd is None or self._write_fd is None:
+            return
+        if self._previous_wakeup_fd is not None:
+            signal.set_wakeup_fd(self._previous_wakeup_fd)
+        for signum, handler in self._previous_handlers.items():
+            signal.signal(signum, handler)  # type: ignore[arg-type]
+        os.close(self._read_fd)
+        os.close(self._write_fd)
+        self._read_fd = None
+        self._write_fd = None
+        self._previous_wakeup_fd = None
+        self._previous_handlers = {}
+
+    def _handle_signal(self, _signum: int, _frame: object) -> None:
+        """Keep the Python signal handler minimal and exception-free."""
+        self._signal_pending = True
+
+    def _dispatch_pending_signal(self, *_: object) -> None:
+        read_fd = self._read_fd
+        if read_fd is None:
+            return
+        while True:
+            try:
+                if not os.read(read_fd, 4096):
+                    break
+            except BlockingIOError:
+                break
+        if not self._signal_pending or self._shutdown_dispatched:
+            return
+        self._signal_pending = False
+        self._shutdown_dispatched = True
+        self._request_shutdown()
+
+
 class MainWindow(QMainWindow):
     """Single-image UI; conversion and transport stay in separate modules."""
 
     transport_frame_requested = Signal()
+    refresh_worker_finished = Signal()
 
     def __init__(
         self,
@@ -165,6 +254,8 @@ class MainWindow(QMainWindow):
         self._preview_dirty = False
         self._quit_when_stopped = False
         self._quit_requested = False
+        self._quit_finished = False
+        self._worker_completion_notifier_installed = False
 
         self.setWindowTitle("TUF AIO Control")
         self.resize(920, 900)
@@ -185,6 +276,7 @@ class MainWindow(QMainWindow):
         self._transport_animation_timer.setSingleShot(True)
         self._transport_animation_timer.timeout.connect(self._produce_transport_frame)
         self.transport_frame_requested.connect(self._produce_transport_frame)
+        self.refresh_worker_finished.connect(self._poll_refresh_controller)
         self._apply_refresh_state()
         self._restore_last_image()
         QTimer.singleShot(0, self._maybe_autostart_lcd)
@@ -1216,6 +1308,7 @@ class MainWindow(QMainWindow):
         self._set_refresh_state(GuiRefreshState.STARTING)
         self.status_label.setText("Status: LCD-Session wird gestartet …")
         controller: RefreshControllerLike | None = None
+        self._worker_completion_notifier_installed = False
         try:
             diagnostics = self._diagnostics_factory()
             self._refresh_diagnostics = diagnostics
@@ -1238,6 +1331,10 @@ class MainWindow(QMainWindow):
             controller = self._controller_factory(frame_buffer)
             self._frame_buffer = frame_buffer
             self._refresh_controller = controller
+            set_completion_callback = getattr(controller, "set_completion_callback", None)
+            if callable(set_completion_callback):
+                set_completion_callback(self.refresh_worker_finished.emit)
+                self._worker_completion_notifier_installed = True
             controller.start()
         except Exception as error:
             self._refresh_diagnostics.record_exception("gui_session_start", error)
@@ -1251,7 +1348,10 @@ class MainWindow(QMainWindow):
 
     def stop_lcd(self) -> None:
         """Request stop without blocking the Qt event loop."""
-        if self._refresh_state is not GuiRefreshState.RUNNING:
+        if self._refresh_state not in {
+            GuiRefreshState.STARTING,
+            GuiRefreshState.RUNNING,
+        }:
             return
         controller = self._refresh_controller
         if controller is None:
@@ -1286,6 +1386,7 @@ class MainWindow(QMainWindow):
         result = controller.result
         self._last_refresh_result = result
         self._refresh_controller = None
+        self._worker_completion_notifier_installed = False
         if result is None:
             self._enter_refresh_error("LCD-Refreshworker endete ohne Ergebnis")
         elif result.stop_reason in {
@@ -1348,27 +1449,46 @@ class MainWindow(QMainWindow):
         self.hide()
 
     def quit_application(self) -> None:
-        """Stop an active session, then terminate only by explicit request."""
+        """Use one idempotent lifecycle for tray and terminal shutdown."""
         if self._quit_requested:
             return
         self._quit_requested = True
         self.hide()
-        if self._refresh_state is GuiRefreshState.RUNNING:
+        self._stop_application_timers()
+        if self._refresh_state in {
+            GuiRefreshState.STARTING,
+            GuiRefreshState.RUNNING,
+        }:
             self._quit_when_stopped = True
             self.stop_lcd()
+            if self._worker_completion_notifier_installed:
+                self._refresh_state_timer.stop()
             return
         if self._refresh_state is GuiRefreshState.STOPPING:
             self._quit_when_stopped = True
+            if not self._worker_completion_notifier_installed:
+                # Compatibility for a non-production injected controller that
+                # has no completion callback to wake the Qt event loop.
+                self._refresh_state_timer.start()
             return
         self._finish_quit()
 
-    def _finish_quit(self) -> None:
+    def _stop_application_timers(self) -> None:
+        """Stop all GUI-owned timers before waiting for the worker to exit."""
         self._temperature_timer.stop()
         self._refresh_state_timer.stop()
         self._animation_timer.stop()
         self._transport_animation_timer.stop()
         self._animation_scheduler.stop()
         self._lcd_animation_scheduler.stop()
+        with self._transport_frame_request_lock:
+            self._transport_frame_request_pending = False
+
+    def _finish_quit(self) -> None:
+        if self._quit_finished:
+            return
+        self._quit_finished = True
+        self._stop_application_timers()
         self.tray_icon.hide()
         application = QApplication.instance()
         if application is not None:
@@ -1383,9 +1503,14 @@ def main() -> int:
     window = MainWindow(
         controller_factory=gui_refresh_factory.ProductionControllerFactory()
     )
+    signal_bridge = QtSignalShutdownBridge(window.quit_application)
+    signal_bridge.install()
     if not background:
         window.show()
-    return app.exec()
+    try:
+        return app.exec()
+    finally:
+        signal_bridge.close()
 
 
 if __name__ == "__main__":

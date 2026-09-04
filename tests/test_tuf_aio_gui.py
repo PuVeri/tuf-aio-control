@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import signal
 import sys
 import tempfile
 import threading
@@ -9,6 +10,7 @@ import time
 import unittest
 from dataclasses import replace
 from pathlib import Path
+from typing import Callable
 from unittest import mock
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -70,6 +72,8 @@ class FakeRefreshController:
         self.block_sender = block_sender
         self.result: lcd_refresh.RefreshResult | None = None
         self.request_stop_calls = 0
+        self.handle_close_calls = 0
+        self._completion_callback: Callable[[], None] | None = None
         self._running = False
         self._stop = threading.Event()
         self._transfer = threading.Event()
@@ -92,6 +96,9 @@ class FakeRefreshController:
         self.request_stop_calls += 1
         self._stop.set()
         self._transfer.set()
+
+    def set_completion_callback(self, callback: Callable[[], None]) -> None:
+        self._completion_callback = callback
 
     def join(self) -> None:
         if self._thread is not None:
@@ -128,7 +135,10 @@ class FakeRefreshController:
                 (),
             )
         finally:
+            self.handle_close_calls += 1
             self._running = False
+            if self._completion_callback is not None:
+                self._completion_callback()
 
 
 class TufAioGuiOfflineTests(unittest.TestCase):
@@ -1618,6 +1628,71 @@ class TufAioGuiOfflineTests(unittest.TestCase):
             self.assertFalse(window._lcd_animation_scheduler.is_running)
             self.assertFalse(window._animation_timer.isActive())
 
+    def test_signal_bridge_routes_sigint_and_sigterm_to_one_shutdown(self) -> None:
+        for signum in (signal.SIGINT, signal.SIGTERM):
+            with self.subTest(signal=signum):
+                shutdown_calls: list[None] = []
+                bridge = tuf_aio_gui.QtSignalShutdownBridge(
+                    lambda: shutdown_calls.append(None)
+                )
+                try:
+                    bridge.install()
+                    handler = signal.getsignal(signum)
+                    self.assertTrue(callable(handler))
+                    handler(signum, None)  # type: ignore[misc]
+                    bridge._dispatch_pending_signal()
+                    handler(signal.SIGTERM, None)  # type: ignore[misc]
+                    bridge._dispatch_pending_signal()
+                    self.assertEqual(shutdown_calls, [None])
+                finally:
+                    bridge.close()
+
+    def test_shutdown_is_idempotent_stops_timers_worker_and_handle_once(self) -> None:
+        release_sender = threading.Event()
+        sender = FakeSender()
+        controllers: list[FakeRefreshController] = []
+
+        def factory(source: lcd_refresh.FrameSource) -> FakeRefreshController:
+            controller = FakeRefreshController(
+                source,
+                sender,
+                block_sender=release_sender,
+            )
+            controllers.append(controller)
+            return controller
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "shutdown.gif"
+            self._write_gif(path, ("red", "blue"), durations=(250, 250))
+            settings = self._settings(Path(directory) / "shutdown.ini")
+            settings.setValue(tuf_aio_gui.OVERLAY_ENABLED_SETTING, True)
+            settings.sync()
+            window = self._window(settings=settings, controller_factory=factory)
+            window.show()
+            self.assertTrue(window.load_image(path))
+            window.start_lcd_button.click()
+            controller = controllers[0]
+            self.assertTrue(window._temperature_timer.isActive())
+            self.assertTrue(window._refresh_state_timer.isActive())
+
+            with mock.patch.object(QApplication.instance(), "quit") as quit_app:
+                window.quit_application()
+                window.quit_application()
+                self.assertEqual(controller.request_stop_calls, 1)
+                self.assertFalse(window._temperature_timer.isActive())
+                self.assertFalse(window._refresh_state_timer.isActive())
+                self.assertFalse(window._animation_timer.isActive())
+                self.assertFalse(window._transport_animation_timer.isActive())
+                quit_app.assert_not_called()
+
+                release_sender.set()
+                controller.join()
+                QApplication.processEvents()
+                QApplication.processEvents()
+
+                self.assertEqual(controller.handle_close_calls, 1)
+                quit_app.assert_called_once_with()
+
     def test_close_hides_without_stopping_and_quit_stops_nonblocking(self) -> None:
         release_sender = threading.Event()
         sender = FakeSender()
@@ -1664,6 +1739,7 @@ class TufAioGuiOfflineTests(unittest.TestCase):
             controller.join()
             window._poll_refresh_controller()
             QApplication.processEvents()
+            self.assertEqual(controller.handle_close_calls, 1)
             quit_app.assert_called_once_with()
             self.assertFalse(window.isVisible())
 

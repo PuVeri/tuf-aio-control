@@ -314,6 +314,19 @@ Die vollständige Offline-Suite bestand nach dieser Änderung mit 237 Tests;
 Live-Validierung änderte weder das 0x08-Protokoll noch die Safety-Gates.
 Details: `research/reports/hidraw-transport-performance.md`.
 
+## Terminalsignal- und Produktions-Shutdown
+
+`SIGINT`/Ctrl+C und `SIGTERM` verwenden denselben idempotenten Shutdownpfad
+wie Tray → Beenden, auch im `--background`-Modus. Eine Pipe- und
+`QSocketNotifier`-Bridge ersetzt den Python-Standardpfad mit asynchronem
+`KeyboardInterrupt`: Der Signalhandler setzt nur einen Zustand, die Qt-
+Eventloop fordert genau einmal den Shutdown an. GIF-, Telemetrie-,
+Transport- und Refresh-Poll-Timer stoppen; ein laufender LCD-Worker erhält
+genau eine Stopanforderung. Erst nach dessen `finally` und dem einmaligen
+Close des persistenten HID-Handles meldet der Worker in den Qt-Thread zurück;
+danach werden Tray und `QApplication` beendet. Es gibt keinen normalen
+`os._exit()`- oder Killpfad und keinen Join-Timeout als Shutdownmechanismus.
+
 ## Ziel und Grenze
 
 Ziel ist eine native Linux-Steuerung für das LCD der ASUS TUF Gaming LC III

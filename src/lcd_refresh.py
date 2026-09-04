@@ -473,11 +473,14 @@ class RefreshController:
         frame_source: FrameSource | None = None,
         clock: Callable[[], float] = time.monotonic,
         wait_function: WaitFunction = _event_wait,
+        completion_callback: Callable[[], None] | None = None,
     ) -> None:
         if not callable(sender):
             raise TypeError("sender muss aufrufbar sein")
         if not callable(clock) or not callable(wait_function):
             raise TypeError("clock und wait_function müssen aufrufbar sein")
+        if completion_callback is not None and not callable(completion_callback):
+            raise TypeError("completion_callback muss aufrufbar sein oder None")
         if frame_source is not None:
             if not callable(getattr(frame_source, "snapshot", None)):
                 raise TypeError("frame_source muss snapshot() bereitstellen")
@@ -496,6 +499,18 @@ class RefreshController:
         self._thread: threading.Thread | None = None
         self._started = False
         self._result: RefreshResult | None = None
+        self._completion_callback = completion_callback
+
+    def set_completion_callback(self, callback: Callable[[], None]) -> None:
+        """Notify one owner after worker cleanup has completed."""
+        if not callable(callback):
+            raise TypeError("completion_callback muss aufrufbar sein")
+        with self._state_lock:
+            if self._started:
+                raise RefreshStateError(
+                    "completion_callback muss vor dem Start gesetzt werden"
+                )
+            self._completion_callback = callback
 
     @property
     def is_running(self) -> bool:
@@ -622,6 +637,14 @@ class RefreshController:
             with self._state_lock:
                 self._result = result
             _ACTIVE_REFRESH_LOCK.release()
+            completion_callback = self._completion_callback
+            if completion_callback is not None:
+                try:
+                    completion_callback()
+                except Exception as error:
+                    self._diagnostics.record_exception(
+                        "refresh_completion_callback", error
+                    )
 
     def _run_loop(self) -> RefreshResult:
         started_at = self._clock()
