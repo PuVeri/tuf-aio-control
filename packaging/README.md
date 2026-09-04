@@ -1,52 +1,100 @@
-# Linux-Desktopintegration
+# Lokale Linux-v0.1-Installation
 
-## Benutzer-Autostart
+Die produktive Anwendung wird als eigenständige Kopie in XDG-Benutzerpfade
+installiert. Sie benötigt danach weder das HeartdriveLAB-Repository noch einen
+Symlink dorthin. Der Installer verändert keine udev-Regeln und benötigt keine
+Root-Rechte.
 
-`tuf-aio-control-autostart.desktop` startet die Anwendung beim Desktop-Login mit
-`--background`. Dadurch läuft dieselbe Anwendung als Tray-Prozess, ohne das
-Fenster anfänglich anzuzeigen. App-Autostart startet nicht automatisch den
-LCD-Refresh: Dafür existiert die getrennte, standardmäßig ausgeschaltete
-GUI-Option `LCD beim Programmstart automatisch starten`.
+## Runtime-Abhängigkeiten
 
-Die Repositorydatei installiert sich nicht selbst. Eine bewusste
-Benutzerinstallation beziehungsweise Entfernung erfolgt aus dem Projektroot:
+Die Laufzeit besteht aus `/usr/bin/python3`, `PySide6` und `Pillow`; alle
+weiteren Python-Imports stammen aus der Standardbibliothek oder den zehn in
+`runtime-files.txt` aufgeführten Projektmodulen. Test-, Forschungs- und
+Dokumentationsdateien sowie die Hardware-Testprogramme werden nicht kopiert.
+
+Der gegenwärtig offline geprüfte Satz ist Python 3.14.7, PySide6 6.11.2 und
+Pillow 12.3.0. Die beiden Python-Pakete stehen in
+`runtime-requirements.txt`. Sie werden bewusst nicht vom App-Installer aus dem
+Netz geladen. Sie müssen vorher für `/usr/bin/python3` über die
+Linux-Distribution oder, sofern die Distribution Benutzerpakete erlaubt, so
+bereitgestellt werden:
 
 ```text
-packaging/manage-user-autostart.sh install
-packaging/manage-user-autostart.sh uninstall
+/usr/bin/python3 -m pip install --user -r packaging/runtime-requirements.txt
+/usr/bin/python3 -c 'import PIL, PySide6; print(PIL.__version__, PySide6.__version__)'
 ```
 
-Das Skript überschreibt keine vorhandene Zieldatei und entfernt nur eine mit
-seinem Projektmarker versehene Datei.
+Der Installer führt nur den zweiten, rein lokalen Importcheck aus.
 
-Das Hilfsskript schreibt ausschließlich
-`${XDG_CONFIG_HOME:-$HOME/.config}/autostart/tuf-aio-control.desktop` und setzt
-den absoluten aktuellen Projektpfad ein. Wird das Repository verschoben, muss
-die Benutzerdatei erneut installiert werden.
+## Installieren und aktualisieren
+
+Aus dem Entwicklungsrepository:
+
+```text
+packaging/manage-user-installation.sh install
+packaging/manage-user-installation.sh install --autostart
+packaging/manage-user-installation.sh update
+packaging/manage-user-installation.sh uninstall
+```
+
+`install` verweigert vorhandene Zielpfade. `update` akzeptiert nur eine durch
+diesen Installer markierte Installation, ersetzt den Programmbaum durch einen
+frisch erzeugten, vollständigen Stand und aktualisiert Launcher und
+Desktopdateien. Ein vorhandener verwalteter Login-Autostart bleibt beim Update
+aktiv. Alternativ lässt er sich getrennt schalten:
+
+```text
+packaging/manage-user-installation.sh enable-autostart
+packaging/manage-user-installation.sh disable-autostart
+```
+
+Das resultierende Standardlayout ist:
+
+```text
+~/.local/share/tuf-aio-control/app/       kopierte Python-Laufzeit
+~/.local/bin/tuf-aio-control              ausführbarer Launcher
+~/.local/share/applications/tuf-aio-control.desktop
+~/.config/autostart/tuf-aio-control.desktop   optional
+~/.local/state/tuf-aio-control/           Runtime-/Diagnoselogs
+```
+
+`XDG_DATA_HOME`, `XDG_CONFIG_HOME` und `XDG_STATE_HOME` ersetzen die
+entsprechenden Standardbasen. Der Launcher verwendet ebenfalls
+`XDG_DATA_HOME` und reicht alle Argumente weiter. Damit funktionieren sowohl
+`tuf-aio-control` als auch `tuf-aio-control --background` ohne absoluten Pfad
+ins Entwicklungsrepository.
+
+`uninstall` entfernt ausschließlich die markierte Anwendung, den Launcher und
+die beiden verwalteten Desktopdateien. QSettings unter der XDG-Konfigurations-
+basis (Organisation `HeartDriveLab`, Anwendung `tuf-aio-control`) und Logs
+unter der XDG-State-Basis bleiben erhalten. Einen automatischen Purge gibt es
+absichtlich nicht.
+
+## Desktop- und LCD-Autostart
+
+Der optionale Desktop-Autostart ruft den installierten Launcher mit
+`--background` auf. Er startet den Tray-Prozess, nicht automatisch den
+LCD-Refresh. Dafür existiert die getrennte, standardmäßig ausgeschaltete
+Anwendungsoption `LCD beim Programmstart automatisch starten`. Auch bei deren
+Aktivierung bleiben sämtliche Production-Safety-Gates aktiv; es gibt keinen
+Retry oder Reconnect.
 
 ## Permanente Interface-1-Berechtigung
 
-`99-tuf-aio-control.rules` ist die vorbereitete permanente udev-Regel. Sie
-passt ausschließlich auf hidraw-Knoten des Geräts `0b05:1c7b`. Zunächst setzt
-sie beide Interfaces für die Gruppe `input` auf `0640`; eine zweite,
-zusätzliche Bedingung setzt ausschließlich
-`ID_USB_INTERFACE_NUM==01` auf `0660`. Interface 0 bleibt damit für die Gruppe
-read-only. Das getrennte Gerät `0b05:19af` wird nicht erfasst.
+`99-tuf-aio-control.rules` bleibt eine getrennte Vorlage. Sie passt nur auf
+hidraw-Knoten des Geräts `0b05:1c7b`: beide Interfaces erhalten für Gruppe
+`input` höchstens `0640`, ausschließlich `ID_USB_INTERFACE_NUM==01` erhält
+`0660`. Interface 0 bleibt gruppen-read-only und `0b05:19af` wird nicht
+erfasst.
 
-Die Anwendung installiert die Regel nicht und ruft weder `sudo` noch udev auf.
-Eine spätere bewusste Administratorinstallation muss zunächst sicherstellen,
-dass keine ungeprüfte Zieldatei überschrieben wird:
+Der Benutzerinstaller installiert diese Datei nicht und ruft weder
+Privilegienwerkzeuge noch udev auf. Eine spätere, separat bestätigte
+Administratoraktion darf sie nach
+`/etc/udev/rules.d/99-tuf-aio-control.rules` kopieren und die Regeln neu laden.
 
-```text
-sudo test ! -e /etc/udev/rules.d/99-tuf-aio-control.rules
-sudo install -o root -g root -m 0644 \
-  packaging/99-tuf-aio-control.rules \
-  /etc/udev/rules.d/99-tuf-aio-control.rules
-sudo udevadm verify /etc/udev/rules.d/99-tuf-aio-control.rules
-sudo udevadm control --reload-rules
-```
+## GIF-Status in v0.1
 
-Danach wird das Gerät bevorzugt neu verbunden. Vor jedem LCD-Start müssen die
-dynamisch erkannten Interfacewerte und Modusbits geprüft werden. Die
-Production-Safety-Gates der Anwendung bleiben unabhängig von Unix-Rechten
-vollständig aktiv; es gibt keinen Reconnect oder automatischen Retry.
+Die Bildpipeline kann GIF-Dateien laden und separat Frames, Dauern sowie
+Loop-Metadaten vorbereiten. Echte animierte GIF-Wiedergabe auf dem LCD ist
+noch nicht implementiert. Der aktive GUI-/LCD-Pfad verwendet GIF in v0.1
+weiterhin als statisches Standbild aus Frame 0.

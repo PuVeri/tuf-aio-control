@@ -1,12 +1,11 @@
 [Desktop Entry]
 Type=Application
 Name=TUF AIO Control
-Comment=ASUS TUF AIO LCD background and tray control
-Exec="@LAUNCHER@" --background
+Comment=ASUS TUF AIO LCD control
+Exec="@LAUNCHER@"
 TryExec=@LAUNCHER@
 Icon=video-display
 Terminal=false
 Categories=Utility;
-StartupNotify=false
-X-GNOME-Autostart-enabled=true
+StartupNotify=true
 X-TufAioControl-Managed=true

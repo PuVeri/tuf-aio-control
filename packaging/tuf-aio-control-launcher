@@ -1,0 +1,13 @@
+#!/bin/sh
+# X-TufAioControl-Managed: true
+set -eu
+
+data_home=${XDG_DATA_HOME:-"${HOME:?HOME is required}/.local/share"}
+application="$data_home/tuf-aio-control/app/tuf_aio_gui.py"
+
+if [ ! -r "$application" ]; then
+    printf 'TUF AIO Control installation is incomplete: %s\n' "$application" >&2
+    exit 1
+fi
+
+exec /usr/bin/python3 -B "$application" "$@"

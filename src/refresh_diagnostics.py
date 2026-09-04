@@ -4,14 +4,13 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 import uuid
 from pathlib import Path
 from typing import Protocol
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_LOG_DIRECTORY = PROJECT_ROOT / "logs"
 DEFAULT_MAX_LOG_BYTES = 2 * 1024 * 1024
 DEFAULT_BACKUP_COUNT = 3
 DEFAULT_RETAINED_LOG_FILES = 20
@@ -34,6 +33,16 @@ class NullRefreshDiagnostics:
 
 
 NULL_DIAGNOSTICS = NullRefreshDiagnostics()
+
+
+def default_log_directory() -> Path:
+    """Return the XDG user-state directory used for persistent runtime logs."""
+    configured = os.environ.get("XDG_STATE_HOME")
+    if configured:
+        candidate = Path(configured).expanduser()
+        if candidate.is_absolute():
+            return candidate / "tuf-aio-control"
+    return Path.home() / ".local" / "state" / "tuf-aio-control"
 
 
 class JsonlRefreshDiagnostics:
@@ -99,14 +108,17 @@ class JsonlRefreshDiagnostics:
         )
 
 
-def create_gui_session_diagnostics() -> JsonlRefreshDiagnostics:
+def create_gui_session_diagnostics(
+    directory: Path | None = None,
+) -> JsonlRefreshDiagnostics:
     """Create a unique persistent log only after an explicit GUI start request."""
     filename = (
         f"gui-refresh-{time.strftime('%Y%m%d-%H%M%S')}-"
         f"{uuid.uuid4().hex[:8]}.jsonl"
     )
-    diagnostics = JsonlRefreshDiagnostics(DEFAULT_LOG_DIRECTORY / filename)
-    _prune_runtime_logs(DEFAULT_LOG_DIRECTORY)
+    log_directory = directory if directory is not None else default_log_directory()
+    diagnostics = JsonlRefreshDiagnostics(log_directory / filename)
+    _prune_runtime_logs(log_directory)
     return diagnostics
 
 

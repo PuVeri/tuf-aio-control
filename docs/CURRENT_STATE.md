@@ -111,9 +111,10 @@ Ergebnishistorie hält maximal die letzten 1024 Transfers, der Gesamtframezähle
 bleibt vollständig.
 
 Die validierte XDG-Vorlage
-`packaging/tuf-aio-control-autostart.desktop` startet die App mit
-`--background`. Das optionale Hilfsskript installiert sie nur nach bewusstem
-Benutzeraufruf. App-Autostart und LCD-Autostart bleiben getrennt: Die neue
+`packaging/tuf-aio-control-autostart.desktop` startet die installierte App über
+den Benutzerlauncher mit `--background`. Der lokale Benutzerinstaller erzeugt
+sie nur nach bewusstem Benutzeraufruf. App-Autostart und LCD-Autostart bleiben
+getrennt: Die neue
 persistente GUI-Option `LCD beim Programmstart automatisch starten` ist
 standardmäßig aus. Aktiviert verwendet sie die wiederhergestellte letzte
 Bildquelle und exakt die vorhandene ProductionFactory mit allen Safety-Gates;
@@ -136,6 +137,55 @@ Die vollständige Offline-Suite bestand mit 202 Tests. Außerdem bestanden
 `udevadm verify`. In diesem Ticket fanden keine Gerätekommunikation, keine
 HID-/USB-Writes, keine Installation und kein Live-Test statt. Details:
 `research/reports/background-runtime-and-tray.md`.
+
+## Offline-Stand: lokale Linux-v0.1-Installation
+
+Stand: 2026-09-04
+
+Die produktive Anwendung ist jetzt als eigenständige XDG-Benutzerinstallation
+vorbereitet. `packaging/manage-user-installation.sh` kopiert ausschließlich die
+zehn erforderlichen Python-Runtimedateien nach
+`${XDG_DATA_HOME:-$HOME/.local/share}/tuf-aio-control/app`, erzeugt
+`$HOME/.local/bin/tuf-aio-control` sowie die normale Desktopdatei und optional
+die Login-Autostartdatei. Es werden keine Tests, Research-Daten,
+Dokumentationen oder manuellen Hardware-Testprogramme installiert. Die
+Installation verwendet echte Kopien und enthält weder Symlink noch absoluten
+Pfad zurück nach HeartdriveLAB.
+
+Der Launcher unterstützt unverändert den normalen Aufruf und `--background`.
+Desktop- und Autostartdatei verwenden ausschließlich diesen installierten
+Launcher. `install` verweigert kollidierende Ziele; `update` ersetzt nur eine
+markierte Installation und bewahrt einen aktivierten Autostart. `uninstall`
+entfernt nur verwaltete Programm- und Desktopdateien. QSettings und Runtime-
+Logs werden durch Installation, Update und Uninstall nicht gelöscht. Ein
+Purge-Modus wurde bewusst nicht hinzugefügt.
+
+JSONL-Diagnostik liegt nun unter
+`$XDG_STATE_HOME/tuf-aio-control`, bei fehlender oder nicht absoluter
+XDG-Angabe unter `~/.local/state/tuf-aio-control`. Die bestehende Größenrotation
+und Dateianzahlbegrenzung bleiben unverändert; Tests können weiterhin einen
+temporären Pfad injizieren. Das Repository und der installierte Programmbaum
+werden nicht mehr als Runtime-Logziel verwendet.
+
+Die tatsächlichen externen Runtime-Abhängigkeiten sind `/usr/bin/python3`,
+PySide6 und Pillow. Offline geprüft wurden Python 3.14.7, PySide6 6.11.2 und
+Pillow 12.3.0. Der Benutzerinstaller lädt nichts herunter und installiert keine
+Abhängigkeiten; er prüft nur deren lokale Importierbarkeit. Die vorhandene
+udev-Regel bleibt ein vollständig getrennter administrativer Schritt und wird
+vom Benutzerinstaller weder kopiert noch aktiviert.
+
+Der GIF-Status ist unverändert und ausdrücklich begrenzt: GIF-Dateien können
+geladen und vorbereitet werden; Frames, Dauern und Loop-Metadaten lassen sich
+verarbeiten. Echte GIF-Liveanimation auf dem LCD ist noch nicht implementiert.
+Der aktive v0.1-GUI-/LCD-Pfad verwendet weiterhin den statischen Frame-0-Pfad.
+
+Die neuen Installations- und Logpfadtests verwenden ausschließlich temporäre
+HOME-/XDG-Verzeichnisse. Es fanden keine echte Installation, keine
+Gerätekommunikation, keine HID-/USB-Writes und kein Live-Test statt. Die
+vollständige Offline-Suite bestand mit 210 Tests; außerdem bestanden `sh -n`,
+`compileall`, `desktop-file-validate` für beide erzeugten Desktopdateien und
+`git diff --check`. Details:
+`research/reports/local-installation-layout.md`.
 
 ## Ziel und Grenze
 

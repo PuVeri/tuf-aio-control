@@ -55,6 +55,35 @@ def read_entries(path: Path) -> list[dict[str, object]]:
 
 
 class RefreshDiagnosticsTests(unittest.TestCase):
+    def test_default_log_directory_uses_absolute_xdg_state_home(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            state_home = Path(directory) / "state"
+            with mock.patch.dict(
+                os.environ, {"XDG_STATE_HOME": str(state_home)}, clear=False
+            ):
+                self.assertEqual(
+                    refresh_diagnostics.default_log_directory(),
+                    state_home / "tuf-aio-control",
+                )
+
+    def test_default_log_directory_falls_back_to_local_user_state(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            with mock.patch.dict(os.environ, {}, clear=True), mock.patch.object(
+                refresh_diagnostics.Path, "home", return_value=home
+            ):
+                self.assertEqual(
+                    refresh_diagnostics.default_log_directory(),
+                    home / ".local" / "state" / "tuf-aio-control",
+                )
+
+    def test_factory_writes_only_to_injected_log_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            diagnostics = refresh_diagnostics.create_gui_session_diagnostics(root)
+            self.assertEqual(diagnostics.path.parent, root)
+            self.assertTrue(diagnostics.path.is_file())
+
     def test_jsonl_rotates_by_size_and_limits_backups(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "gui-refresh-test.jsonl"
