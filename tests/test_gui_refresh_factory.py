@@ -86,7 +86,9 @@ class ProductionControllerFactoryTests(unittest.TestCase):
 
         self.assertIsInstance(controller, lcd_refresh.RefreshController)
         self.assertIs(controller._frame_source, source)
-        self.assertIsInstance(controller._sender, lcd_refresh.HidrawFrameSender)
+        self.assertIsInstance(
+            controller._sender, lcd_refresh.PersistentHidrawFrameSender
+        )
         self.assertIs(controller._sender.device, device)
         self.assertIs(
             controller._sender.extra_validator,

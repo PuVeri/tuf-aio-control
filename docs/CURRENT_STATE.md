@@ -251,6 +251,57 @@ Production-Safety-Gates wurden nicht verändert. In diesem Ticket gab es keine
 Gerätekommunikation, HID-/USB-Writes oder Live-Tests. Details:
 `research/reports/lcd-gif-animation.md`.
 
+## Offline-Stand: persistente hidraw-Produktionssession
+
+Stand: 2026-09-04
+
+Das reale GIF-Log
+`gui-refresh-20260904-165355-c912e06c.jsonl` enthält 329 abgeschlossene Frames
+in 106,3383 s (3,0939 FPS) und für jeden Frame genau ein Open/Close-Indiz. Der
+alte `send_frame_once()`-Zeitraum lag je nach 8–15 Segmenten überwiegend bei
+ungefähr 216–387 ms. Eine lineare Regression über die 328 vor dem Stop
+abgeschlossenen Frames ergibt ungefähr 72,430 ms gemeinsamen Fixanteil plus
+19,201 ms je Segment (R²≈0,9805). Der Fixanteil umfasst den vollständigen
+alten Codepfad und darf nicht allein Open/Close zugeschrieben werden.
+
+Der Audit zeigte, dass der alte Produktionssender nicht nur je Frame öffnete
+und schloss, sondern vor jedem Segment `fstat`, sysfs-Gerätenummer,
+zielgebundene Discovery, strikte Geräteprüfung und Konkurrenzwritersuche
+wiederholte. Sleeps, Polls, Reads oder Retrypausen existierten zwischen den
+seriellen Writes nicht.
+
+Der normale Produktionspfad verwendet jetzt einen
+`PersistentHidrawFrameSender` mit genau einer `PersistentHidrawSession` pro
+Refreshworker. Alle Production-Gates laufen vor dem einzigen Open und die
+FD-/Zielbindung wird direkt danach einmal revalidiert. Frames verwenden
+anschließend denselben exklusiven FD. Stop, Quit oder der erste
+Write-/Disconnect-/Short-Write-Fehler führen über das Worker-`finally` zu
+genau einem Close; es gibt keinen Retry, Reconnect, Pfadwechsel, zweiten Handle
+oder parallelen Write. Der globale Sender-Lock wird über die gesamte Session
+gehalten.
+
+`send_frame_once()` bleibt als Legacy-/Einzelbildpfad mit
+`open → Frame → close` verfügbar. Legacy und Production teilen Segmentbau und
+die weiterhin einzige `os.write()`-Callsite; Reportbytes und Reihenfolge sind
+offline byteidentisch geprüft. Das bestätigte 0x08-Protokoll blieb unverändert.
+
+Die neue payloadfreie JSONL-Diagnostik erfasst einmalige Session-Open-/Close-
+Zeiten sowie pro Frame alle einzelnen Writezeiten, Write-Summe und komplette
+Framezeit. Segmentzeiten werden im Speicher gesammelt und erst nach dem Frame
+geschrieben; zwischen Writes gibt es kein Log-I/O und kein `fsync()`.
+
+Der Encoder bleibt Qualität 60, 4:2:0, Baseline, non-progressive und ohne
+Optimierung. Eine reine Offline-Stichprobe bei Qualität 60/50/40 ist
+dokumentiert, der Default wurde nicht verändert. sysfs meldet für Interface 1
+EP 0x03 OUT als Interruptendpoint mit 1024 Byte, 125 µs Intervall und das
+Gerät mit `speed=480`. Das ist nur ein Descriptorbefund, keine Erklärung der
+realen hidraw-Leistung.
+
+Die vollständige Offline-Suite bestand nach dieser Änderung mit 237 Tests;
+`compileall` und `git diff --check` waren sauber. Es gab keine reale
+Gerätekommunikation, keinen HID-/USB-Write und keinen Live-Test. Details:
+`research/reports/hidraw-transport-performance.md`.
+
 ## Ziel und Grenze
 
 Ziel ist eine native Linux-Steuerung für das LCD der ASUS TUF Gaming LC III

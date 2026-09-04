@@ -7,6 +7,7 @@ import importlib.util
 import io
 import sys
 import tempfile
+import threading
 import unittest
 from dataclasses import replace
 from pathlib import Path
@@ -495,6 +496,177 @@ class ReusableTransportTests(unittest.TestCase):
                     _jpeg(total_length=(count - 1) * 1020 + 1)
                 )
                 self.assertEqual(info.segment_count, count)
+
+
+class PersistentHidrawSessionTests(unittest.TestCase):
+    @staticmethod
+    def _device(**changes: object) -> object:
+        device = TRANSPORT.HidrawInterface(
+            device_path="/dev/hidraw-never-opened",
+            sysfs_path="/sys/class/hidraw/hidraw-never-opened",
+            interface_number=1,
+            manufacturer="ASUS",
+            product="TUF AIO",
+            serial=None,
+            vendor_id="0b05",
+            product_id="1c7b",
+            input_report_bytes=16,
+            output_report_bytes=1024,
+            feature_report_bytes=None,
+            report_ids=(),
+            readable=False,
+            udev_properties={},
+        )
+        return replace(device, **changes)
+
+    def test_one_open_many_frames_one_close_and_legacy_identical_reports(self) -> None:
+        jpeg = _jpeg(total_length=2041)
+        expected = [segment.hidraw_buffer for segment in TRANSPORT.build_segments(jpeg)]
+        writes: list[bytes] = []
+        with (
+            mock.patch.object(TRANSPORT.os, "access", return_value=True),
+            mock.patch.object(TRANSPORT.os, "open", return_value=123) as opened,
+            mock.patch.object(TRANSPORT, "validate_open_target"),
+            mock.patch.object(
+                TRANSPORT.os,
+                "write",
+                side_effect=lambda _fd, report: writes.append(report) or len(report),
+            ),
+            mock.patch.object(TRANSPORT.os, "close") as closed,
+        ):
+            session = TRANSPORT.PersistentHidrawSession(self._device())
+            session.open()
+            self.assertEqual(session.send_frame(jpeg), 3)
+            self.assertEqual(session.send_frame(jpeg), 3)
+            session.close()
+
+        opened.assert_called_once()
+        closed.assert_called_once_with(123)
+        self.assertEqual(writes, expected + expected)
+        self.assertTrue(all(report[1] == 0x08 for report in writes))
+
+    def test_persistent_and_legacy_paths_write_byte_identical_report_order(self) -> None:
+        jpeg = _jpeg(total_length=3061)
+        legacy: list[bytes] = []
+        persistent: list[bytes] = []
+        with (
+            mock.patch.object(TRANSPORT.os, "access", return_value=True),
+            mock.patch.object(TRANSPORT.os, "open", return_value=123),
+            mock.patch.object(TRANSPORT, "validate_open_target"),
+            mock.patch.object(TRANSPORT.os, "close"),
+            mock.patch.object(
+                TRANSPORT.os,
+                "write",
+                side_effect=lambda _fd, report: legacy.append(report) or len(report),
+            ),
+        ):
+            self.assertEqual(TRANSPORT.send_frame_once(self._device(), jpeg), 4)
+        with (
+            mock.patch.object(TRANSPORT.os, "access", return_value=True),
+            mock.patch.object(TRANSPORT.os, "open", return_value=124),
+            mock.patch.object(TRANSPORT, "validate_open_target"),
+            mock.patch.object(TRANSPORT.os, "close"),
+            mock.patch.object(
+                TRANSPORT.os,
+                "write",
+                side_effect=lambda _fd, report: persistent.append(report) or len(report),
+            ),
+        ):
+            with TRANSPORT.PersistentHidrawSession(self._device()) as session:
+                self.assertEqual(session.send_frame(jpeg), 4)
+        self.assertEqual(persistent, legacy)
+
+    def test_session_cannot_reopen_and_second_session_cannot_overlap(self) -> None:
+        with (
+            mock.patch.object(TRANSPORT.os, "access", return_value=True),
+            mock.patch.object(TRANSPORT.os, "open", return_value=123) as opened,
+            mock.patch.object(TRANSPORT, "validate_open_target"),
+            mock.patch.object(TRANSPORT.os, "close"),
+        ):
+            first = TRANSPORT.PersistentHidrawSession(self._device())
+            second = TRANSPORT.PersistentHidrawSession(self._device())
+            first.open()
+            with self.assertRaisesRegex(TRANSPORT.LcdTransportError, "anderer"):
+                second.open()
+            first.close()
+            with self.assertRaisesRegex(TRANSPORT.LcdTransportError, "nicht erneut"):
+                first.open()
+        opened.assert_called_once()
+
+    def test_interface_zero_and_openrgb_identity_fail_before_open(self) -> None:
+        for changes in ({"interface_number": 0}, {"product_id": "19af"}):
+            with self.subTest(changes=changes), mock.patch.object(
+                TRANSPORT.os,
+                "open",
+                side_effect=AssertionError("open reached"),
+            ) as opened:
+                session = TRANSPORT.PersistentHidrawSession(
+                    self._device(**changes)
+                )
+                with self.assertRaises(TRANSPORT.LcdTransportError):
+                    session.open()
+                opened.assert_not_called()
+
+    def test_write_error_has_no_retry_and_controller_closes_without_reconnect(self) -> None:
+        jpeg = _jpeg(total_length=2041)
+        with (
+            mock.patch.object(TRANSPORT.os, "access", return_value=True),
+            mock.patch.object(TRANSPORT.os, "open", return_value=123) as opened,
+            mock.patch.object(TRANSPORT, "validate_open_target"),
+            mock.patch.object(
+                TRANSPORT.os, "write", side_effect=OSError("device disconnected")
+            ) as write,
+            mock.patch.object(TRANSPORT.os, "close") as closed,
+        ):
+            import lcd_refresh
+
+            sender = lcd_refresh.PersistentHidrawFrameSender(self._device())
+            controller = lcd_refresh.RefreshController(
+                lcd_refresh.RefreshPlan(
+                    frames=(lcd_refresh.RefreshFrame(jpeg),),
+                    transport_interval_seconds=0.01,
+                    max_duration_seconds=None,
+                    max_frames=None,
+                ),
+                sender,
+            )
+            controller.start()
+            result = controller.wait(1.0)
+
+        assert result is not None
+        self.assertEqual(result.stop_reason.value, "send-error")
+        self.assertEqual(write.call_count, 1)
+        opened.assert_called_once()
+        closed.assert_called_once_with(123)
+
+    def test_parallel_frame_call_is_rejected_while_first_write_is_active(self) -> None:
+        jpeg = _jpeg(total_length=2041)
+        entered = threading.Event()
+        release = threading.Event()
+
+        def blocking_write(_fd: int, report: bytes) -> int:
+            entered.set()
+            self.assertTrue(release.wait(1.0))
+            return len(report)
+
+        with (
+            mock.patch.object(TRANSPORT.os, "access", return_value=True),
+            mock.patch.object(TRANSPORT.os, "open", return_value=123),
+            mock.patch.object(TRANSPORT, "validate_open_target"),
+            mock.patch.object(TRANSPORT.os, "write", side_effect=blocking_write),
+            mock.patch.object(TRANSPORT.os, "close"),
+        ):
+            session = TRANSPORT.PersistentHidrawSession(self._device())
+            session.open()
+            worker = threading.Thread(target=session.send_frame, args=(jpeg,))
+            worker.start()
+            self.assertTrue(entered.wait(1.0))
+            with self.assertRaisesRegex(TRANSPORT.LcdTransportError, "parallel"):
+                session.send_frame(jpeg)
+            release.set()
+            worker.join(1.0)
+            session.close()
+        self.assertFalse(worker.is_alive())
 
 
 class SingleImageCliTests(unittest.TestCase):

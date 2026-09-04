@@ -55,6 +55,107 @@ def read_entries(path: Path) -> list[dict[str, object]]:
 
 
 class RefreshDiagnosticsTests(unittest.TestCase):
+    def test_persistent_session_records_open_each_write_frame_and_close_timings(
+        self,
+    ) -> None:
+        class Clock:
+            now = 0.0
+
+            def __call__(self) -> float:
+                return self.now
+
+            def advance(self, seconds: float) -> None:
+                self.now += seconds
+
+            def wait(self, event: threading.Event, timeout: float) -> bool:
+                self.now += timeout
+                return event.is_set()
+
+        clock = Clock()
+        write_durations = iter((0.010, 0.020, 0.030))
+
+        def open_fd(*_: object) -> int:
+            clock.advance(0.004)
+            return 123
+
+        def validate_target(*_: object, **__: object) -> None:
+            clock.advance(0.002)
+
+        def write_report(_: int, report: bytes) -> int:
+            clock.advance(next(write_durations))
+            return len(report)
+
+        def close_fd(_: int) -> None:
+            clock.advance(0.005)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "persistent.jsonl"
+            diagnostics = refresh_diagnostics.JsonlRefreshDiagnostics(
+                path, clock=clock
+            )
+            sender = lcd_refresh.PersistentHidrawFrameSender(
+                valid_device(), diagnostics=diagnostics, clock=clock
+            )
+            jpeg = REFERENCE_PATH.read_bytes()
+            controller = lcd_refresh.RefreshController(
+                lcd_refresh.RefreshPlan(
+                    frames=(lcd_refresh.RefreshFrame(jpeg),),
+                    transport_interval_seconds=1.0,
+                    max_duration_seconds=None,
+                    max_frames=1,
+                ),
+                sender,
+                clock=clock,
+                wait_function=clock.wait,
+            )
+            with (
+                mock.patch.object(lcd_transport.os, "access", return_value=True),
+                mock.patch.object(lcd_transport.os, "open", side_effect=open_fd),
+                mock.patch.object(
+                    lcd_transport, "validate_open_target", side_effect=validate_target
+                ),
+                mock.patch.object(lcd_transport.os, "write", side_effect=write_report),
+                mock.patch.object(lcd_transport.os, "close", side_effect=close_fd),
+                mock.patch.object(
+                    lcd_transport.os,
+                    "fsync",
+                    side_effect=AssertionError("fsync called"),
+                    create=True,
+                ),
+            ):
+                controller.start()
+                result = controller.wait(1.0)
+
+            assert result is not None
+            self.assertEqual(result.stop_reason, lcd_refresh.RefreshStopReason.MAX_FRAMES)
+            entries = read_entries(path)
+            opened = next(
+                entry for entry in entries if entry["event"] == "persistent_session_opened"
+            )
+            frame = next(
+                entry
+                for entry in entries
+                if entry["event"] == "persistent_frame_send_returned"
+            )
+            closed = next(
+                entry for entry in entries if entry["event"] == "persistent_session_closed"
+            )
+            self.assertAlmostEqual(opened["open_duration_seconds"], 0.004)
+            self.assertAlmostEqual(opened["session_open_duration_seconds"], 0.006)
+            self.assertEqual(frame["segment_write_indices"], [0, 1, 2])
+            for observed, expected in zip(
+                frame["segment_write_durations_seconds"],
+                (0.01, 0.02, 0.03),
+                strict=True,
+            ):
+                self.assertAlmostEqual(observed, expected)
+            self.assertAlmostEqual(frame["write_total_duration_seconds"], 0.06)
+            self.assertAlmostEqual(frame["send_frame_duration_seconds"], 0.06)
+            self.assertAlmostEqual(closed["close_duration_seconds"], 0.005)
+            self.assertTrue(
+                all("payload" not in json.dumps(entry) for entry in entries)
+            )
+
     def test_default_log_directory_uses_absolute_xdg_state_home(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             state_home = Path(directory) / "state"

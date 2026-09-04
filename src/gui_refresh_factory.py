@@ -67,9 +67,11 @@ def build_gui_production_plan(
 def _production_sender(
     device: HidrawInterface,
     diagnostics: refresh_diagnostics.RefreshDiagnostics,
-) -> lcd_refresh.HidrawFrameSender:
-    return lcd_refresh.HidrawFrameSender(
+) -> lcd_refresh.PersistentHidrawFrameSender:
+    return lcd_refresh.PersistentHidrawFrameSender(
         device,
+        # Repeat the complete gate immediately around the one session open;
+        # unlike the legacy path it is never rerun between segment writes.
         extra_validator=lcd_runtime_safety.runtime_device_error,
         diagnostics=diagnostics,
     )

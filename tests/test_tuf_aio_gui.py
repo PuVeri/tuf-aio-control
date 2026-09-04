@@ -991,7 +991,6 @@ class TufAioGuiOfflineTests(unittest.TestCase):
             diagnostics = refresh_diagnostics.JsonlRefreshDiagnostics(log_path)
             clock = FastClock()
             controllers: list[lcd_refresh.RefreshController] = []
-            send_calls = 0
             fake_writes = 0
             active_sends = 0
             maximum_active = 0
@@ -1018,27 +1017,20 @@ class TufAioGuiOfflineTests(unittest.TestCase):
                 controller_builder=build_controller,
             )
 
-            def fake_send_once(
-                device: lcd_transport.HidrawInterface,
-                jpeg: bytes,
-                **kwargs: object,
-            ) -> int:
-                nonlocal send_calls, fake_writes, active_sends, maximum_active
-                self.assertEqual(device.interface_number, 1)
-                observer = kwargs["write_observer"]
-                segments = lcd_transport.build_segments(jpeg)
-                send_calls += 1
+            def fake_write(fd: int, report: bytes) -> int:
+                nonlocal fake_writes, active_sends, maximum_active
+                self.assertEqual(fd, 123)
+                self.assertEqual(len(report), 1025)
+                self.assertEqual(report[1], 0x08)
                 active_sends += 1
                 maximum_active = max(maximum_active, active_sends)
                 try:
-                    for segment in segments:
-                        observer(segment)  # type: ignore[operator]
-                        fake_writes += 1
+                    fake_writes += 1
                 finally:
                     active_sends -= 1
-                if send_calls == 35:
+                if fake_writes == 105:
                     controllers[0].request_stop()
-                return len(segments)
+                return len(report)
 
             window = self._window(
                 controller_factory=factory,
@@ -1048,20 +1040,27 @@ class TufAioGuiOfflineTests(unittest.TestCase):
                 self.assertTrue(window.load_image(REFERENCE_PATH))
                 with (
                     mock.patch.object(
-                        lcd_refresh.lcd_transport,
-                        "send_frame_once",
-                        side_effect=fake_send_once,
+                        lcd_runtime_safety,
+                        "runtime_device_error",
+                        return_value=None,
                     ),
                     mock.patch.object(
                         lcd_transport.os,
                         "open",
-                        side_effect=AssertionError("real hidraw open called"),
-                    ) as real_open,
+                        return_value=123,
+                    ) as hidraw_open,
+                    mock.patch.object(lcd_transport.os, "access", return_value=True),
+                    mock.patch.object(lcd_transport, "validate_open_target"),
+                    mock.patch.object(
+                        lcd_transport.os, "write", side_effect=fake_write
+                    ),
+                    mock.patch.object(lcd_transport.os, "close") as hidraw_close,
                 ):
                     window.start_lcd_button.click()
                     self._wait_until(lambda: bool(controllers[0].result))
                     window._poll_refresh_controller()
-                real_open.assert_not_called()
+                hidraw_open.assert_called_once()
+                hidraw_close.assert_called_once_with(123)
 
                 result = controllers[0].result
                 assert result is not None
@@ -1070,7 +1069,6 @@ class TufAioGuiOfflineTests(unittest.TestCase):
                     result.stop_reason, lcd_refresh.RefreshStopReason.EXPLICIT_STOP
                 )
                 self.assertGreater(result.elapsed_seconds, 30.0)
-                self.assertEqual(send_calls, 35)
                 self.assertEqual(fake_writes, 105)
                 self.assertEqual(maximum_active, 1)
 
@@ -1084,18 +1082,19 @@ class TufAioGuiOfflineTests(unittest.TestCase):
                 self.assertIn("refresh_controller_created", events)
                 self.assertIn("worker_started", events)
                 self.assertEqual(events.count("frame_snapshot"), 35)
-                self.assertEqual(events.count("send_frame_once_called"), 35)
+                self.assertEqual(events.count("persistent_frame_send_called"), 35)
                 returned = [
                     entry
                     for entry in entries
-                    if entry["event"] == "send_frame_once_returned"
+                    if entry["event"] == "persistent_frame_send_returned"
                 ]
                 self.assertEqual(len(returned), 35)
                 self.assertEqual(
                     sum(entry["completed_segments"] for entry in returned), 105
                 )
                 self.assertEqual(events.count("frame_count_advanced"), 35)
-                self.assertIn("handle_closed", events)
+                self.assertEqual(events.count("persistent_session_opened"), 1)
+                self.assertEqual(events.count("persistent_session_closed"), 1)
                 self.assertIn("worker_ended", events)
                 terminal = next(
                     entry for entry in entries if entry["event"] == "session_stopped"

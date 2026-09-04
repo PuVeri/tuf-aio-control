@@ -7,6 +7,7 @@ import hashlib
 import os
 import stat
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Sequence
@@ -512,6 +513,7 @@ def _sysfs_device_number(device: HidrawInterface) -> int:
 DeviceValidator = Callable[[HidrawInterface], str | None]
 TransferValidator = Callable[[], None]
 WriteObserver = Callable[[TransferSegment], None]
+TimedWriteObserver = Callable[[TransferSegment, float], None]
 
 
 def validate_open_target(
@@ -572,6 +574,23 @@ def load_jpeg(path: Path, *, max_segments: int = MAX_SEGMENTS) -> bytes:
     return data
 
 
+def _write_segment(fd: int, segment: TransferSegment) -> None:
+    """Use the single shared hidraw write callsite for either lifecycle."""
+    try:
+        written = os.write(fd, segment.hidraw_buffer)
+    except PermissionError:
+        raise
+    except OSError as error:
+        raise LcdTransportError(
+            f"Write für Segment {segment.index} fehlgeschlagen: {error}"
+        ) from error
+    if written != HIDRAW_WRITE_BYTES:
+        raise LcdTransportError(
+            f"Short Write bei Segment {segment.index}: "
+            f"{written} statt {HIDRAW_WRITE_BYTES} Byte; kein Nachsenden"
+        )
+
+
 def send_frame_once(
     device: HidrawInterface,
     jpeg: bytes,
@@ -626,19 +645,7 @@ def send_frame_once(
                     extra_validator=extra_validator,
                 )
                 validate_transfer_invariants(jpeg, segments)
-                try:
-                    written = os.write(fd, segment.hidraw_buffer)
-                except PermissionError:
-                    raise
-                except OSError as error:
-                    raise LcdTransportError(
-                        f"Write für Segment {segment.index} fehlgeschlagen: {error}"
-                    ) from error
-                if written != HIDRAW_WRITE_BYTES:
-                    raise LcdTransportError(
-                        f"Short Write bei Segment {segment.index}: "
-                        f"{written} statt {HIDRAW_WRITE_BYTES} Byte; kein Nachsenden"
-                    )
+                _write_segment(fd, segment)
                 completed += 1
                 if write_observer is not None:
                     write_observer(segment)
@@ -647,3 +654,143 @@ def send_frame_once(
             os.close(fd)
     finally:
         _FRAME_SEND_LOCK.release()
+
+
+class PersistentHidrawSession:
+    """One validated hidraw handle owned by exactly one refresh session."""
+
+    def __init__(
+        self,
+        device: HidrawInterface,
+        *,
+        extra_validator: DeviceValidator | None = None,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        if not callable(clock):
+            raise TypeError("clock muss aufrufbar sein")
+        self.device = device
+        self.extra_validator = extra_validator
+        self._clock = clock
+        self._fd: int | None = None
+        self._ever_opened = False
+        self._session_lock_held = False
+        self._write_lock = threading.Lock()
+        self.open_duration_seconds: float | None = None
+        self.close_duration_seconds: float | None = None
+
+    @property
+    def is_open(self) -> bool:
+        return self._fd is not None
+
+    def open(self) -> None:
+        """Open and revalidate once; a closed session cannot reconnect."""
+        if self._ever_opened or self._fd is not None:
+            raise LcdTransportError("Persistente HID-Session kann nicht erneut öffnen")
+        if not _FRAME_SEND_LOCK.acquire(blocking=False):
+            raise LcdTransportError("Ein anderer Frame-Sender ist bereits aktiv")
+        self._session_lock_held = True
+        fd: int | None = None
+        try:
+            error = device_validation_error(self.device)
+            if error is not None:
+                raise LcdTransportError(error)
+            if self.extra_validator is not None:
+                error = self.extra_validator(self.device)
+                if error is not None:
+                    raise LcdTransportError(error)
+            if not os.access(self.device.device_path, os.W_OK):
+                raise PermissionError(
+                    "Keine Schreibberechtigung; Rechte wurden nicht verändert"
+                )
+            flags = os.O_WRONLY | os.O_NONBLOCK
+            flags |= getattr(os, "O_CLOEXEC", 0)
+            flags |= getattr(os, "O_NOFOLLOW", 0)
+            open_started = self._clock()
+            fd = os.open(self.device.device_path, flags)
+            self.open_duration_seconds = max(0.0, self._clock() - open_started)
+            validate_open_target(
+                fd,
+                self.device,
+                extra_validator=self.extra_validator,
+            )
+            self._fd = fd
+            self._ever_opened = True
+        except BaseException:
+            try:
+                if fd is not None:
+                    os.close(fd)
+            finally:
+                self._release_session_lock()
+            raise
+
+    def send_frame(
+        self,
+        jpeg: bytes,
+        *,
+        prepared_segments: Sequence[TransferSegment] | None = None,
+        write_observer: TimedWriteObserver | None = None,
+    ) -> int:
+        """Write one complete frame serially on the already-open descriptor."""
+        fd = self._fd
+        if fd is None:
+            raise LcdTransportError("Persistente HID-Session ist nicht geöffnet")
+        if not self._write_lock.acquire(blocking=False):
+            raise LcdTransportError("Ein paralleler Frame-Write wurde abgewiesen")
+        try:
+            validate_jpeg(jpeg)
+            segments = (
+                tuple(prepared_segments)
+                if prepared_segments is not None
+                else build_segments(jpeg)
+            )
+            validate_transfer_invariants(jpeg, segments)
+            completed = 0
+            for segment in segments:
+                write_started = self._clock()
+                try:
+                    _write_segment(fd, segment)
+                except BaseException:
+                    if write_observer is not None:
+                        write_observer(
+                            segment,
+                            max(0.0, self._clock() - write_started),
+                        )
+                    raise
+                write_duration = max(0.0, self._clock() - write_started)
+                completed += 1
+                if write_observer is not None:
+                    write_observer(segment, write_duration)
+            return completed
+        finally:
+            self._write_lock.release()
+
+    def close(self) -> None:
+        """Close the owned descriptor at most once and never reopen it."""
+        fd = self._fd
+        if fd is None:
+            return
+        self._write_lock.acquire()
+        try:
+            self._fd = None
+            close_started = self._clock()
+            try:
+                os.close(fd)
+            finally:
+                self.close_duration_seconds = max(
+                    0.0, self._clock() - close_started
+                )
+                self._release_session_lock()
+        finally:
+            self._write_lock.release()
+
+    def _release_session_lock(self) -> None:
+        if self._session_lock_held:
+            self._session_lock_held = False
+            _FRAME_SEND_LOCK.release()
+
+    def __enter__(self) -> PersistentHidrawSession:
+        self.open()
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        self.close()

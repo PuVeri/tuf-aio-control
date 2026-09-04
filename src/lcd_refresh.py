@@ -339,6 +339,111 @@ class HidrawFrameSender:
         return written
 
 
+class PersistentHidrawFrameSender:
+    """Diagnostic adapter for one production-owned persistent hidraw handle."""
+
+    def __init__(
+        self,
+        device: lcd_transport.HidrawInterface,
+        *,
+        extra_validator: lcd_transport.DeviceValidator | None = None,
+        diagnostics: refresh_diagnostics.RefreshDiagnostics = (
+            refresh_diagnostics.NULL_DIAGNOSTICS
+        ),
+        clock: Callable[[], float] = time.monotonic,
+        session: lcd_transport.PersistentHidrawSession | None = None,
+    ) -> None:
+        self.device = device
+        self.extra_validator = extra_validator
+        self.diagnostics = diagnostics
+        self.clock = clock
+        self.session = session or lcd_transport.PersistentHidrawSession(
+            device,
+            extra_validator=extra_validator,
+            clock=clock,
+        )
+
+    def open(self) -> None:
+        self.diagnostics.record("persistent_session_open_called")
+        started_at = self.clock()
+        try:
+            self.session.open()
+        except Exception as error:
+            self.diagnostics.record(
+                "persistent_session_open_failed",
+                session_open_duration_seconds=max(0.0, self.clock() - started_at),
+            )
+            self.diagnostics.record_exception("persistent_session_open", error)
+            raise
+        self.diagnostics.record(
+            "persistent_session_opened",
+            session_open_duration_seconds=max(0.0, self.clock() - started_at),
+            open_duration_seconds=self.session.open_duration_seconds,
+        )
+
+    def __call__(self, jpeg: bytes) -> int:
+        info = lcd_transport.validate_jpeg(jpeg)
+        segment_indices: list[int] = []
+        segment_durations: list[float] = []
+
+        def observe_write(
+            segment: lcd_transport.TransferSegment,
+            duration_seconds: float,
+        ) -> None:
+            segment_indices.append(segment.index)
+            segment_durations.append(duration_seconds)
+
+        self.diagnostics.record(
+            "persistent_frame_send_called",
+            planned_segments=info.segment_count,
+        )
+        started_at = self.clock()
+        try:
+            written = self.session.send_frame(jpeg, write_observer=observe_write)
+        except Exception as error:
+            self.diagnostics.record(
+                "persistent_frame_send_failed",
+                planned_segments=info.segment_count,
+                completed_segments=max(0, len(segment_durations) - 1),
+                segment_write_indices=segment_indices,
+                segment_write_durations_seconds=segment_durations,
+                write_total_duration_seconds=sum(segment_durations),
+                send_frame_duration_seconds=max(0.0, self.clock() - started_at),
+            )
+            self.diagnostics.record_exception("persistent_frame_send", error)
+            raise
+        self.diagnostics.record(
+            "persistent_frame_send_returned",
+            planned_segments=info.segment_count,
+            completed_segments=written,
+            segment_write_indices=segment_indices,
+            segment_write_durations_seconds=segment_durations,
+            write_total_duration_seconds=sum(segment_durations),
+            send_frame_duration_seconds=max(0.0, self.clock() - started_at),
+        )
+        return written
+
+    def close(self) -> None:
+        if not self.session.is_open:
+            return
+        started_at = self.clock()
+        try:
+            self.session.close()
+        except Exception as error:
+            self.diagnostics.record(
+                "persistent_session_close_failed",
+                session_close_duration_seconds=max(0.0, self.clock() - started_at),
+                close_duration_seconds=self.session.close_duration_seconds,
+            )
+            self.diagnostics.record_exception("persistent_session_close", error)
+            raise
+        self.diagnostics.record(
+            "persistent_session_closed",
+            session_close_duration_seconds=max(0.0, self.clock() - started_at),
+            close_duration_seconds=self.session.close_duration_seconds,
+        )
+
+
 _ACTIVE_REFRESH_LOCK = threading.Lock()
 
 
@@ -461,8 +566,13 @@ class RefreshController:
 
     def _thread_main(self) -> None:
         result: RefreshResult | None = None
+        sender_opened = False
         self._diagnostics.record("worker_started")
         try:
+            open_sender = getattr(self._sender, "open", None)
+            if callable(open_sender):
+                open_sender()
+                sender_opened = True
             result = self._run_loop()
         except Exception as error:
             self._diagnostics.record_exception("refresh_worker", error)
@@ -475,6 +585,27 @@ class RefreshController:
                 error=error,
             )
         finally:
+            close_sender = getattr(self._sender, "close", None)
+            if sender_opened and callable(close_sender):
+                try:
+                    close_sender()
+                except Exception as error:
+                    self._diagnostics.record_exception("refresh_sender_close", error)
+                    if result is None or result.error is None:
+                        result = RefreshResult(
+                            stop_reason=RefreshStopReason.INTERNAL_ERROR,
+                            frames_sent=(0 if result is None else result.frames_sent),
+                            elapsed_seconds=(
+                                0.0 if result is None else result.elapsed_seconds
+                            ),
+                            transfer_durations=(
+                                () if result is None else result.transfer_durations
+                            ),
+                            frame_indices=(
+                                () if result is None else result.frame_indices
+                            ),
+                            error=error,
+                        )
             if result is not None:
                 self._diagnostics.record(
                     "session_stopped",
