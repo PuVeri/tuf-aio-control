@@ -454,8 +454,10 @@ class ImagePipelineOfflineTests(unittest.TestCase):
         )
         self.assertEqual(
             [item.center for item in placements],
-            [(108, 110), (212, 110), (108, 242), (212, 242)],
+            [(102, 105), (218, 105), (102, 247), (218, 247)],
         )
+        self.assertGreater(218 - 102, 212 - 108)
+        self.assertGreater(247 - 105, 242 - 110)
         for index, first in enumerate(placements):
             for second in placements[index + 1 :]:
                 horizontal_gap = max(
@@ -482,6 +484,46 @@ class ImagePipelineOfflineTests(unittest.TestCase):
                 )
                 self.assertEqual(len(visible), 3)
                 self.assertNotIn(disabled, {item.sensor for item in visible})
+
+    def test_every_metric_fits_every_outward_slot_at_extreme_values(self) -> None:
+        import telemetry
+
+        slot_names = ("top_left", "top_right", "bottom_left", "bottom_right")
+        config = image_pipeline.TemperatureOverlayConfig(enabled=True)
+        for definition in telemetry.METRIC_DEFINITIONS:
+            if definition.metric_id is telemetry.MetricId.OFF:
+                continue
+            for value in (None, 0.0, 100.0):
+                metric = telemetry.MetricValue(
+                    definition.metric_id,
+                    definition.display_label,
+                    value,
+                    definition.unit,
+                )
+                for slot_name in slot_names:
+                    with self.subTest(
+                        metric=definition.metric_id,
+                        value=value,
+                        slot=slot_name,
+                    ):
+                        slots = image_pipeline.OverlaySlots(**{slot_name: metric})
+                        placement = image_pipeline.layout_data_overlay(
+                            slots, config
+                        )[0]
+                        left, top, right, bottom = placement.bounds
+                        safe_left, safe_top, safe_right, safe_bottom = (
+                            image_pipeline.OVERLAY_SAFE_BOUNDS
+                        )
+                        self.assertGreaterEqual(left, safe_left)
+                        self.assertGreaterEqual(top, safe_top)
+                        self.assertLessEqual(right, safe_right)
+                        self.assertLessEqual(bottom, safe_bottom)
+                        for x in (left, right):
+                            for y in (top, bottom):
+                                self.assertLessEqual(
+                                    math.hypot(x - 160, y - 160),
+                                    image_pipeline.OVERLAY_ROUND_SAFE_RADIUS,
+                                )
 
     def test_overlay_is_composed_before_rotation_and_jpeg_validation(self) -> None:
         import telemetry

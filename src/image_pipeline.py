@@ -353,20 +353,26 @@ def layout_data_overlay(
     canvas = Image.new("RGB", OUTPUT_SIZE)
     draw = ImageDraw.Draw(canvas)
     specs = (
-        ("top_left", slots.top_left, (108, 78), (108, 110), config.colors.cpu_package),
-        ("top_right", slots.top_right, (212, 78), (212, 110), config.colors.gpu),
+        (
+            "top_left",
+            slots.top_left,
+            (102, 73),
+            (102, 105),
+            config.colors.cpu_package,
+        ),
+        ("top_right", slots.top_right, (218, 73), (218, 105), config.colors.gpu),
         (
             "bottom_left",
             slots.bottom_left,
-            (108, 210),
-            (108, 242),
+            (102, 215),
+            (102, 247),
             config.colors.cpu_ccd,
         ),
         (
             "bottom_right",
             slots.bottom_right,
-            (212, 210),
-            (212, 242),
+            (218, 215),
+            (218, 247),
             config.colors.cpu_ccd,
         ),
     )

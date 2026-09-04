@@ -22,6 +22,62 @@ Kanonischer Live-Stand vom 2026-09-03:
 
 Stand: 2026-09-03
 
+## Offline-Stand: kontinuierlicher GUI-Dauerbetrieb
+
+Stand: 2026-09-04
+
+Der normale GUI-Produktionsbetrieb besitzt keinen 30-s-/30-Frame-Hardcap mehr.
+Ein ausdrücklicher Klick auf `LCD starten` erzeugt genau eine Refreshsession,
+die mit 1,0 s zwischen Frame-Startzeitpunkten bis `LCD stoppen`, einem sauberen
+Fensterschluss oder dem ersten Fehler läuft. Es gibt keinen Autostart,
+automatischen Neustart, Retry, Reconnect, Catch-up, parallelen Transfer oder
+eine Framequeue. Das begrenzte Entwicklungsprofil und das feste Profil des
+ersten Refresh-Livetests bleiben für ihre Offline-/Testzwecke separat erhalten.
+
+`LCD stoppen` fordert über `request_stop()` nicht blockierend das Ende an. Ein
+bereits laufender Frame darf vollständig abgeschlossen werden; danach beendet
+sich der Worker und das durch `send_frame_once()` verwaltete Handle ist
+geschlossen. Beim Fensterschluss wartet die GUI ausschließlich über die
+Qt-Ereignisschleife auf dieses terminale Ergebnis und hängt nicht blockierend.
+
+Der erste Transportfehler beendet die Session ohne Retry oder Reconnect und
+führt zum GUI-State `error` mit sichtbarer Fehlermeldung. Der letzte gültige
+`LatestFrameBuffer`-Snapshot bleibt dabei unverändert. Nach der bewussten Aktion
+`Fehler bestätigen` ist eine neue Session wieder möglich.
+
+Die sichtbare Entwicklungscheckbox `Hardware-Livebetrieb freigeben` wurde als
+redundante Freigabe entfernt. `LCD starten` bleibt die notwendige explizite
+Benutzeraktion. Alle Production-Safety-Gates sind unverändert aktiv: exakt
+`0b05:1c7b`, Interface 1, `bcdDevice 0x0049`, Usage `ff06/01`, bekannte
+Reportgrößen, keine Feature-Reports, dynamischer hidraw-Pfad und Prüfung auf
+konkurrierende Writer. `lcd_transport.py` und das bestätigte `0x08`-Protokoll
+wurden nicht verändert.
+
+Das symmetrische 2×2-Telemetrielayout liegt nun weiter außen. Die
+Wertmittelpunkte sind oben `(102, 105)` und `(218, 105)`, unten `(102, 247)`
+und `(218, 247)`; die zugehörigen Labelmittelpunkte liegen bei y=73 und y=215.
+Alle verfügbaren Metrics einschließlich längerer Labels, Prozentwerten und
+Temperaturen bleiben geprüft innerhalb des runden Sicherheitsbereichs. Die
+vollständige Komposition rotiert weiterhin erst nach Basisbild und allen vier
+Overlays gemeinsam um 0°, 90°, 180° oder 270°. Preview und LCD-Snapshot
+verwenden weiterhin dieselben validierten JPEG-Bytes.
+
+Die JSONL-Transportdiagnostik wird nun bei 2 MiB pro Datei rotiert, behält drei
+Backups und begrenzt den Runtime-Logbestand insgesamt auf die 20 neuesten
+Dateien. Transportereignisse, Generationen, Segmentzahlen, Dauer, Fehler,
+Stopgrund, Workerende und Handle-Close bleiben enthalten; JPEG-Payloads und
+nicht benötigte Sensortelemetrie werden weiterhin nicht geloggt.
+
+Die vollständige Offline-Suite bestand mit 194 Tests; `compileall` und
+`git diff --check` waren sauber. Getestet wurden unter anderem mehr als 30
+Frames und mehr als 30 simulierte Sekunden ohne automatischen Stop,
+expliziter Stop, Fensterschluss, erster Transportfehler, fehlender Retry/
+Reconnect, fehlende Parallelität und Catch-up, dynamische Publikation ohne
+Sessionneustart, vollständige Safety-Gates, alle Slotmetriken, alle vier
+Rotationen und die Logbegrenzung. In diesem Ticket fanden keine
+Gerätekommunikation, keine HID-/USB-Writes und kein Live-Test statt. Details:
+`research/reports/lcd-continuous-runtime.md`.
+
 ## Ziel und Grenze
 
 Ziel ist eine native Linux-Steuerung für das LCD der ASUS TUF Gaming LC III

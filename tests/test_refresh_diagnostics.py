@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import tempfile
 import threading
@@ -54,6 +55,59 @@ def read_entries(path: Path) -> list[dict[str, object]]:
 
 
 class RefreshDiagnosticsTests(unittest.TestCase):
+    def test_jsonl_rotates_by_size_and_limits_backups(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "gui-refresh-test.jsonl"
+            diagnostics = refresh_diagnostics.JsonlRefreshDiagnostics(
+                path,
+                session_id="offline-session",
+                max_bytes=300,
+                backup_count=2,
+            )
+            for index in range(20):
+                diagnostics.record("frame_transfer_succeeded", frame_number=index)
+
+            files = sorted(path.parent.glob(f"{path.name}*"))
+            self.assertEqual(
+                [candidate.name for candidate in files],
+                [path.name, f"{path.name}.1", f"{path.name}.2"],
+            )
+            entries = [
+                json.loads(line)
+                for candidate in files
+                for line in candidate.read_text(encoding="utf-8").splitlines()
+            ]
+            self.assertTrue(entries)
+            self.assertTrue(
+                all(entry["session_id"] == "offline-session" for entry in entries)
+            )
+            self.assertTrue(
+                all(
+                    "jpeg_bytes" not in entry and "payload" not in entry
+                    for entry in entries
+                )
+            )
+
+    def test_runtime_log_retention_removes_oldest_files(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = [root / f"gui-refresh-{index:02d}.jsonl" for index in range(5)]
+            for index, path in enumerate(paths):
+                path.write_text("{}\n", encoding="utf-8")
+                path.touch()
+                path.chmod(0o600)
+                os.utime(path, (index + 1, index + 1))
+
+            with mock.patch.object(
+                refresh_diagnostics, "DEFAULT_RETAINED_LOG_FILES", 3
+            ):
+                refresh_diagnostics._prune_runtime_logs(root)
+
+            self.assertEqual(
+                sorted(path.name for path in root.glob("gui-refresh-*.jsonl")),
+                [path.name for path in paths[-3:]],
+            )
+
     def test_factory_gate_exception_is_persisted_with_phase_and_type(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "factory.jsonl"

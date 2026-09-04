@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bounded, explicit and offline-testable scheduling for LCD frame refreshes."""
+"""Explicit and offline-testable scheduling for LCD frame refreshes."""
 
 from __future__ import annotations
 
@@ -133,12 +133,12 @@ class LatestFrameBuffer:
 
 @dataclass(frozen=True)
 class RefreshPlan:
-    """Immutable frames plus explicit transport and session limits."""
+    """Immutable frames plus transport timing and optional session limits."""
 
     frames: tuple[RefreshFrame, ...]
     transport_interval_seconds: float
-    max_duration_seconds: float
-    max_frames: int
+    max_duration_seconds: float | None
+    max_frames: int | None
 
     def __post_init__(self) -> None:
         if not isinstance(self.frames, tuple) or not self.frames:
@@ -148,12 +148,16 @@ class RefreshPlan:
         if any(not isinstance(frame, RefreshFrame) for frame in self.frames):
             raise RefreshConfigurationError("RefreshPlan akzeptiert nur RefreshFrame-Einträge")
         _require_positive_finite(self.transport_interval_seconds, "Transportintervall")
-        _require_positive_finite(self.max_duration_seconds, "Maximale Laufzeit")
-        if self.max_duration_seconds > MAX_REFRESH_DURATION_SECONDS:
+        if self.max_duration_seconds is not None:
+            _require_positive_finite(self.max_duration_seconds, "Maximale Laufzeit")
+        if (
+            self.max_duration_seconds is not None
+            and self.max_duration_seconds > MAX_REFRESH_DURATION_SECONDS
+        ):
             raise RefreshConfigurationError(
                 f"Maximale Laufzeit darf {MAX_REFRESH_DURATION_SECONDS:g} s nicht überschreiten"
             )
-        if (
+        if self.max_frames is not None and (
             isinstance(self.max_frames, bool)
             or not isinstance(self.max_frames, int)
             or not 1 <= self.max_frames <= MAX_REFRESH_FRAME_COUNT
@@ -287,7 +291,7 @@ def _event_wait(event: threading.Event, timeout: float) -> bool:
 
 
 class RefreshController:
-    """Run one bounded refresh session on one non-daemon worker thread.
+    """Run one explicit refresh session on one non-daemon worker thread.
 
     The sender is synchronous. The controller never queues frames, never starts
     a second transfer while one is active and never retries a failed call.
@@ -424,7 +428,11 @@ class RefreshController:
 
     def _run_loop(self) -> RefreshResult:
         started_at = self._clock()
-        deadline = started_at + self._plan.max_duration_seconds
+        deadline = (
+            None
+            if self._plan.max_duration_seconds is None
+            else started_at + self._plan.max_duration_seconds
+        )
         sent = 0
         frame_index = 0
         visible_since: float | None = None
@@ -441,7 +449,7 @@ class RefreshController:
                     transfer_durations,
                     frame_indices,
                 )
-            if now >= deadline:
+            if deadline is not None and now >= deadline:
                 return self._result_for(
                     RefreshStopReason.MAX_DURATION,
                     started_at,
@@ -449,7 +457,10 @@ class RefreshController:
                     transfer_durations,
                     frame_indices,
                 )
-            if sent >= self._plan.max_frames:
+            if (
+                self._plan.max_frames is not None
+                and sent >= self._plan.max_frames
+            ):
                 return self._result_for(
                     RefreshStopReason.MAX_FRAMES,
                     started_at,
@@ -480,6 +491,14 @@ class RefreshController:
                 )
                 jpeg_bytes = snapshot.jpeg_bytes
                 jpeg_info = snapshot.jpeg_info
+            if self._stop_event.is_set():
+                return self._result_for(
+                    RefreshStopReason.EXPLICIT_STOP,
+                    started_at,
+                    sent,
+                    transfer_durations,
+                    frame_indices,
+                )
             transfer_started = self._clock()
             self._diagnostics.record(
                 "frame_transfer_begun",
@@ -537,7 +556,7 @@ class RefreshController:
             if frame_changed:
                 visible_since = transfer_finished
 
-            if transfer_finished >= deadline:
+            if deadline is not None and transfer_finished >= deadline:
                 return self._result_for(
                     RefreshStopReason.MAX_DURATION,
                     started_at,
@@ -545,7 +564,10 @@ class RefreshController:
                     transfer_durations,
                     frame_indices,
                 )
-            if sent >= self._plan.max_frames:
+            if (
+                self._plan.max_frames is not None
+                and sent >= self._plan.max_frames
+            ):
                 return self._result_for(
                     RefreshStopReason.MAX_FRAMES,
                     started_at,
@@ -555,7 +577,10 @@ class RefreshController:
                 )
 
             next_start = transfer_started + self._plan.transport_interval_seconds
-            wait_seconds = max(0.0, min(next_start, deadline) - transfer_finished)
+            next_wakeup = (
+                next_start if deadline is None else min(next_start, deadline)
+            )
+            wait_seconds = max(0.0, next_wakeup - transfer_finished)
             if wait_seconds > 0 and self._wait_function(self._stop_event, wait_seconds):
                 return self._result_for(
                     RefreshStopReason.EXPLICIT_STOP,

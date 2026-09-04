@@ -167,15 +167,8 @@ class MainWindow(QMainWindow):
         device_text.addWidget(self.device_detail_label)
         self.refresh_button = QPushButton("Gerät aktualisieren")
         self.refresh_button.clicked.connect(self.refresh_device_status)
-        self.hardware_live_checkbox = QCheckBox("Hardware-Livebetrieb freigeben")
-        self.hardware_live_checkbox.setChecked(False)
-        self.hardware_live_checkbox.setToolTip(
-            "Entwicklungsfreigabe für reale HID-Writes; standardmäßig aus"
-        )
-        self.hardware_live_checkbox.toggled.connect(self._apply_refresh_state)
         device_layout.addWidget(self.device_dot)
         device_layout.addLayout(device_text, 1)
-        device_layout.addWidget(self.hardware_live_checkbox)
         device_layout.addWidget(self.refresh_button)
         outer.addWidget(device_card)
 
@@ -806,15 +799,11 @@ class MainWindow(QMainWindow):
         for combo in self.slot_combos.values():
             combo.setEnabled(editable)
         self.refresh_button.setEnabled(editable)
-        self.hardware_live_checkbox.setEnabled(
-            self._refresh_state is GuiRefreshState.IDLE
-        )
         self.start_lcd_button.setEnabled(
             self._refresh_state is GuiRefreshState.IDLE
             and self._prepared is not None
             and self._device_ready
             and self._controller_factory is not None
-            and self.hardware_live_checkbox.isChecked()
         )
         self.stop_lcd_button.setEnabled(
             self._refresh_state is GuiRefreshState.RUNNING
@@ -842,12 +831,6 @@ class MainWindow(QMainWindow):
             return
         if self._prepared is None:
             self.status_label.setText("Status: LCD-Start benötigt einen gültigen Frame")
-            self._apply_refresh_state()
-            return
-        if not self.hardware_live_checkbox.isChecked():
-            self.status_label.setText(
-                "Status: Hardware-Livebetrieb muss ausdrücklich freigegeben werden"
-            )
             self._apply_refresh_state()
             return
         if self._controller_factory is None:

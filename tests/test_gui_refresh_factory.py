@@ -94,13 +94,15 @@ class ProductionControllerFactoryTests(unittest.TestCase):
         )
         device_open.assert_not_called()
 
-    def test_temporary_development_policy_is_exactly_one_hz_30s_30_frames(self) -> None:
+    def test_production_policy_is_one_hz_and_has_no_automatic_limit(self) -> None:
         clock = FakeClock()
         calls = 0
 
         def sender(jpeg: bytes) -> int:
             nonlocal calls
             calls += 1
+            if calls == 35:
+                controller.request_stop()
             return lcd_transport.validate_jpeg(jpeg).segment_count
 
         def build_controller(
@@ -123,15 +125,26 @@ class ProductionControllerFactoryTests(unittest.TestCase):
             controller_builder=build_controller,
         )(frame_source())
         self.assertEqual(controller._plan.transport_interval_seconds, 1.0)
-        self.assertEqual(controller._plan.max_duration_seconds, 30.0)
-        self.assertEqual(controller._plan.max_frames, 30)
+        self.assertIsNone(controller._plan.max_duration_seconds)
+        self.assertIsNone(controller._plan.max_frames)
 
         controller.start()
         result = controller.wait(1.0)
         assert result is not None
-        self.assertEqual(result.stop_reason, lcd_refresh.RefreshStopReason.MAX_FRAMES)
-        self.assertEqual(result.frames_sent, 30)
-        self.assertEqual(calls, 30)
+        self.assertEqual(
+            result.stop_reason, lcd_refresh.RefreshStopReason.EXPLICIT_STOP
+        )
+        self.assertEqual(result.frames_sent, 35)
+        self.assertGreater(result.elapsed_seconds, 30.0)
+        self.assertEqual(calls, 35)
+
+    def test_bounded_development_policy_remains_available(self) -> None:
+        plan = gui_refresh_factory.build_gui_development_plan(
+            REFERENCE_PATH.read_bytes()
+        )
+        self.assertEqual(plan.transport_interval_seconds, 1.0)
+        self.assertEqual(plan.max_duration_seconds, 30.0)
+        self.assertEqual(plan.max_frames, 30)
 
     def test_stop_is_nonblocking_at_factory_controller_boundary(self) -> None:
         first_send = threading.Event()

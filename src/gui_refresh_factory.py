@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Production wiring for the explicitly enabled, bounded GUI refresh path."""
+"""Production wiring for the explicitly started GUI refresh path."""
 
 from __future__ import annotations
 
@@ -12,11 +12,11 @@ import lcd_transport
 import refresh_diagnostics
 from discover_device import HidrawInterface
 
-# Temporary development policy for the first GUI live path. Replace this
-# isolated profile with an explicitly reviewed production session policy later.
+# The bounded development profile remains available to offline tests and tools.
 GUI_DEVELOPMENT_INTERVAL_SECONDS = 1.0
 GUI_DEVELOPMENT_MAX_DURATION_SECONDS = 30.0
 GUI_DEVELOPMENT_MAX_FRAMES = 30
+GUI_PRODUCTION_INTERVAL_SECONDS = 1.0
 
 
 class ProductionControllerFactoryError(RuntimeError):
@@ -47,6 +47,16 @@ def build_gui_development_plan(jpeg_bytes: bytes) -> lcd_refresh.RefreshPlan:
         transport_interval_seconds=GUI_DEVELOPMENT_INTERVAL_SECONDS,
         max_duration_seconds=GUI_DEVELOPMENT_MAX_DURATION_SECONDS,
         max_frames=GUI_DEVELOPMENT_MAX_FRAMES,
+    )
+
+
+def build_gui_production_plan(jpeg_bytes: bytes) -> lcd_refresh.RefreshPlan:
+    """Build the 1 Hz GUI plan that runs until stop, close, or first error."""
+    return lcd_refresh.RefreshPlan(
+        frames=(lcd_refresh.RefreshFrame(jpeg_bytes),),
+        transport_interval_seconds=GUI_PRODUCTION_INTERVAL_SECONDS,
+        max_duration_seconds=None,
+        max_frames=None,
     )
 
 
@@ -128,7 +138,7 @@ class ProductionControllerFactory:
                 "factory_initial_snapshot",
                 generation=snapshot.generation,
             )
-            plan = build_gui_development_plan(snapshot.jpeg_bytes)
+            plan = build_gui_production_plan(snapshot.jpeg_bytes)
             diagnostics.record(
                 "refresh_plan_created",
                 interval_seconds=plan.transport_interval_seconds,

@@ -258,8 +258,7 @@ class TufAioGuiOfflineTests(unittest.TestCase):
         window = self._window()
         try:
             self.assertTrue(window.load_image(REFERENCE_PATH))
-            self.assertFalse(window.hardware_live_checkbox.isChecked())
-            window.hardware_live_checkbox.setChecked(True)
+            self.assertFalse(hasattr(window, "hardware_live_checkbox"))
             self.assertEqual(window.original_size_value.text(), "320×320")
             self.assertEqual(window.output_size_value.text(), "320×320")
             self.assertEqual(window.segments_value.text(), "3")
@@ -286,7 +285,6 @@ class TufAioGuiOfflineTests(unittest.TestCase):
         try:
             self.assertEqual(window.device_status_label.text(), "Gerät: nicht verbunden")
             self.assertTrue(window.load_image(REFERENCE_PATH))
-            window.hardware_live_checkbox.setChecked(True)
             self.assertFalse(window.start_lcd_button.isEnabled())
         finally:
             window.close()
@@ -584,7 +582,6 @@ class TufAioGuiOfflineTests(unittest.TestCase):
         )
         try:
             self.assertTrue(window.load_image(REFERENCE_PATH))
-            window.hardware_live_checkbox.setChecked(True)
             with (
                 mock.patch.object(
                     tuf_aio_gui.transport.os,
@@ -633,8 +630,6 @@ class TufAioGuiOfflineTests(unittest.TestCase):
             self.assertFalse(window.start_lcd_button.isEnabled())
             self.assertFalse(window.stop_lcd_button.isEnabled())
             self.assertTrue(window.load_image(REFERENCE_PATH))
-            self.assertFalse(window.start_lcd_button.isEnabled())
-            window.hardware_live_checkbox.setChecked(True)
             self.assertTrue(window.start_lcd_button.isEnabled())
 
             window.start_lcd_button.click()
@@ -649,12 +644,28 @@ class TufAioGuiOfflineTests(unittest.TestCase):
                 window._poll_refresh_controller()
             window.close()
 
-    def test_hardware_live_approval_defaults_off_and_blocks_all_writes(self) -> None:
-        factory = mock.Mock(side_effect=AssertionError("controller factory called"))
+    def test_start_is_explicit_without_redundant_hardware_approval(self) -> None:
+        sender = FakeSender()
+        controllers: list[FakeRefreshController] = []
+
+        def build_controller(source: lcd_refresh.FrameSource) -> FakeRefreshController:
+            controller = FakeRefreshController(source, sender)
+            controllers.append(controller)
+            return controller
+
+        factory = mock.Mock(side_effect=build_controller)
         window = self._window(controller_factory=factory)
         try:
             self.assertTrue(window.load_image(REFERENCE_PATH))
-            self.assertFalse(window.hardware_live_checkbox.isChecked())
+            self.assertFalse(hasattr(window, "hardware_live_checkbox"))
+            self.assertFalse(
+                any(
+                    checkbox.text() == "Hardware-Livebetrieb freigeben"
+                    for checkbox in window.findChildren(tuf_aio_gui.QCheckBox)
+                )
+            )
+            self.assertTrue(window.start_lcd_button.isEnabled())
+            factory.assert_not_called()
             with (
                 mock.patch.object(
                     tuf_aio_gui.transport.os,
@@ -668,11 +679,15 @@ class TufAioGuiOfflineTests(unittest.TestCase):
                 ) as send_once,
             ):
                 window.start_lcd()
-            factory.assert_not_called()
+            factory.assert_called_once()
             device_open.assert_not_called()
             send_once.assert_not_called()
-            self.assertEqual(window._refresh_state, tuf_aio_gui.GuiRefreshState.IDLE)
+            self.assertEqual(window._refresh_state, tuf_aio_gui.GuiRefreshState.RUNNING)
         finally:
+            if controllers and controllers[0].is_running:
+                controllers[0].request_stop()
+                controllers[0].join()
+                window._poll_refresh_controller()
             window.close()
 
     def test_production_gate_failure_enters_error_before_device_open(self) -> None:
@@ -684,7 +699,6 @@ class TufAioGuiOfflineTests(unittest.TestCase):
         window = self._window(controller_factory=factory)
         try:
             self.assertTrue(window.load_image(REFERENCE_PATH))
-            window.hardware_live_checkbox.setChecked(True)
             with mock.patch.object(
                 tuf_aio_gui.transport.os,
                 "open",
@@ -736,7 +750,6 @@ class TufAioGuiOfflineTests(unittest.TestCase):
                         side_effect=AssertionError("USB sender called"),
                     ) as real_sender,
                 ):
-                    window.hardware_live_checkbox.setChecked(True)
                     window.start_lcd_button.click()
                     controller = controllers[0]
                     self._wait_until(lambda: len(sender.frames) == 1)
@@ -775,7 +788,7 @@ class TufAioGuiOfflineTests(unittest.TestCase):
                     window._poll_refresh_controller()
                 window.close()
 
-    def test_production_diagnostics_reach_send_once_and_fake_writes_30_frames(
+    def test_production_runs_past_old_hardcaps_until_explicit_stop(
         self,
     ) -> None:
         class FastClock:
@@ -841,6 +854,8 @@ class TufAioGuiOfflineTests(unittest.TestCase):
                         fake_writes += 1
                 finally:
                     active_sends -= 1
+                if send_calls == 35:
+                    controllers[0].request_stop()
                 return len(segments)
 
             window = self._window(
@@ -849,7 +864,6 @@ class TufAioGuiOfflineTests(unittest.TestCase):
             )
             try:
                 self.assertTrue(window.load_image(REFERENCE_PATH))
-                window.hardware_live_checkbox.setChecked(True)
                 with (
                     mock.patch.object(
                         lcd_refresh.lcd_transport,
@@ -869,12 +883,13 @@ class TufAioGuiOfflineTests(unittest.TestCase):
 
                 result = controllers[0].result
                 assert result is not None
-                self.assertEqual(result.frames_sent, 30)
+                self.assertEqual(result.frames_sent, 35)
                 self.assertEqual(
-                    result.stop_reason, lcd_refresh.RefreshStopReason.MAX_FRAMES
+                    result.stop_reason, lcd_refresh.RefreshStopReason.EXPLICIT_STOP
                 )
-                self.assertEqual(send_calls, 30)
-                self.assertEqual(fake_writes, 90)
+                self.assertGreater(result.elapsed_seconds, 30.0)
+                self.assertEqual(send_calls, 35)
+                self.assertEqual(fake_writes, 105)
                 self.assertEqual(maximum_active, 1)
 
                 entries = [
@@ -886,25 +901,25 @@ class TufAioGuiOfflineTests(unittest.TestCase):
                 self.assertIn("production_factory_created", events)
                 self.assertIn("refresh_controller_created", events)
                 self.assertIn("worker_started", events)
-                self.assertEqual(events.count("frame_snapshot"), 30)
-                self.assertEqual(events.count("send_frame_once_called"), 30)
+                self.assertEqual(events.count("frame_snapshot"), 35)
+                self.assertEqual(events.count("send_frame_once_called"), 35)
                 returned = [
                     entry
                     for entry in entries
                     if entry["event"] == "send_frame_once_returned"
                 ]
-                self.assertEqual(len(returned), 30)
+                self.assertEqual(len(returned), 35)
                 self.assertEqual(
-                    sum(entry["completed_segments"] for entry in returned), 90
+                    sum(entry["completed_segments"] for entry in returned), 105
                 )
-                self.assertEqual(events.count("frame_count_advanced"), 30)
+                self.assertEqual(events.count("frame_count_advanced"), 35)
                 self.assertIn("handle_closed", events)
                 self.assertIn("worker_ended", events)
                 terminal = next(
                     entry for entry in entries if entry["event"] == "session_stopped"
                 )
-                self.assertEqual(terminal["frame_count"], 30)
-                self.assertEqual(terminal["stop_reason"], "30 Frames")
+                self.assertEqual(terminal["frame_count"], 35)
+                self.assertEqual(terminal["stop_reason"], "user")
                 timestamps = [entry["monotonic_seconds"] for entry in entries]
                 self.assertEqual(timestamps, sorted(timestamps))
                 self.assertTrue(
@@ -933,7 +948,6 @@ class TufAioGuiOfflineTests(unittest.TestCase):
             window = self._window(settings=settings, controller_factory=factory)
             try:
                 self.assertTrue(window.load_image(REFERENCE_PATH))
-                window.hardware_live_checkbox.setChecked(True)
                 window.start_lcd_button.click()
                 source = window._frame_buffer
                 assert source is not None
@@ -1006,7 +1020,6 @@ class TufAioGuiOfflineTests(unittest.TestCase):
         window = self._window(controller_factory=factory)
         try:
             self.assertTrue(window.load_image(REFERENCE_PATH))
-            window.hardware_live_checkbox.setChecked(True)
             window.start_lcd_button.click()
             controller = controllers[0]
             controller.join()
@@ -1040,7 +1053,6 @@ class TufAioGuiOfflineTests(unittest.TestCase):
 
         window = self._window(controller_factory=factory)
         self.assertTrue(window.load_image(REFERENCE_PATH))
-        window.hardware_live_checkbox.setChecked(True)
         window.show()
         window.start_lcd_button.click()
         controller = controllers[0]

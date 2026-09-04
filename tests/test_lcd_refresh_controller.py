@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import threading
+import time
 import unittest
 from dataclasses import FrozenInstanceError
 from pathlib import Path
@@ -206,7 +207,9 @@ class RefreshControllerTests(unittest.TestCase):
         self.assertTrue(first_send.wait(1.0))
         result = controller.stop(timeout=1.0)
 
-        self.assertEqual(result.stop_reason, lcd_refresh.RefreshStopReason.EXPLICIT_STOP)
+        self.assertEqual(
+            result.stop_reason, lcd_refresh.RefreshStopReason.EXPLICIT_STOP
+        )
         self.assertEqual(result.frames_sent, 1)
         self.assertFalse(controller.is_running)
 
@@ -367,6 +370,39 @@ class RefreshControllerTests(unittest.TestCase):
         self.assertEqual(result.stop_reason, lcd_refresh.RefreshStopReason.MAX_DURATION)
         self.assertEqual(starts, [0.0, 0.01, 0.02])
 
+    def test_unbounded_plan_runs_past_old_limits_until_explicit_stop(self) -> None:
+        clock = FakeClock()
+        starts: list[float] = []
+        controller: lcd_refresh.RefreshController
+
+        def sender(_: bytes) -> int:
+            starts.append(clock())
+            if len(starts) == 35:
+                controller.request_stop()
+            return self.segment_count
+
+        controller = lcd_refresh.RefreshController(
+            lcd_refresh.RefreshPlan(
+                frames=(lcd_refresh.RefreshFrame(self.jpeg),),
+                transport_interval_seconds=1.0,
+                max_duration_seconds=None,
+                max_frames=None,
+            ),
+            sender,
+            clock=clock,
+            wait_function=clock.wait,
+        )
+        controller.start()
+        result = controller.wait(timeout=1.0)
+
+        assert result is not None
+        self.assertEqual(
+            result.stop_reason, lcd_refresh.RefreshStopReason.EXPLICIT_STOP
+        )
+        self.assertEqual(result.frames_sent, 35)
+        self.assertEqual(starts, [float(index) for index in range(35)])
+        self.assertGreater(result.elapsed_seconds, 30.0)
+
     def test_slow_transfer_never_overlaps_and_has_no_catch_up_burst(self) -> None:
         clock = FakeClock()
         starts: list[float] = []
@@ -504,6 +540,41 @@ class RefreshControllerTests(unittest.TestCase):
         self.assertEqual(result.stop_reason, lcd_refresh.RefreshStopReason.EXPLICIT_STOP)
         device_open.assert_not_called()
 
+    def test_stop_during_frame_finishes_it_without_starting_another(self) -> None:
+        transfer_started = threading.Event()
+        release_transfer = threading.Event()
+        calls = 0
+
+        def sender(_: bytes) -> int:
+            nonlocal calls
+            calls += 1
+            transfer_started.set()
+            self.assertTrue(release_transfer.wait(1.0))
+            return self.segment_count
+
+        controller = lcd_refresh.RefreshController(
+            lcd_refresh.RefreshPlan(
+                frames=(lcd_refresh.RefreshFrame(self.jpeg),),
+                transport_interval_seconds=1.0,
+                max_duration_seconds=None,
+                max_frames=None,
+            ),
+            sender,
+        )
+        controller.start()
+        self.assertTrue(transfer_started.wait(1.0))
+
+        requested = time.monotonic()
+        controller.request_stop()
+        self.assertLess(time.monotonic() - requested, 0.1)
+        release_transfer.set()
+        result = controller.wait(timeout=1.0)
+
+        assert result is not None
+        self.assertEqual(result.stop_reason, lcd_refresh.RefreshStopReason.EXPLICIT_STOP)
+        self.assertEqual(result.frames_sent, 1)
+        self.assertEqual(calls, 1)
+
     def test_animated_frames_rotate_in_order_without_skipping(self) -> None:
         clock = FakeClock()
         jpegs = (_jpeg("red"), _jpeg("green"), _jpeg("blue"))
@@ -550,7 +621,7 @@ class RefreshControllerTests(unittest.TestCase):
         self.assertEqual(result.stop_reason, lcd_refresh.RefreshStopReason.MAX_FRAMES)
         send_once.assert_called_once_with(device, self.jpeg)
 
-    def test_plan_requires_explicit_bounded_limits_and_frame_durations(self) -> None:
+    def test_plan_validates_optional_limits_and_frame_durations(self) -> None:
         frame = lcd_refresh.RefreshFrame(self.jpeg)
         with self.assertRaises(lcd_refresh.RefreshConfigurationError):
             _plan((frame,), max_duration=lcd_refresh.MAX_REFRESH_DURATION_SECONDS + 1)
@@ -560,6 +631,15 @@ class RefreshControllerTests(unittest.TestCase):
             lcd_refresh.RefreshConfigurationError, "explizites Frameintervall"
         ):
             _plan((frame, frame))
+
+        unbounded = lcd_refresh.RefreshPlan(
+            frames=(frame,),
+            transport_interval_seconds=1.0,
+            max_duration_seconds=None,
+            max_frames=None,
+        )
+        self.assertIsNone(unbounded.max_duration_seconds)
+        self.assertIsNone(unbounded.max_frames)
 
     def test_first_live_profile_is_fixed_to_reference_and_conservative_limits(self) -> None:
         plan = lcd_refresh.build_first_refresh_live_test_plan(self.jpeg)
