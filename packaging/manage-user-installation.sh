@@ -26,7 +26,7 @@ autostart_directory="$config_home/autostart"
 autostart_file="$autostart_directory/tuf-aio-control.desktop"
 
 usage() {
-    printf 'Usage: %s install [--autostart] | update [--autostart] | uninstall | enable-autostart | disable-autostart\n' "$0" >&2
+    printf 'Usage: %s install [--autostart] | update [--autostart] | uninstall | enable-autostart | disable-autostart | autostart-status\n' "$0" >&2
     exit 2
 }
 
@@ -189,6 +189,16 @@ disable_autostart() {
     rm -- "$autostart_file"
 }
 
+autostart_status() {
+    require_managed_installation
+    if [ -e "$autostart_file" ]; then
+        require_managed_file "$autostart_file" 'autostart file'
+        printf 'enabled\n'
+    else
+        printf 'disabled\n'
+    fi
+}
+
 uninstall_application() {
     require_managed_installation
     disable_autostart
@@ -223,6 +233,10 @@ case "$command" in
     disable-autostart)
         [ "$#" -eq 0 ] || usage
         disable_autostart
+        ;;
+    autostart-status)
+        [ "$#" -eq 0 ] || usage
+        autostart_status
         ;;
     *) usage ;;
 esac

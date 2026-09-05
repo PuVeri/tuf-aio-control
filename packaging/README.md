@@ -46,7 +46,14 @@ aktiv. Alternativ lässt er sich getrennt schalten:
 ```text
 packaging/manage-user-installation.sh enable-autostart
 packaging/manage-user-installation.sh disable-autostart
+packaging/manage-user-installation.sh autostart-status
 ```
+
+Die Statusabfrage gibt exakt `enabled` oder `disabled` aus. Wiederholtes
+Aktivieren und Deaktivieren ist idempotent. `install` aktiviert Autostart ohne
+das ausdrücklich angegebene `--autostart` nicht. `update` erhält einen
+aktivierten oder deaktivierten Zustand; `--autostart` ist dabei eine explizite
+Aktivierungsentscheidung.
 
 Das resultierende Standardlayout ist:
 
@@ -78,6 +85,25 @@ LCD-Refresh. Dafür existiert die getrennte, standardmäßig ausgeschaltete
 Anwendungsoption `LCD beim Programmstart automatisch starten`. Auch bei deren
 Aktivierung bleiben sämtliche Production-Safety-Gates aktiv; es gibt keinen
 Retry oder Reconnect.
+
+Ein per-user Kernel-Lock wird vor `QApplication` erworben. Läuft bereits eine
+Instanz, endet ein weiterer normaler oder durch den Desktop-Autostart
+ausgelöster Prozess, bevor Tray, Timer, Refreshworker oder HID-Handle erzeugt
+werden.
+
+## Manueller V1-Autostart-Abnahmetest
+
+1. Autostart mit `packaging/manage-user-installation.sh enable-autostart`
+   aktivieren und mit `autostart-status` prüfen.
+2. Abmelden und erneut anmelden oder neu starten.
+3. Prüfen, dass genau ein Tray-Icon und kein Hauptfenster erscheint.
+4. Prüfen, dass die installierte App ohne HeartdriveLAB-Repository läuft.
+5. Bei ausgeschalteter Option `LCD beim Programmstart automatisch starten`
+   prüfen, dass das LCD nicht automatisch startet und kein dauerhafter GIF-,
+   Sensor- oder Transportbetrieb beginnt.
+6. Bei eingeschalteter Option prüfen, dass ausschließlich die bestehende
+   LCD-Autostartlogik verwendet wird.
+7. Die App über Tray → Beenden sauber schließen.
 
 ## Permanente Interface-1-Berechtigung
 

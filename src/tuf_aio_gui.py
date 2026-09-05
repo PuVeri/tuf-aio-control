@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import fcntl
 import os
 import signal
 import sys
@@ -183,6 +184,50 @@ class QtSignalShutdownBridge:
         self._signal_pending = False
         self._shutdown_dispatched = True
         self._request_shutdown()
+
+
+def _single_instance_lock_path() -> Path:
+    runtime_home = os.environ.get("XDG_RUNTIME_DIR")
+    if runtime_home and Path(runtime_home).is_absolute():
+        base = Path(runtime_home)
+    else:
+        state_home = os.environ.get("XDG_STATE_HOME")
+        if state_home and Path(state_home).is_absolute():
+            base = Path(state_home)
+        else:
+            base = Path(os.environ["HOME"]) / ".local" / "state"
+    return base / "tuf-aio-control" / "instance.lock"
+
+
+class SingleInstanceGuard:
+    """Hold one per-user kernel lock before creating any Qt application state."""
+
+    def __init__(self, path: Path | None = None) -> None:
+        self.path = path if path is not None else _single_instance_lock_path()
+        self._fd: int | None = None
+
+    def acquire(self) -> bool:
+        if self._fd is not None:
+            return True
+        self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        flags = os.O_RDWR | os.O_CREAT | os.O_CLOEXEC | os.O_NOFOLLOW
+        fd = os.open(self.path, flags, 0o600)
+        os.fchmod(fd, 0o600)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            os.close(fd)
+            return False
+        os.ftruncate(fd, 0)
+        os.write(fd, f"{os.getpid()}\n".encode("ascii"))
+        self._fd = fd
+        return True
+
+    def close(self) -> None:
+        if self._fd is None:
+            return
+        os.close(self._fd)
+        self._fd = None
 
 
 class MainWindow(QMainWindow):
@@ -1496,21 +1541,27 @@ class MainWindow(QMainWindow):
 
 
 def main() -> int:
+    instance_guard = SingleInstanceGuard()
+    if not instance_guard.acquire():
+        return 0
     background = "--background" in sys.argv[1:]
     qt_arguments = [argument for argument in sys.argv if argument != "--background"]
-    app = QApplication(qt_arguments)
-    app.setQuitOnLastWindowClosed(False)
-    window = MainWindow(
-        controller_factory=gui_refresh_factory.ProductionControllerFactory()
-    )
-    signal_bridge = QtSignalShutdownBridge(window.quit_application)
-    signal_bridge.install()
-    if not background:
-        window.show()
     try:
-        return app.exec()
+        app = QApplication(qt_arguments)
+        app.setQuitOnLastWindowClosed(False)
+        window = MainWindow(
+            controller_factory=gui_refresh_factory.ProductionControllerFactory()
+        )
+        signal_bridge = QtSignalShutdownBridge(window.quit_application)
+        signal_bridge.install()
+        if not background:
+            window.show()
+        try:
+            return app.exec()
+        finally:
+            signal_bridge.close()
     finally:
-        signal_bridge.close()
+        instance_guard.close()
 
 
 if __name__ == "__main__":

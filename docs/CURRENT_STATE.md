@@ -158,10 +158,21 @@ Pfad zurück nach HeartdriveLAB.
 Der Launcher unterstützt unverändert den normalen Aufruf und `--background`.
 Desktop- und Autostartdatei verwenden ausschließlich diesen installierten
 Launcher. `install` verweigert kollidierende Ziele; `update` ersetzt nur eine
-markierte Installation und bewahrt einen aktivierten Autostart. `uninstall`
-entfernt nur verwaltete Programm- und Desktopdateien. QSettings und Runtime-
-Logs werden durch Installation, Update und Uninstall nicht gelöscht. Ein
-Purge-Modus wurde bewusst nicht hinzugefügt.
+markierte Installation und bewahrt sowohl einen aktivierten als auch einen
+deaktivierten Autostartzustand. `enable-autostart` und `disable-autostart`
+schalten ihn explizit und idempotent; `autostart-status` meldet `enabled` oder
+`disabled`. `install` aktiviert ihn standardmäßig nicht. `uninstall` entfernt
+nur verwaltete Programm- und Desktopdateien einschließlich des verwalteten
+Autostarteintrags. Fremde Desktopdateien sowie QSettings und Runtime-Logs
+bleiben erhalten. Ein Purge-Modus wurde bewusst nicht hinzugefügt.
+
+Vor der Erzeugung von `QApplication`, Tray, Timern und Refreshworker erwirbt
+der Prozess einen nichtblockierenden per-user Kernel-Lock. Ein zweiter
+manueller oder durch XDG-Autostart ausgelöster Start endet ohne zweite
+App-Instanz und kann daher kein zweites Tray-Icon, keinen zweiten Timer,
+Refreshworker oder HID-Handle erzeugen. Der Lock liegt bevorzugt unter
+`XDG_RUNTIME_DIR`, andernfalls unter der XDG-State-Basis, und wird beim
+Prozessende automatisch mit dem Dateideskriptor freigegeben.
 
 JSONL-Diagnostik liegt nun unter
 `$XDG_STATE_HOME/tuf-aio-control`, bei fehlender oder nicht absoluter
@@ -189,6 +200,21 @@ vollständige Offline-Suite bestand mit 210 Tests; außerdem bestanden `sh -n`,
 `compileall`, `desktop-file-validate` für beide erzeugten Desktopdateien und
 `git diff --check`. Details:
 `research/reports/local-installation-layout.md`.
+
+Der noch manuell auszuführende V1-Abnahmetest aktiviert den Autostart mit
+`packaging/manage-user-installation.sh enable-autostart`, bestätigt
+`enabled` mit `autostart-status` und prüft nach Ab-/Anmeldung oder Reboot genau
+ein Tray-Icon ohne sichtbares Hauptfenster. Ohne HeartdriveLAB muss die
+installierte App weiterlaufen. Bei ausgeschalteter LCD-Autostartoption bleibt
+das LCD aus und es beginnt kein dauerhafter GIF-, Sensor- oder
+Transportbetrieb; bei eingeschalteter Option wird ausschließlich die
+bestehende LCD-Autostartlogik verwendet. Abschluss ist Tray → Beenden.
+
+Der fertige Stand wurde ausschließlich offline mit temporären HOME-/XDG-
+Pfaden geprüft. Die vollständige Suite bestand mit 246 Tests; `compileall`,
+`sh -n`, `desktop-file-validate` für beide erzeugten Desktopdateien und
+`git diff --check` waren sauber. Es gab keine echte Installation, keine
+Login-Simulation, keine Gerätekommunikation und keinen Live-Test.
 
 ## Offline-Stand: GIF-Liveanimation und weiter außen liegende Slots
 

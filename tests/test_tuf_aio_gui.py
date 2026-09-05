@@ -1647,6 +1647,64 @@ class TufAioGuiOfflineTests(unittest.TestCase):
                 finally:
                     bridge.close()
 
+    def test_single_instance_guard_rejects_second_owner_and_releases_cleanly(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            lock_path = Path(directory) / "instance.lock"
+            first = tuf_aio_gui.SingleInstanceGuard(lock_path)
+            second = tuf_aio_gui.SingleInstanceGuard(lock_path)
+            try:
+                self.assertTrue(first.acquire())
+                self.assertTrue(first.acquire())
+                self.assertFalse(second.acquire())
+                first.close()
+                first.close()
+                self.assertTrue(second.acquire())
+            finally:
+                first.close()
+                second.close()
+
+    def test_second_process_exits_before_creating_qapplication_or_window(self) -> None:
+        guard = mock.Mock()
+        guard.acquire.return_value = False
+        with (
+            mock.patch.object(tuf_aio_gui, "SingleInstanceGuard", return_value=guard),
+            mock.patch.object(tuf_aio_gui, "QApplication") as application,
+            mock.patch.object(tuf_aio_gui, "MainWindow") as main_window,
+        ):
+            self.assertEqual(tuf_aio_gui.main(), 0)
+        application.assert_not_called()
+        main_window.assert_not_called()
+
+    def test_background_main_creates_tray_app_without_showing_window(self) -> None:
+        guard = mock.Mock()
+        guard.acquire.return_value = True
+        application = mock.Mock()
+        application.exec.return_value = 0
+        window = mock.Mock()
+        signal_bridge = mock.Mock()
+        with (
+            mock.patch.object(sys, "argv", ["tuf-aio-control", "--background"]),
+            mock.patch.object(tuf_aio_gui, "SingleInstanceGuard", return_value=guard),
+            mock.patch.object(
+                tuf_aio_gui, "QApplication", return_value=application
+            ) as application_type,
+            mock.patch.object(tuf_aio_gui, "MainWindow", return_value=window),
+            mock.patch.object(
+                tuf_aio_gui,
+                "QtSignalShutdownBridge",
+                return_value=signal_bridge,
+            ),
+        ):
+            self.assertEqual(tuf_aio_gui.main(), 0)
+
+        application_type.assert_called_once_with(["tuf-aio-control"])
+        window.show.assert_not_called()
+        signal_bridge.install.assert_called_once_with()
+        signal_bridge.close.assert_called_once_with()
+        guard.close.assert_called_once_with()
+
     def test_shutdown_is_idempotent_stops_timers_worker_and_handle_once(self) -> None:
         release_sender = threading.Event()
         sender = FakeSender()

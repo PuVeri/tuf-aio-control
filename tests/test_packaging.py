@@ -97,8 +97,13 @@ class PackagingOfflineTests(unittest.TestCase):
         autostart = self.read_desktop(self.autostart)
         self.assertEqual(desktop["Exec"], f'"{self.launcher}"')
         self.assertEqual(desktop["TryExec"], str(self.launcher))
+        self.assertEqual(autostart["Type"], "Application")
+        self.assertEqual(autostart["Name"], "TUF AIO Control")
         self.assertEqual(autostart["Exec"], f'"{self.launcher}" --background')
         self.assertEqual(autostart["TryExec"], str(self.launcher))
+        self.assertEqual(autostart["Terminal"], "false")
+        self.assertNotIn("sudo", autostart["Exec"])
+        self.assertNotIn("src/", autostart["Exec"])
 
     def test_runtime_manifest_is_import_complete_and_dependencies_are_exact(self) -> None:
         relative_files = [
@@ -165,10 +170,66 @@ class PackagingOfflineTests(unittest.TestCase):
     def test_autostart_can_be_enabled_and_disabled_explicitly(self) -> None:
         self.run_installer("install")
         self.assertFalse(self.autostart.exists())
+        self.assertEqual(
+            self.run_installer("autostart-status").stdout.strip(), "disabled"
+        )
         self.run_installer("enable-autostart")
         self.assertTrue(self.autostart.is_file())
+        expected = (PACKAGING_ROOT / "tuf-aio-control-autostart.desktop").read_text(
+            encoding="utf-8"
+        ).replace("@LAUNCHER@", str(self.launcher))
+        self.assertEqual(self.autostart.read_text(encoding="utf-8"), expected)
+        first_content = self.autostart.read_bytes()
+        self.run_installer("enable-autostart")
+        self.assertEqual(self.autostart.read_bytes(), first_content)
+        self.assertEqual(
+            self.run_installer("autostart-status").stdout.strip(), "enabled"
+        )
         self.run_installer("disable-autostart")
         self.assertFalse(self.autostart.exists())
+        self.run_installer("disable-autostart")
+        self.assertFalse(self.autostart.exists())
+
+    def test_update_preserves_disabled_autostart_and_install_does_not_enable(self) -> None:
+        self.run_installer("install")
+        self.assertFalse(self.autostart.exists())
+        self.run_installer("update")
+        self.assertFalse(self.autostart.exists())
+
+    def test_xdg_config_home_and_home_fallback_are_respected(self) -> None:
+        self.run_installer("install")
+        self.run_installer("enable-autostart")
+        self.assertTrue(self.autostart.is_file())
+        self.run_installer("uninstall")
+
+        self.environment.pop("XDG_CONFIG_HOME")
+        fallback = self.home / ".config/autostart/tuf-aio-control.desktop"
+        self.run_installer("install")
+        self.run_installer("enable-autostart")
+        self.assertTrue(fallback.is_file())
+
+    def test_disable_and_uninstall_preserve_unmanaged_desktop_files(self) -> None:
+        self.run_installer("install", "--autostart")
+        foreign = self.config_home / "autostart/foreign.desktop"
+        foreign.write_text("[Desktop Entry]\nType=Application\n", encoding="utf-8")
+        self.run_installer("disable-autostart")
+        self.assertTrue(foreign.is_file())
+        self.run_installer("enable-autostart")
+        self.run_installer("uninstall")
+        self.assertTrue(foreign.is_file())
+
+    def test_unmanaged_autostart_target_is_never_removed(self) -> None:
+        self.run_installer("install", "--autostart")
+        self.autostart.write_text(
+            "[Desktop Entry]\nType=Application\nName=Foreign\n",
+            encoding="utf-8",
+        )
+        disabled = self.run_installer("disable-autostart", check=False)
+        self.assertNotEqual(disabled.returncode, 0)
+        self.assertTrue(self.autostart.is_file())
+        uninstalled = self.run_installer("uninstall", check=False)
+        self.assertNotEqual(uninstalled.returncode, 0)
+        self.assertTrue(self.autostart.is_file())
 
     def test_generated_desktop_files_pass_available_validator(self) -> None:
         validator = shutil.which("desktop-file-validate")
