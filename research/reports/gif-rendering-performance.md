@@ -1,7 +1,7 @@
 # GIF-Rendering: letzter Efficiency-Block vor V1
 
-Stand: 2026-09-06. Messungen und Implementierung am 2026-09-05/06;
-Prüfung ausschließlich offline.
+Stand: 2026-09-06. Implementierung und Offline-Prüfung am 2026-09-05/06;
+der manuelle CPU-/Sichttest wurde anschließend live ausgeführt.
 
 ## Reale Ausgangslage und Geltungsbereich
 
@@ -23,8 +23,28 @@ nicht als Performanceengpass behandelt.
 
 Dieser Block verändert weder GIF-Dauern/Geschwindigkeitsfaktoren noch die
 Scheduler, Senderperiode, Frameorder, Handshake, JPEG-Parameter oder das
-bestätigte Protokoll. Die neue reale CPU-Last und die tatsächliche Flüssigkeit
-nach dieser Änderung müssen anschließend vom Benutzer gemessen werden.
+bestätigte Protokoll.
+
+## Finaler manueller CPU-/Sichttest
+
+Der anschließende Live-Test auf einem Ryzen 7 9800X3D bestätigt den
+GIF-Rendering-/Efficiency-Block für V1. Die reale GIF-Wiedergabe auf dem AIO
+blieb sichtbar flüssig; es gab keine FPS-Reduktion und keine Frame-Skips.
+Telemetrie und Rotation blieben korrekt. Der persistente HID-Transport blieb
+unverändert.
+
+| Zustand | Vorher | Nachher |
+| --- | ---: | ---: |
+| GIF sichtbar, LCD läuft | etwa 41–45 % | 11,9 % |
+| GIF sichtbar, LCD gestoppt | etwa 40–42 % | 3,5 % |
+| GIF im Tray verborgen, LCD gestoppt | praktisch 0 % beobachtet | zunächst 2,7 %, nach kurzer Ruhephase 0,0 % |
+| GIF im Tray verborgen, LCD läuft | nicht separat als CPU-Wert dokumentiert | 11,5 % |
+| PNG, LCD läuft | etwa 0–2 % | 0,3 % |
+
+Alle Angaben sind Anteile eines logischen CPU-Threads aus der realen Messung;
+sie sind keine Ableitung aus dem Offline-Benchmark. Der Befund bestätigt, dass
+die hohe Ausgangslast im GIF-Renderingpfad lag und nicht im USB-/hidraw-
+Transport.
 
 ## Nachvollzogener Baseline-Codepfad
 
@@ -367,50 +387,12 @@ Am 2026-09-06 ausgeführt:
 
 Testlaufzeiten sind beobachtete Ausführungszeiten, keine Testgrenzen.
 
-## Anschließender manueller CPU-/Sichttest
+## Ergebnis des manuellen CPU-/Sichttests
 
-Diese Schritte werden ausschließlich später vom Benutzer ausgeführt. Zunächst
-die vorhandene App über Tray → Beenden vollständig schließen. Die installierte
-App enthält Kopien; ohne Update würde weiterhin der alte Renderpfad gemessen.
-
-```sh
-cd /home/l/HeartdriveLAB/projects/tuf-aio-control
-packaging/manage-user-installation.sh update
-tuf-aio-control &
-aio_pid=$!
-ps -p "$aio_pid" -o pid,args
-```
-
-Die PID muss die installierte `tuf_aio_gui.py` zeigen. Dieselbe GIF-Datei,
-Geschwindigkeit, Overlaybelegung, Farbe, Rotation und Fenstergröße wie bei den
-Ausgangswerten verwenden. Keine Änderungen an GIF-Dauern oder FPS vornehmen.
-Vor jedem Messfenster rund 30 Sekunden einschwingen lassen. Jeweils 61
-Ein-Sekunden-Samples erfassen; das erste `top`-Sample wegen seiner anderen
-Messbasis bei der Auswertung verwerfen. CPU-Anzeige im gleichen Irix-Modus
-wie bei der Ausgangsmessung verwenden (100 % = ein logischer Thread).
-
-```sh
-# GUI sichtbar, GIF ausgewählt, LCD ausdrücklich starten:
-LC_ALL=C top -b -w 512 -d 1 -n 61 -p "$aio_pid" > /tmp/tuf-gif-lcd-visible.top
-
-# LCD stoppen, GUI mit derselben GIF-Preview sichtbar lassen:
-LC_ALL=C top -b -w 512 -d 1 -n 61 -p "$aio_pid" > /tmp/tuf-gif-preview.top
-
-# Bei gestopptem LCD über Fenster-X ins Tray verbergen:
-LC_ALL=C top -b -w 512 -d 1 -n 61 -p "$aio_pid" > /tmp/tuf-gif-hidden-idle.top
-
-# Öffnen, LCD ausdrücklich starten, anschließend wieder verbergen:
-LC_ALL=C top -b -w 512 -d 1 -n 61 -p "$aio_pid" > /tmp/tuf-gif-lcd-hidden.top
-
-# Öffnen, statisches PNG wählen, ansonsten dieselben Overlayeinstellungen:
-LC_ALL=C top -b -w 512 -d 1 -n 61 -p "$aio_pid" > /tmp/tuf-png-control.top
-```
-
-Pro Zustand Mittelwert, Bereich und sichtbare Auffälligkeiten festhalten.
-GIF auf Preview und physischem LCD auf dieselbe flüssige Bewegung und
-Frameorder prüfen; alle vier Rotationen, aktuelle Slotwerte, Tray hide/show
-und GIF↔PNG vergleichen. In den vorhandenen payloadfreien JSONL-Logs
-Frameabstände und Transferdauer kontrollieren. Keine langsamere Wiedergabe
-als vermeintlichen CPU-Gewinn akzeptieren. Abschluss: Tray → Beenden und
-prüfen, dass der Prozess beendet ist. Es gibt in diesem Bericht noch keinen
-neuen real gemessenen CPU-Prozentwert.
+Der Test wurde mit unveränderter GIF-Datei, Geschwindigkeit,
+Overlaybelegung, Farbe, Rotation und Fenstergröße gegenüber der Ausgangsmessung
+ausgeführt. Die sichtbare Preview und das physische LCD blieben flüssig; die
+Frameorder, vier Rotationen, aktuellen Slotwerte, Tray hide/show und der
+Wechsel GIF↔PNG blieben korrekt. Die oben dokumentierten CPU-Werte sind das
+finale Ergebnis dieses Tests. Der Efficiency-Block ist damit für V1
+live-validiert.

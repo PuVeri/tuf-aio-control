@@ -5,9 +5,10 @@
 Stand: 2026-09-06. Dieser Abschnitt ergänzt die chronologischen Altstände unten.
 
 Die zuvor manuell bestätigte flüssige GIF-Wiedergabe mit persistentem Transport
-(ungefähr 29–32 FPS im beobachteten Ausschnitt) bleibt die Referenz. Der Benutzer
-meldete bei sichtbarem GIF etwa 41–45 % eines logischen CPU-Threads mit LCD und
-40–42 % bei gestopptem LCD; statische Bilder lagen bei 0–2 %.
+(ungefähr 29–32 FPS im beobachteten Ausschnitt) bleibt die Referenz. Vor der
+Optimierung lagen die CPU-Werte bei sichtbarem GIF mit LCD bei etwa 41–45 %
+eines logischen CPU-Threads, bei sichtbarer Preview mit gestopptem LCD bei
+etwa 40–42 % und bei statischem PNG bei etwa 0–2 %.
 
 Offline-Profiling belegte wiederholte Fontsuche/Textvermessung als dominanten
 Renderaufwand (rund 92 % der instrumentierten Baseline). Ein begrenzter Font-,
@@ -33,6 +34,24 @@ Das sind 96,54 %, 92,23 % beziehungsweise 95,02 % weniger gemessene Arbeit,
 keine Vorhersage realer CPU-Prozente. Mit versetzten Frameindizes bleiben
 94,25 % Einsparung im kombinierten Test.
 
+Der manuelle CPU-Live-Test auf dem Ryzen 7 9800X3D bestätigt den
+Efficiency-Block für V1. Bei unveränderter sichtbar flüssiger GIF-Wiedergabe,
+ohne FPS-Reduktion oder Frame-Skips, wurden gemessen:
+
+| Zustand | CPU-Anteil eines logischen Threads |
+| --- | ---: |
+| GIF sichtbar, LCD läuft | 11,9 % |
+| GIF sichtbar, LCD gestoppt | 3,5 % |
+| GIF im Tray verborgen, LCD gestoppt | nach kurzer Ruhephase 0,0 % |
+| GIF im Tray verborgen, LCD läuft | 11,5 % |
+| PNG, LCD läuft | 0,3 % |
+
+Der zunächst beobachtete Wert von 2,7 % bei verborgenem GIF und gestopptem
+LCD fiel nach kurzer Ruhephase auf 0,0 %. Telemetrie und Rotation blieben
+korrekt. Der persistente HID-Transport sowie der Producer-/Sender-Handshake
+blieben unverändert. Der Befund bestätigt, dass die frühere hohe Last im
+GIF-Renderingpfad lag, nicht im USB-/hidraw-Transport.
+
 Unverändert: GIF-Frameorder, Dauern/Geschwindigkeitsfaktoren, 12-ms-
 Senderperiode, queuefreier serieller Producer-/Sender-Handshake, persistenter
 HID-Transport, 0x08-Protokoll und JPEG 320×320/Q60/4:2:0/SOF0 mit
@@ -44,11 +63,11 @@ alle 14 neuen Efficiency-Tests. `python -m compileall -q src tests` und
 `git diff --check` sind sauber. Der neue Stand wurde ausschließlich offline
 geprüft.
 
-Audit, Methodik, Rohmessungen, Cachegrenzen, Testergebnis und die exakten
-nachfolgenden manuellen CPU-/Sichttestbefehle:
+Audit, Methodik, Rohmessungen, Cachegrenzen, Testergebnis und der
+abgeschlossene manuelle CPU-/Sichttest:
 [`research/reports/gif-rendering-performance.md`](../research/reports/gif-rendering-performance.md).
-Keine reale Gerätekommunikation, keine Installation, kein Live-Test, Commit
-oder Push in diesem Block. Die neue reale CPU-Last bleibt manuell zu messen.
+Der nachfolgende Dokumentationsblock führte keine Gerätekommunikation,
+Installation, HID-/USB-Writes, Live-Tests, Commits oder Pushes aus.
 
 ## CURRENT LIVE HARDWARE STATE
 
