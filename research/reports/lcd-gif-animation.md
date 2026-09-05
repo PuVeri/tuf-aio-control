@@ -1,6 +1,6 @@
 # LCD-GIF-Liveanimation
 
-Stand: 2026-09-04
+Stand: 2026-09-06
 
 ## Ergebnis und Sicherheitsgrenze
 
@@ -47,20 +47,29 @@ skalierten 320×320-RGB-Basisframes, ihre originalen Millisekunden-Dauern und
 den Loopwert als unveränderliches `PreparedAnimation`-Modell. Während einer
 Wiedergabe wird die GIF-Datei weder erneut geöffnet noch dekodiert.
 
-Jeder fällige Frame verwendet denselben bestehenden Kompositionspfad:
+Jeder fällige Frame verwendet denselben visuellen Kompositionspfad. Seit dem
+Efficiency-Block erfolgt JPEG-Encoding ausschließlich für tatsächlich
+benötigte LCD-Frames:
 
 ```text
 gecachter GIF-RGB-Basisframe
 → aktuelle vier Telemetrieslots
 → vollständige 320×320-Komposition
 → Rotation
-→ validiertes JPEG
-→ je nach Taktquelle Preview oder LatestFrameBuffer.publish()
+├→ immutable RGB-Bytes → QImage/QPixmap → sichtbare Preview
+└→ einmal JPEG-Encoding + Validierung → LatestFrameBuffer.publish()
 ```
 
-Für denselben Basisframe und Zustand entstehen identische Bytes; Preview und
-LCD dürfen wegen ihrer unabhängigen Taktung jedoch gleichzeitig verschiedene
-Frameindizes zeigen.
+Für denselben Basisframe und Zustand wird dieselbe RGB-Komposition verwendet;
+die LCD-JPEGs bleiben für die geprüften Overlays bytegleich zum bisherigen
+Encoderpfad. Die Preview zeigt die unkomprimierte Komposition, nicht mehr die
+verlustbehaftete JPEG-Decodierung. Preview und LCD dürfen wegen ihrer
+unabhängigen Taktung gleichzeitig verschiedene Frameindizes zeigen. Ein auf
+zwei Einträge begrenzter Cache teilt gleiche Kompositionen, ohne die Timelines
+zu koppeln. Fonts, Layouts und zugeschnittene Textmasken werden begrenzt
+gecacht. Die GUI erzeugt beim GIF-Laden keine unbenutzten JPEGs für sämtliche
+Basisframes. Profiling, Cachegrenzen und aktuelle Tests stehen in
+[`gif-rendering-performance.md`](gif-rendering-performance.md).
 
 Änderungen von Telemetrie, Overlayfarbe, Slotbelegung, Rotation oder
 Overlaystatus rendern den aktuellen GIF-Basisframe neu, ohne Timeline oder
@@ -130,16 +139,18 @@ Single-Shot-Timer werden wiederverwendet; es entstehen keine zusätzlichen
 Worker, Timer, Sender oder LCD-Sessions.
 
 Bei versteckter GUI und laufendem LCD bleibt die GIF-Timeline aktiv. Neue
-Kompositionen werden validiert und publiziert, aber nicht als `QPixmap`
-dekodiert, skaliert oder neu gezeichnet. Beim Öffnen wird der aktuelle
-Snapshot einmal angezeigt, ohne die Animation neu zu starten. Sind GUI
+Kompositionen werden als JPEG validiert und publiziert, aber nicht für Qt
+konvertiert, skaliert oder neu gezeichnet. Beim Öffnen wird die pausierte
+Preview mit den aktuellen Overlaywerten einmal angezeigt, ohne die Animation
+neu zu starten. Sind GUI
 versteckt und LCD gestoppt, ist der Animationstimer inaktiv; auch das bereits
 bestehende bedarfsgesteuerte Sensorpolling bleibt aus.
 
 ## Offline-Tests
 
-Die vollständige Suite bestand mit 237 Tests. Neu beziehungsweise weiterhin
-abgedeckt sind:
+Die ursprüngliche Suite dieses Animationstickets bestand mit 237 Tests.
+Der nachfolgende Efficiency-Block erweitert diese Abdeckung. Neu
+beziehungsweise weiterhin abgedeckt sind:
 
 - Faktoren 1×/1.5×/2×/3×, Default 2×, Persistenz und 1-ms-Sicherheitsminimum,
 - korrekte Dauerskalierung und Änderung ohne Neudekodierung oder Sessionstart,

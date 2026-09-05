@@ -266,8 +266,10 @@ class TufAioGuiOfflineTests(unittest.TestCase):
             self.assertFalse(hasattr(window, "hardware_live_checkbox"))
             self.assertEqual(window.original_size_value.text(), "320×320")
             self.assertEqual(window.output_size_value.text(), "320×320")
-            self.assertEqual(window.segments_value.text(), "3")
-            self.assertIn("ASUS-JPEG-Validator: PASS", window.validation_value.text())
+            self.assertEqual(window.segments_value.text(), "—")
+            self.assertIn("JPEG-Prüfung beim LCD-Start", window.validation_value.text())
+            self.assertFalse(window._prepared.jpeg_is_prepared)
+            self.assertEqual(window._prepared.jpeg_info.segment_count, 3)
             self.assertIsNotNone(window._final_pixmap)
         finally:
             window.close()
@@ -348,7 +350,7 @@ class TufAioGuiOfflineTests(unittest.TestCase):
             finally:
                 restored.close()
 
-    def test_rotation_cycles_persists_and_preview_matches_final_jpeg(self) -> None:
+    def test_rotation_cycles_persists_and_preview_matches_rgb_composition(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "settings.ini"
             settings = self._settings(path)
@@ -373,7 +375,9 @@ class TufAioGuiOfflineTests(unittest.TestCase):
                     )
                     preview = window._final_pixmap
                     assert preview is not None
-                    expected = QImage.fromData(window._prepared.jpeg_bytes, "JPEG")
+                    rgb = window._prepared.rgb_bytes
+                    expected = QImage(rgb, 320, 320, 960, QImage.Format.Format_RGB888)
+                    expected = expected.convertToFormat(preview.toImage().format())
                     self.assertEqual(preview.toImage(), expected)
                 self.assertEqual(observed, [90, 180, 270, 0])
             finally:
@@ -1457,13 +1461,11 @@ class TufAioGuiOfflineTests(unittest.TestCase):
                 self.assertFalse(window._animation_timer.isActive())
 
                 with mock.patch.object(window, "_update_scaled_preview") as repaint:
+                    previous_preview = window._preview_prepared
                     clock.now = 0.05
                     source.request_next_frame()
                     self.assertEqual(source.snapshot().generation, initial_generation + 1)
-                    self.assertNotEqual(
-                        window._preview_jpeg,
-                        source.snapshot().jpeg_bytes,
-                    )
+                    self.assertIs(window._preview_prepared, previous_preview)
                     self.assertEqual(window._animation_frame_index, 0)
                     self.assertEqual(window._lcd_animation_frame_index, 1)
                     repaint.assert_not_called()

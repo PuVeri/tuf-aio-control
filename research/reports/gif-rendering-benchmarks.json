@@ -1,0 +1,5173 @@
+{
+  "baseline": {
+    "python": "3.14.7",
+    "platform": "Linux-7.1.13-200.fc44.x86_64-x86_64-with-glibc2.43",
+    "pillow": "12.3.0",
+    "pyside": "6.11.2",
+    "frames": 600,
+    "repeats": 3,
+    "overlay": "on",
+    "rotation": 90,
+    "scenarios": {
+      "preview": {
+        "runs": [
+          {
+            "total_ms": 7976.135019,
+            "ms_per_tick": 13.293558365,
+            "processing_ticks_per_second": 75.22440362039212,
+            "load_ms": 86.821932
+          },
+          {
+            "total_ms": 7926.767544,
+            "ms_per_tick": 13.21127924,
+            "processing_ticks_per_second": 75.69289709449816,
+            "load_ms": 84.371697
+          },
+          {
+            "total_ms": 7889.862618,
+            "ms_per_tick": 13.14977103,
+            "processing_ticks_per_second": 76.04695151866838,
+            "load_ms": 84.139677
+          }
+        ],
+        "median_ms_per_tick": 13.21127924,
+        "components_separate_pass": {
+          "font load/layout/draw": {
+            "calls": 40300,
+            "exclusive_ms": 7328.990578,
+            "ms_per_tick": 12.214984296666668,
+            "percent_instrumented_total": 92.01356449465791
+          },
+          "JPEG validation": {
+            "calls": 620,
+            "exclusive_ms": 149.189726,
+            "ms_per_tick": 0.24864954333333333,
+            "percent_instrumented_total": 1.8730380847327297
+          },
+          "Qt scaling/widget": {
+            "calls": 620,
+            "exclusive_ms": 112.2915,
+            "ms_per_tick": 0.1871525,
+            "percent_instrumented_total": 1.409790484445057
+          },
+          "JPEG encode": {
+            "calls": 620,
+            "exclusive_ms": 102.294282,
+            "ms_per_tick": 0.17049047,
+            "percent_instrumented_total": 1.284278020836299
+          },
+          "Qt image/pixmap (+JPEG decode in baseline)": {
+            "calls": 620,
+            "exclusive_ms": 93.358716,
+            "ms_per_tick": 0.15559785999999998,
+            "percent_instrumented_total": 1.1720943210911643
+          },
+          "metadata widgets": {
+            "calls": 620,
+            "exclusive_ms": 45.235312,
+            "ms_per_tick": 0.07539218666666667,
+            "percent_instrumented_total": 0.5679175397826487
+          },
+          "telemetry composition": {
+            "calls": 620,
+            "exclusive_ms": 42.208189,
+            "ms_per_tick": 0.07034698166666667,
+            "percent_instrumented_total": 0.5299128003264586
+          },
+          "image copy/convert/bytes": {
+            "calls": 2480,
+            "exclusive_ms": 38.357339,
+            "ms_per_tick": 0.06392889833333333,
+            "percent_instrumented_total": 0.4815663833044645
+          },
+          "rotation": {
+            "calls": 620,
+            "exclusive_ms": 23.311732,
+            "ms_per_tick": 0.03885288666666666,
+            "percent_instrumented_total": 0.2926727129794627
+          },
+          "lookup/composition Python": {
+            "calls": 1860,
+            "exclusive_ms": 12.050294,
+            "ms_per_tick": 0.020083823333333334,
+            "percent_instrumented_total": 0.151288297119242
+          },
+          "sensor snapshot/slots": {
+            "calls": 680,
+            "exclusive_ms": 6.728793,
+            "ms_per_tick": 0.011214655,
+            "percent_instrumented_total": 0.08447824050084385
+          }
+        },
+        "instrumented_total_ms": 7965.119728,
+        "cprofile_top_cumulative": [
+          {
+            "site": "benchmark_gif_rendering.py:183:tick",
+            "calls": 600,
+            "self_seconds": 0.0008977690000000001,
+            "cumulative_seconds": 14.314109456
+          },
+          {
+            "site": "tuf_aio_gui.py:877:_prepare_animation_frame",
+            "calls": 620,
+            "self_seconds": 0.001994975,
+            "cumulative_seconds": 14.038066146
+          },
+          {
+            "site": "image_pipeline.py:835:render_prepared_animation_frame",
+            "calls": 620,
+            "self_seconds": 0.011600171000000001,
+            "cumulative_seconds": 14.020568223000001
+          },
+          {
+            "site": "image_pipeline.py:561:_encode_and_validate_frame",
+            "calls": 620,
+            "self_seconds": 0.001693309,
+            "cumulative_seconds": 14.007586175
+          },
+          {
+            "site": "tuf_aio_gui.py:911:_advance_gif_animation",
+            "calls": 600,
+            "self_seconds": 0.000799209,
+            "cumulative_seconds": 13.851601909000001
+          },
+          {
+            "site": "tuf_aio_gui.py:900:_advance_preview_animation",
+            "calls": 600,
+            "self_seconds": 0.0008316370000000001,
+            "cumulative_seconds": 13.845288824
+          },
+          {
+            "site": "tuf_aio_gui.py:890:_render_preview_animation_frame",
+            "calls": 600,
+            "self_seconds": 0.0030310650000000003,
+            "cumulative_seconds": 13.84256388
+          },
+          {
+            "site": "image_pipeline.py:590:compose_lcd_frame",
+            "calls": 620,
+            "self_seconds": 0.007823437,
+            "cumulative_seconds": 13.199681908
+          },
+          {
+            "site": "image_pipeline.py:456:render_data_overlay",
+            "calls": 620,
+            "self_seconds": 0.040321103000000004,
+            "cumulative_seconds": 13.134424760000002
+          },
+          {
+            "site": "image_pipeline.py:240:_fit_font",
+            "calls": 9920,
+            "self_seconds": 0.082071747,
+            "cumulative_seconds": 11.172423253
+          },
+          {
+            "site": "image_pipeline.py:230:_overlay_font",
+            "calls": 24800,
+            "self_seconds": 0.041062732000000005,
+            "cumulative_seconds": 9.314605783000001
+          },
+          {
+            "site": "ImageFont.py:808:truetype",
+            "calls": 24800,
+            "self_seconds": 0.337625799,
+            "cumulative_seconds": 9.273543051
+          },
+          {
+            "site": "<frozen os>:297:walk",
+            "calls": 496000,
+            "self_seconds": 4.293412826,
+            "cumulative_seconds": 8.027205039
+          },
+          {
+            "site": "image_pipeline.py:354:layout_data_overlay",
+            "calls": 620,
+            "self_seconds": 0.043670638000000005,
+            "cumulative_seconds": 5.984880154000001
+          },
+          {
+            "site": "ImageDraw.py:710:textbbox",
+            "calls": 32240,
+            "self_seconds": 0.032715558,
+            "cumulative_seconds": 2.068317925
+          },
+          {
+            "site": "ImageText.py:465:get_bbox",
+            "calls": 32240,
+            "self_seconds": 0.028894379,
+            "cumulative_seconds": 2.026043643
+          },
+          {
+            "site": "ImageText.py:449:_get_bbox",
+            "calls": 32240,
+            "self_seconds": 0.018092361,
+            "cumulative_seconds": 1.931687646
+          },
+          {
+            "site": "ImageFont.py:405:getbbox",
+            "calls": 32240,
+            "self_seconds": 0.023598461,
+            "cumulative_seconds": 1.9086309410000002
+          },
+          {
+            "site": "~:0:<method 'getsize' of 'Font' objects>",
+            "calls": 32240,
+            "self_seconds": 1.874979098,
+            "cumulative_seconds": 1.874979098
+          },
+          {
+            "site": "ImageDraw.py:530:text",
+            "calls": 4960,
+            "self_seconds": 0.017816500000000002,
+            "cumulative_seconds": 1.501777734
+          },
+          {
+            "site": "ImageDraw.py:583:draw_text",
+            "calls": 9920,
+            "self_seconds": 0.026782060000000003,
+            "cumulative_seconds": 1.457418394
+          },
+          {
+            "site": "ImageFont.py:562:getmask2",
+            "calls": 9920,
+            "self_seconds": 0.008540737000000001,
+            "cumulative_seconds": 1.3834532830000001
+          },
+          {
+            "site": "~:0:<method 'render' of 'Font' objects>",
+            "calls": 9920,
+            "self_seconds": 1.3515642350000001,
+            "cumulative_seconds": 1.370451464
+          },
+          {
+            "site": "<frozen posixpath>:72:join",
+            "calls": 1016800,
+            "self_seconds": 0.662994666,
+            "cumulative_seconds": 1.170033051
+          },
+          {
+            "site": "<frozen genericpath>:60:islink",
+            "calls": 868000,
+            "self_seconds": 0.21611422200000002,
+            "cumulative_seconds": 0.865514219
+          }
+        ]
+      },
+      "lcd": {
+        "runs": [
+          {
+            "total_ms": 8120.380596,
+            "ms_per_tick": 13.53396766,
+            "processing_ticks_per_second": 73.88816237203865,
+            "load_ms": 88.6388
+          },
+          {
+            "total_ms": 8082.720718,
+            "ms_per_tick": 13.471201196666668,
+            "processing_ticks_per_second": 74.23243001132234,
+            "load_ms": 85.994767
+          },
+          {
+            "total_ms": 7995.189556,
+            "ms_per_tick": 13.325315926666665,
+            "processing_ticks_per_second": 75.04512504643861,
+            "load_ms": 84.80425
+          }
+        ],
+        "median_ms_per_tick": 13.471201196666668,
+        "components_separate_pass": {
+          "font load/layout/draw": {
+            "calls": 40300,
+            "exclusive_ms": 7472.071362,
+            "ms_per_tick": 12.45345227,
+            "percent_instrumented_total": 91.7543941397314
+          },
+          "JPEG validation": {
+            "calls": 1820,
+            "exclusive_ms": 421.239673,
+            "ms_per_tick": 0.7020661216666667,
+            "percent_instrumented_total": 5.172674230641746
+          },
+          "JPEG encode": {
+            "calls": 620,
+            "exclusive_ms": 102.809383,
+            "ms_per_tick": 0.17134897166666668,
+            "percent_instrumented_total": 1.2624628690001798
+          },
+          "telemetry composition": {
+            "calls": 620,
+            "exclusive_ms": 38.619459,
+            "ms_per_tick": 0.064365765,
+            "percent_instrumented_total": 0.4742333003630108
+          },
+          "image copy/convert/bytes": {
+            "calls": 2480,
+            "exclusive_ms": 37.123224,
+            "ms_per_tick": 0.06187204,
+            "percent_instrumented_total": 0.4558600636439607
+          },
+          "rotation": {
+            "calls": 620,
+            "exclusive_ms": 23.34775,
+            "ms_per_tick": 0.038912916666666665,
+            "percent_instrumented_total": 0.2867021140443859
+          },
+          "memory sender/reports": {
+            "calls": 600,
+            "exclusive_ms": 12.915767,
+            "ms_per_tick": 0.021526278333333333,
+            "percent_instrumented_total": 0.15860105163901086
+          },
+          "lookup/composition Python": {
+            "calls": 1860,
+            "exclusive_ms": 12.005964,
+            "ms_per_tick": 0.02000994,
+            "percent_instrumented_total": 0.14742899251280278
+          },
+          "sensor snapshot/slots": {
+            "calls": 680,
+            "exclusive_ms": 6.323836,
+            "ms_per_tick": 0.010539726666666667,
+            "percent_instrumented_total": 0.07765446991979925
+          },
+          "buffer publish": {
+            "calls": 600,
+            "exclusive_ms": 3.571212,
+            "ms_per_tick": 0.005952020000000001,
+            "percent_instrumented_total": 0.043853220550189184
+          }
+        },
+        "instrumented_total_ms": 8143.556973,
+        "cprofile_top_cumulative": [
+          {
+            "site": "benchmark_gif_rendering.py:183:tick",
+            "calls": 600,
+            "self_seconds": 0.001605159,
+            "cumulative_seconds": 15.453983393000001
+          },
+          {
+            "site": "lcd_refresh.py:172:request_next_frame",
+            "calls": 600,
+            "self_seconds": 0.00024840800000000004,
+            "cumulative_seconds": 14.322495571000001
+          },
+          {
+            "site": "tuf_aio_gui.py:921:_request_transport_frame",
+            "calls": 600,
+            "self_seconds": 0.001329757,
+            "cumulative_seconds": 14.322247163
+          },
+          {
+            "site": "~:0:<method 'emit' of 'PySide6.QtCore.SignalInstance' objects>",
+            "calls": 600,
+            "self_seconds": 0.003888036,
+            "cumulative_seconds": 14.320606019000001
+          },
+          {
+            "site": "tuf_aio_gui.py:936:_produce_transport_frame",
+            "calls": 600,
+            "self_seconds": 0.004707648,
+            "cumulative_seconds": 14.316717983
+          },
+          {
+            "site": "tuf_aio_gui.py:877:_prepare_animation_frame",
+            "calls": 620,
+            "self_seconds": 0.0020085420000000003,
+            "cumulative_seconds": 14.073862584
+          },
+          {
+            "site": "image_pipeline.py:835:render_prepared_animation_frame",
+            "calls": 620,
+            "self_seconds": 0.002297293,
+            "cumulative_seconds": 14.056427104
+          },
+          {
+            "site": "image_pipeline.py:561:_encode_and_validate_frame",
+            "calls": 620,
+            "self_seconds": 0.001713288,
+            "cumulative_seconds": 14.052719455
+          },
+          {
+            "site": "image_pipeline.py:590:compose_lcd_frame",
+            "calls": 620,
+            "self_seconds": 0.006714436000000001,
+            "cumulative_seconds": 13.251261130000001
+          },
+          {
+            "site": "image_pipeline.py:456:render_data_overlay",
+            "calls": 620,
+            "self_seconds": 0.035821048,
+            "cumulative_seconds": 13.187318512000001
+          },
+          {
+            "site": "image_pipeline.py:240:_fit_font",
+            "calls": 9920,
+            "self_seconds": 0.088495059,
+            "cumulative_seconds": 11.254036654
+          },
+          {
+            "site": "image_pipeline.py:230:_overlay_font",
+            "calls": 24800,
+            "self_seconds": 0.042025966000000005,
+            "cumulative_seconds": 9.376337600000001
+          },
+          {
+            "site": "ImageFont.py:808:truetype",
+            "calls": 24800,
+            "self_seconds": 0.34588361100000004,
+            "cumulative_seconds": 9.334311634
+          },
+          {
+            "site": "<frozen os>:297:walk",
+            "calls": 496000,
+            "self_seconds": 4.310742524,
+            "cumulative_seconds": 8.066988626
+          },
+          {
+            "site": "image_pipeline.py:354:layout_data_overlay",
+            "calls": 620,
+            "self_seconds": 0.039326783000000004,
+            "cumulative_seconds": 6.006195824000001
+          },
+          {
+            "site": "ImageDraw.py:710:textbbox",
+            "calls": 32240,
+            "self_seconds": 0.034414650000000005,
+            "cumulative_seconds": 2.0832223500000002
+          },
+          {
+            "site": "ImageText.py:465:get_bbox",
+            "calls": 32240,
+            "self_seconds": 0.03029474,
+            "cumulative_seconds": 2.039005887
+          },
+          {
+            "site": "lcd_transport.py:281:validate_jpeg",
+            "calls": 1820,
+            "self_seconds": 0.029094104000000003,
+            "cumulative_seconds": 2.015813299
+          },
+          {
+            "site": "ImageText.py:449:_get_bbox",
+            "calls": 32240,
+            "self_seconds": 0.018897102000000002,
+            "cumulative_seconds": 1.9421494000000001
+          },
+          {
+            "site": "ImageFont.py:405:getbbox",
+            "calls": 32240,
+            "self_seconds": 0.023683997000000002,
+            "cumulative_seconds": 1.9182451180000002
+          },
+          {
+            "site": "~:0:<method 'getsize' of 'Font' objects>",
+            "calls": 32240,
+            "self_seconds": 1.884385766,
+            "cumulative_seconds": 1.884385766
+          },
+          {
+            "site": "lcd_transport.py:133:_find_scan_terminator",
+            "calls": 1820,
+            "self_seconds": 1.2139366040000001,
+            "cumulative_seconds": 1.8801034140000001
+          },
+          {
+            "site": "ImageDraw.py:530:text",
+            "calls": 4960,
+            "self_seconds": 0.018906943000000002,
+            "cumulative_seconds": 1.516316274
+          },
+          {
+            "site": "ImageDraw.py:583:draw_text",
+            "calls": 9920,
+            "self_seconds": 0.027900459000000002,
+            "cumulative_seconds": 1.4707540680000002
+          },
+          {
+            "site": "ImageFont.py:562:getmask2",
+            "calls": 9920,
+            "self_seconds": 0.008646403,
+            "cumulative_seconds": 1.395044761
+          }
+        ]
+      },
+      "combined": {
+        "runs": [
+          {
+            "total_ms": 15803.118258,
+            "ms_per_tick": 26.33853043,
+            "processing_ticks_per_second": 37.96719041169375,
+            "load_ms": 86.700496
+          },
+          {
+            "total_ms": 16052.233723,
+            "ms_per_tick": 26.753722871666668,
+            "processing_ticks_per_second": 37.377975573599244,
+            "load_ms": 87.436053
+          },
+          {
+            "total_ms": 15733.398241,
+            "ms_per_tick": 26.222330401666667,
+            "processing_ticks_per_second": 38.13543589308298,
+            "load_ms": 86.082296
+          }
+        ],
+        "median_ms_per_tick": 26.33853043,
+        "components_separate_pass": {
+          "font load/layout/draw": {
+            "calls": 79300,
+            "exclusive_ms": 14636.497198,
+            "ms_per_tick": 24.394161996666668,
+            "percent_instrumented_total": 91.77993159188433
+          },
+          "JPEG validation": {
+            "calls": 2420,
+            "exclusive_ms": 566.791854,
+            "ms_per_tick": 0.94465309,
+            "percent_instrumented_total": 3.554137091903763
+          },
+          "JPEG encode": {
+            "calls": 1220,
+            "exclusive_ms": 200.535357,
+            "ms_per_tick": 0.334225595,
+            "percent_instrumented_total": 1.2574812879224317
+          },
+          "Qt scaling/widget": {
+            "calls": 620,
+            "exclusive_ms": 114.641079,
+            "ms_per_tick": 0.191068465,
+            "percent_instrumented_total": 0.7188707957855893
+          },
+          "Qt image/pixmap (+JPEG decode in baseline)": {
+            "calls": 620,
+            "exclusive_ms": 107.838832,
+            "ms_per_tick": 0.17973138666666666,
+            "percent_instrumented_total": 0.6762164806249641
+          },
+          "telemetry composition": {
+            "calls": 1220,
+            "exclusive_ms": 75.180999,
+            "ms_per_tick": 0.125301665,
+            "percent_instrumented_total": 0.4714315762771702
+          },
+          "image copy/convert/bytes": {
+            "calls": 4880,
+            "exclusive_ms": 72.775587,
+            "ms_per_tick": 0.121292645,
+            "percent_instrumented_total": 0.456348148471748
+          },
+          "metadata widgets": {
+            "calls": 620,
+            "exclusive_ms": 48.702097,
+            "ms_per_tick": 0.08117016166666667,
+            "percent_instrumented_total": 0.3053924084822768
+          },
+          "rotation": {
+            "calls": 1220,
+            "exclusive_ms": 45.163805,
+            "ms_per_tick": 0.07527300833333334,
+            "percent_instrumented_total": 0.2832051191794451
+          },
+          "lookup/composition Python": {
+            "calls": 3660,
+            "exclusive_ms": 24.79941,
+            "ms_per_tick": 0.04133235,
+            "percent_instrumented_total": 0.15550770942859934
+          },
+          "memory sender/reports": {
+            "calls": 600,
+            "exclusive_ms": 12.95211,
+            "ms_per_tick": 0.021586849999999998,
+            "percent_instrumented_total": 0.08121777729257493
+          },
+          "sensor snapshot/slots": {
+            "calls": 1280,
+            "exclusive_ms": 11.825908,
+            "ms_per_tick": 0.01970984666666667,
+            "percent_instrumented_total": 0.07415579100443713
+          },
+          "buffer publish": {
+            "calls": 600,
+            "exclusive_ms": 3.417201,
+            "ms_per_tick": 0.005695335,
+            "percent_instrumented_total": 0.021427973494817783
+          }
+        },
+        "instrumented_total_ms": 15947.382989,
+        "cprofile_top_cumulative": [
+          {
+            "site": "benchmark_gif_rendering.py:183:tick",
+            "calls": 600,
+            "self_seconds": 0.001971622,
+            "cumulative_seconds": 29.273616179
+          },
+          {
+            "site": "tuf_aio_gui.py:877:_prepare_animation_frame",
+            "calls": 1220,
+            "self_seconds": 0.004282623,
+            "cumulative_seconds": 27.61223885
+          },
+          {
+            "site": "image_pipeline.py:835:render_prepared_animation_frame",
+            "calls": 1220,
+            "self_seconds": 0.004580173,
+            "cumulative_seconds": 27.577884140000002
+          },
+          {
+            "site": "image_pipeline.py:561:_encode_and_validate_frame",
+            "calls": 1220,
+            "self_seconds": 0.003349564,
+            "cumulative_seconds": 27.570526579000003
+          },
+          {
+            "site": "image_pipeline.py:590:compose_lcd_frame",
+            "calls": 1220,
+            "self_seconds": 0.013668122000000001,
+            "cumulative_seconds": 25.993713070000002
+          },
+          {
+            "site": "image_pipeline.py:456:render_data_overlay",
+            "calls": 1220,
+            "self_seconds": 0.07027288300000001,
+            "cumulative_seconds": 25.868049683000002
+          },
+          {
+            "site": "image_pipeline.py:240:_fit_font",
+            "calls": 19520,
+            "self_seconds": 0.166140643,
+            "cumulative_seconds": 22.073432124
+          },
+          {
+            "site": "image_pipeline.py:230:_overlay_font",
+            "calls": 48800,
+            "self_seconds": 0.085509623,
+            "cumulative_seconds": 18.413394572
+          },
+          {
+            "site": "ImageFont.py:808:truetype",
+            "calls": 48800,
+            "self_seconds": 0.67477642,
+            "cumulative_seconds": 18.327884949
+          },
+          {
+            "site": "<frozen os>:297:walk",
+            "calls": 976000,
+            "self_seconds": 8.482692808000001,
+            "cumulative_seconds": 15.848156493000001
+          },
+          {
+            "site": "lcd_refresh.py:172:request_next_frame",
+            "calls": 600,
+            "self_seconds": 0.00024284300000000002,
+            "cumulative_seconds": 14.293723896000001
+          },
+          {
+            "site": "tuf_aio_gui.py:921:_request_transport_frame",
+            "calls": 600,
+            "self_seconds": 0.0011404850000000001,
+            "cumulative_seconds": 14.293481053
+          },
+          {
+            "site": "~:0:<method 'emit' of 'PySide6.QtCore.SignalInstance' objects>",
+            "calls": 600,
+            "self_seconds": 0.003390212,
+            "cumulative_seconds": 14.292004365
+          },
+          {
+            "site": "tuf_aio_gui.py:936:_produce_transport_frame",
+            "calls": 600,
+            "self_seconds": 0.004691543,
+            "cumulative_seconds": 14.288614153000001
+          },
+          {
+            "site": "tuf_aio_gui.py:911:_advance_gif_animation",
+            "calls": 600,
+            "self_seconds": 0.000827427,
+            "cumulative_seconds": 13.846869300000002
+          },
+          {
+            "site": "tuf_aio_gui.py:900:_advance_preview_animation",
+            "calls": 600,
+            "self_seconds": 0.001144693,
+            "cumulative_seconds": 13.840272452
+          },
+          {
+            "site": "tuf_aio_gui.py:890:_render_preview_animation_frame",
+            "calls": 600,
+            "self_seconds": 0.0029054270000000004,
+            "cumulative_seconds": 13.837540722000002
+          },
+          {
+            "site": "image_pipeline.py:354:layout_data_overlay",
+            "calls": 1220,
+            "self_seconds": 0.078201116,
+            "cumulative_seconds": 11.800423752
+          },
+          {
+            "site": "ImageDraw.py:710:textbbox",
+            "calls": 63440,
+            "self_seconds": 0.066562168,
+            "cumulative_seconds": 4.071025387000001
+          },
+          {
+            "site": "ImageText.py:465:get_bbox",
+            "calls": 63440,
+            "self_seconds": 0.05913165200000001,
+            "cumulative_seconds": 3.985121014
+          },
+          {
+            "site": "ImageText.py:449:_get_bbox",
+            "calls": 63440,
+            "self_seconds": 0.036405152,
+            "cumulative_seconds": 3.7957535890000003
+          },
+          {
+            "site": "ImageFont.py:405:getbbox",
+            "calls": 63440,
+            "self_seconds": 0.047256054000000006,
+            "cumulative_seconds": 3.7495713680000002
+          },
+          {
+            "site": "~:0:<method 'getsize' of 'Font' objects>",
+            "calls": 63440,
+            "self_seconds": 3.6820434540000004,
+            "cumulative_seconds": 3.6820434540000004
+          },
+          {
+            "site": "ImageDraw.py:530:text",
+            "calls": 9760,
+            "self_seconds": 0.035831756,
+            "cumulative_seconds": 2.976794524
+          },
+          {
+            "site": "ImageDraw.py:583:draw_text",
+            "calls": 19520,
+            "self_seconds": 0.054125153,
+            "cumulative_seconds": 2.888432039
+          }
+        ]
+      },
+      "static": {
+        "runs": [
+          {
+            "total_ms": 7990.370221,
+            "ms_per_tick": 13.317283701666666,
+            "processing_ticks_per_second": 75.09038798015915,
+            "load_ms": 7.484015
+          },
+          {
+            "total_ms": 7921.656848,
+            "ms_per_tick": 13.202761413333334,
+            "processing_ticks_per_second": 75.74173074051843,
+            "load_ms": 6.942155
+          },
+          {
+            "total_ms": 7912.655712,
+            "ms_per_tick": 13.18775952,
+            "processing_ticks_per_second": 75.82789165084806,
+            "load_ms": 7.034705
+          }
+        ],
+        "median_ms_per_tick": 13.202761413333334,
+        "components_separate_pass": {
+          "font load/layout/draw": {
+            "calls": 39000,
+            "exclusive_ms": 7059.937438,
+            "ms_per_tick": 11.766562396666666,
+            "percent_instrumented_total": 88.38639521818884
+          },
+          "JPEG validation": {
+            "calls": 1800,
+            "exclusive_ms": 399.416173,
+            "ms_per_tick": 0.6656936216666667,
+            "percent_instrumented_total": 5.0004629691612985
+          },
+          "Qt scaling/widget": {
+            "calls": 600,
+            "exclusive_ms": 108.972806,
+            "ms_per_tick": 0.18162134333333332,
+            "percent_instrumented_total": 1.3642774576596781
+          },
+          "JPEG encode": {
+            "calls": 600,
+            "exclusive_ms": 98.243019,
+            "ms_per_tick": 0.163738365,
+            "percent_instrumented_total": 1.2299466363574363
+          },
+          "Qt image/pixmap (+JPEG decode in baseline)": {
+            "calls": 600,
+            "exclusive_ms": 92.353547,
+            "ms_per_tick": 0.15392257833333334,
+            "percent_instrumented_total": 1.1562138016985044
+          },
+          "image copy/convert/bytes": {
+            "calls": 2400,
+            "exclusive_ms": 61.216252,
+            "ms_per_tick": 0.10202708666666667,
+            "percent_instrumented_total": 0.7663926048303664
+          },
+          "metadata widgets": {
+            "calls": 600,
+            "exclusive_ms": 45.04867,
+            "ms_per_tick": 0.07508111666666667,
+            "percent_instrumented_total": 0.563983687623404
+          },
+          "sensor snapshot/slots": {
+            "calls": 2400,
+            "exclusive_ms": 42.810614,
+            "ms_per_tick": 0.07135102333333333,
+            "percent_instrumented_total": 0.5359645013524734
+          },
+          "telemetry composition": {
+            "calls": 600,
+            "exclusive_ms": 36.321333,
+            "ms_per_tick": 0.060535555,
+            "percent_instrumented_total": 0.45472239967878375
+          },
+          "rotation": {
+            "calls": 600,
+            "exclusive_ms": 22.204183,
+            "ms_per_tick": 0.037006971666666666,
+            "percent_instrumented_total": 0.2779837231377729
+          },
+          "memory sender/reports": {
+            "calls": 600,
+            "exclusive_ms": 13.494661,
+            "ms_per_tick": 0.022491101666666666,
+            "percent_instrumented_total": 0.1689454688453118
+          },
+          "buffer publish": {
+            "calls": 600,
+            "exclusive_ms": 3.704722,
+            "ms_per_tick": 0.006174536666666667,
+            "percent_instrumented_total": 0.04638100914365624
+          },
+          "lookup/composition Python": {
+            "calls": 600,
+            "exclusive_ms": 2.369011,
+            "ms_per_tick": 0.003948351666666666,
+            "percent_instrumented_total": 0.02965866827589822
+          }
+        },
+        "instrumented_total_ms": 7987.583859,
+        "cprofile_top_cumulative": [
+          {
+            "site": "benchmark_gif_rendering.py:191:tick",
+            "calls": 600,
+            "self_seconds": 0.00210252,
+            "cumulative_seconds": 15.116835997
+          },
+          {
+            "site": "tuf_aio_gui.py:974:refresh_temperatures",
+            "calls": 600,
+            "self_seconds": 0.0033443110000000004,
+            "cumulative_seconds": 14.471705660000001
+          },
+          {
+            "site": "tuf_aio_gui.py:1174:_rerender_temperature_overlay",
+            "calls": 600,
+            "self_seconds": 0.0035923210000000003,
+            "cumulative_seconds": 14.436198298
+          },
+          {
+            "site": "image_pipeline.py:701:rerender_prepared_image",
+            "calls": 600,
+            "self_seconds": 0.010842151000000001,
+            "cumulative_seconds": 13.541639771000002
+          },
+          {
+            "site": "image_pipeline.py:561:_encode_and_validate_frame",
+            "calls": 600,
+            "self_seconds": 0.0016172410000000002,
+            "cumulative_seconds": 13.525121585
+          },
+          {
+            "site": "image_pipeline.py:590:compose_lcd_frame",
+            "calls": 600,
+            "self_seconds": 0.0069201440000000005,
+            "cumulative_seconds": 12.774605491
+          },
+          {
+            "site": "image_pipeline.py:456:render_data_overlay",
+            "calls": 600,
+            "self_seconds": 0.033686361000000005,
+            "cumulative_seconds": 12.711740587000001
+          },
+          {
+            "site": "image_pipeline.py:240:_fit_font",
+            "calls": 9600,
+            "self_seconds": 0.084984057,
+            "cumulative_seconds": 10.805069857000001
+          },
+          {
+            "site": "image_pipeline.py:230:_overlay_font",
+            "calls": 24000,
+            "self_seconds": 0.040276705,
+            "cumulative_seconds": 8.986873162
+          },
+          {
+            "site": "ImageFont.py:808:truetype",
+            "calls": 24000,
+            "self_seconds": 0.325950415,
+            "cumulative_seconds": 8.946596457
+          },
+          {
+            "site": "<frozen os>:297:walk",
+            "calls": 480000,
+            "self_seconds": 4.135867606000001,
+            "cumulative_seconds": 7.732569199
+          },
+          {
+            "site": "image_pipeline.py:354:layout_data_overlay",
+            "calls": 600,
+            "self_seconds": 0.037057341,
+            "cumulative_seconds": 5.776759094
+          },
+          {
+            "site": "ImageDraw.py:710:textbbox",
+            "calls": 31200,
+            "self_seconds": 0.033636476000000005,
+            "cumulative_seconds": 2.018444053
+          },
+          {
+            "site": "ImageText.py:465:get_bbox",
+            "calls": 31200,
+            "self_seconds": 0.028807460000000003,
+            "cumulative_seconds": 1.9753565590000002
+          },
+          {
+            "site": "ImageText.py:449:_get_bbox",
+            "calls": 31200,
+            "self_seconds": 0.018475292,
+            "cumulative_seconds": 1.88303583
+          },
+          {
+            "site": "lcd_transport.py:281:validate_jpeg",
+            "calls": 1800,
+            "self_seconds": 0.029059355000000002,
+            "cumulative_seconds": 1.872727314
+          },
+          {
+            "site": "ImageFont.py:405:getbbox",
+            "calls": 31200,
+            "self_seconds": 0.023163332000000002,
+            "cumulative_seconds": 1.8597507240000002
+          },
+          {
+            "site": "~:0:<method 'getsize' of 'Font' objects>",
+            "calls": 31200,
+            "self_seconds": 1.8264798320000002,
+            "cumulative_seconds": 1.8264798320000002
+          },
+          {
+            "site": "lcd_transport.py:133:_find_scan_terminator",
+            "calls": 1800,
+            "self_seconds": 1.118271735,
+            "cumulative_seconds": 1.7333921300000001
+          },
+          {
+            "site": "ImageDraw.py:530:text",
+            "calls": 4800,
+            "self_seconds": 0.017545399,
+            "cumulative_seconds": 1.4677970770000002
+          },
+          {
+            "site": "ImageDraw.py:583:draw_text",
+            "calls": 9600,
+            "self_seconds": 0.026542527000000003,
+            "cumulative_seconds": 1.42394098
+          },
+          {
+            "site": "ImageFont.py:562:getmask2",
+            "calls": 9600,
+            "self_seconds": 0.008364243,
+            "cumulative_seconds": 1.3512801030000001
+          },
+          {
+            "site": "~:0:<method 'render' of 'Font' objects>",
+            "calls": 9600,
+            "self_seconds": 1.319877696,
+            "cumulative_seconds": 1.338613469
+          },
+          {
+            "site": "<frozen posixpath>:72:join",
+            "calls": 984000,
+            "self_seconds": 0.635864172,
+            "cumulative_seconds": 1.126803722
+          },
+          {
+            "site": "<frozen genericpath>:60:islink",
+            "calls": 840000,
+            "self_seconds": 0.20966177000000003,
+            "cumulative_seconds": 0.8404064010000001
+          }
+        ]
+      }
+    },
+    "gif_sha256": "7e579a27fcfd857840103f9b2915779a2c7d90d9c85fe03ba033d010aec973af",
+    "source_sha256": {
+      "image_pipeline.py": "1be7037e002e06b6ee5966695448a69a53c34aa3166f4cf5133fbe01434465f4",
+      "tuf_aio_gui.py": "0879547b18d7fc8abcfb3daa3c02350d845fc73c8ba78fed56657e51b9628832",
+      "gif_animation.py": "5cdda5106fa858045442e599e8f78a10f8b52712cce2c77a41e53b35ea0c7e87",
+      "lcd_refresh.py": "d01ddd6c9dfa31dcb07fa637d53640ac75fc8297287a0875e9a338bf3dcb98f6",
+      "lcd_transport.py": "9ff413774a26c6acc14487e9b1f9b51af36f96ae3d69855b52c4fe6cd098f151"
+    }
+  },
+  "font_cache_only": {
+    "python": "3.14.7",
+    "platform": "Linux-7.1.13-200.fc44.x86_64-x86_64-with-glibc2.43",
+    "pillow": "12.3.0",
+    "pyside": "6.11.2",
+    "frames": 600,
+    "repeats": 3,
+    "overlay": "on",
+    "rotation": 90,
+    "scenarios": {
+      "preview": {
+        "runs": [
+          {
+            "total_ms": 3148.893936,
+            "ms_per_tick": 5.24815656,
+            "processing_ticks_per_second": 190.54309614574456,
+            "load_ms": 43.819475
+          },
+          {
+            "total_ms": 3057.998178,
+            "ms_per_tick": 5.09666363,
+            "processing_ticks_per_second": 196.2067879296166,
+            "load_ms": 42.201095
+          },
+          {
+            "total_ms": 3080.630995,
+            "ms_per_tick": 5.134384991666666,
+            "processing_ticks_per_second": 194.76529353039246,
+            "load_ms": 41.549196
+          }
+        ],
+        "median_ms_per_tick": 5.134384991666666,
+        "components_separate_pass": {
+          "font load/layout/draw": {
+            "calls": 40300,
+            "exclusive_ms": 2500.249977,
+            "ms_per_tick": 4.167083295,
+            "percent_instrumented_total": 81.03063617858432
+          },
+          "JPEG validation": {
+            "calls": 620,
+            "exclusive_ms": 147.926742,
+            "ms_per_tick": 0.24654457000000002,
+            "percent_instrumented_total": 4.794159832957098
+          },
+          "Qt scaling/widget": {
+            "calls": 620,
+            "exclusive_ms": 109.937996,
+            "ms_per_tick": 0.18322999333333334,
+            "percent_instrumented_total": 3.562982037007197
+          },
+          "JPEG encode": {
+            "calls": 620,
+            "exclusive_ms": 100.06041,
+            "ms_per_tick": 0.16676735,
+            "percent_instrumented_total": 3.2428592153487616
+          },
+          "Qt image/pixmap (+JPEG decode in baseline)": {
+            "calls": 620,
+            "exclusive_ms": 90.428504,
+            "ms_per_tick": 0.15071417333333334,
+            "percent_instrumented_total": 2.9306986402174684
+          },
+          "metadata widgets": {
+            "calls": 620,
+            "exclusive_ms": 39.174324,
+            "ms_per_tick": 0.06529054,
+            "percent_instrumented_total": 1.2696012097937452
+          },
+          "image copy/convert/bytes": {
+            "calls": 2480,
+            "exclusive_ms": 37.261376,
+            "ms_per_tick": 0.062102293333333336,
+            "percent_instrumented_total": 1.207604451532581
+          },
+          "rotation": {
+            "calls": 620,
+            "exclusive_ms": 21.624136,
+            "ms_per_tick": 0.03604022666666667,
+            "percent_instrumented_total": 0.7008169235120555
+          },
+          "telemetry composition": {
+            "calls": 620,
+            "exclusive_ms": 11.909113,
+            "ms_per_tick": 0.019848521666666667,
+            "percent_instrumented_total": 0.385962608375078
+          },
+          "lookup/composition Python": {
+            "calls": 1860,
+            "exclusive_ms": 11.281504,
+            "ms_per_tick": 0.018802506666666666,
+            "percent_instrumented_total": 0.3656224195902647
+          },
+          "sensor snapshot/slots": {
+            "calls": 680,
+            "exclusive_ms": 6.310092,
+            "ms_per_tick": 0.01051682,
+            "percent_instrumented_total": 0.2045038591376799
+          }
+        },
+        "instrumented_total_ms": 3085.561332,
+        "cprofile_top_cumulative": [
+          {
+            "site": "benchmark_gif_rendering.py:183:tick",
+            "calls": 600,
+            "self_seconds": 0.0007253800000000001,
+            "cumulative_seconds": 3.816770362
+          },
+          {
+            "site": "tuf_aio_gui.py:911:_advance_gif_animation",
+            "calls": 600,
+            "self_seconds": 0.0007639700000000001,
+            "cumulative_seconds": 3.692309276
+          },
+          {
+            "site": "tuf_aio_gui.py:900:_advance_preview_animation",
+            "calls": 600,
+            "self_seconds": 0.0008185180000000001,
+            "cumulative_seconds": 3.6865905000000003
+          },
+          {
+            "site": "tuf_aio_gui.py:890:_render_preview_animation_frame",
+            "calls": 600,
+            "self_seconds": 0.002234409,
+            "cumulative_seconds": 3.6839487940000004
+          },
+          {
+            "site": "tuf_aio_gui.py:877:_prepare_animation_frame",
+            "calls": 620,
+            "self_seconds": 0.0018006390000000001,
+            "cumulative_seconds": 3.558842453
+          },
+          {
+            "site": "image_pipeline.py:837:render_prepared_animation_frame",
+            "calls": 620,
+            "self_seconds": 0.0021037900000000003,
+            "cumulative_seconds": 3.542201147
+          },
+          {
+            "site": "image_pipeline.py:563:_encode_and_validate_frame",
+            "calls": 620,
+            "self_seconds": 0.001518789,
+            "cumulative_seconds": 3.538820627
+          },
+          {
+            "site": "image_pipeline.py:592:compose_lcd_frame",
+            "calls": 620,
+            "self_seconds": 0.001226969,
+            "cumulative_seconds": 2.7447628400000004
+          },
+          {
+            "site": "image_pipeline.py:458:render_data_overlay",
+            "calls": 620,
+            "self_seconds": 0.009510715000000001,
+            "cumulative_seconds": 2.68896348
+          },
+          {
+            "site": "ImageDraw.py:530:text",
+            "calls": 4960,
+            "self_seconds": 0.015066859,
+            "cumulative_seconds": 1.415520126
+          },
+          {
+            "site": "ImageDraw.py:583:draw_text",
+            "calls": 9920,
+            "self_seconds": 0.021632674,
+            "cumulative_seconds": 1.37875911
+          },
+          {
+            "site": "ImageFont.py:562:getmask2",
+            "calls": 9920,
+            "self_seconds": 0.007549768,
+            "cumulative_seconds": 1.312110044
+          },
+          {
+            "site": "~:0:<method 'render' of 'Font' objects>",
+            "calls": 9920,
+            "self_seconds": 1.2859765140000001,
+            "cumulative_seconds": 1.3005803980000001
+          },
+          {
+            "site": "ImageDraw.py:710:textbbox",
+            "calls": 32240,
+            "self_seconds": 0.02225169,
+            "cumulative_seconds": 1.19514517
+          },
+          {
+            "site": "ImageText.py:465:get_bbox",
+            "calls": 32240,
+            "self_seconds": 0.020391875,
+            "cumulative_seconds": 1.1657633040000002
+          },
+          {
+            "site": "ImageText.py:449:_get_bbox",
+            "calls": 32240,
+            "self_seconds": 0.013467425000000002,
+            "cumulative_seconds": 1.0983075290000002
+          },
+          {
+            "site": "ImageFont.py:405:getbbox",
+            "calls": 32240,
+            "self_seconds": 0.01626139,
+            "cumulative_seconds": 1.081224285
+          },
+          {
+            "site": "~:0:<method 'getsize' of 'Font' objects>",
+            "calls": 32240,
+            "self_seconds": 1.05719987,
+            "cumulative_seconds": 1.05719987
+          },
+          {
+            "site": "image_pipeline.py:242:_fit_font",
+            "calls": 9920,
+            "self_seconds": 0.013635073000000001,
+            "cumulative_seconds": 0.9384915760000001
+          },
+          {
+            "site": "image_pipeline.py:356:layout_data_overlay",
+            "calls": 620,
+            "self_seconds": 0.015392309000000002,
+            "cumulative_seconds": 0.7898998410000001
+          },
+          {
+            "site": "lcd_transport.py:281:validate_jpeg",
+            "calls": 620,
+            "self_seconds": 0.010702616,
+            "cumulative_seconds": 0.679196365
+          },
+          {
+            "site": "lcd_transport.py:133:_find_scan_terminator",
+            "calls": 620,
+            "self_seconds": 0.405466971,
+            "cumulative_seconds": 0.6284463530000001
+          },
+          {
+            "site": "~:0:<built-in method builtins.len>",
+            "calls": 4573270,
+            "self_seconds": 0.23476496000000002,
+            "cumulative_seconds": 0.23476496000000002
+          },
+          {
+            "site": "tuf_aio_gui.py:1225:_load_final_preview",
+            "calls": 620,
+            "self_seconds": 0.0012930180000000002,
+            "cumulative_seconds": 0.202551576
+          },
+          {
+            "site": "tuf_aio_gui.py:1232:_refresh_preview_if_needed",
+            "calls": 620,
+            "self_seconds": 0.0034116790000000004,
+            "cumulative_seconds": 0.20099021800000003
+          }
+        ]
+      },
+      "lcd": {
+        "runs": [
+          {
+            "total_ms": 3046.300415,
+            "ms_per_tick": 5.077167358333333,
+            "processing_ticks_per_second": 196.96022002478702,
+            "load_ms": 41.906636
+          },
+          {
+            "total_ms": 3089.46403,
+            "ms_per_tick": 5.149106716666667,
+            "processing_ticks_per_second": 194.2084433331305,
+            "load_ms": 41.630886
+          },
+          {
+            "total_ms": 3048.895534,
+            "ms_per_tick": 5.081492556666666,
+            "processing_ticks_per_second": 196.79257400230756,
+            "load_ms": 42.002795
+          }
+        ],
+        "median_ms_per_tick": 5.081492556666666,
+        "components_separate_pass": {
+          "font load/layout/draw": {
+            "calls": 40300,
+            "exclusive_ms": 2494.626879,
+            "ms_per_tick": 4.157711465,
+            "percent_instrumented_total": 80.05961983287511
+          },
+          "JPEG validation": {
+            "calls": 1820,
+            "exclusive_ms": 415.489413,
+            "ms_per_tick": 0.692482355,
+            "percent_instrumented_total": 13.33422834868943
+          },
+          "JPEG encode": {
+            "calls": 620,
+            "exclusive_ms": 96.661605,
+            "ms_per_tick": 0.161102675,
+            "percent_instrumented_total": 3.102143817129752
+          },
+          "image copy/convert/bytes": {
+            "calls": 2480,
+            "exclusive_ms": 34.649682,
+            "ms_per_tick": 0.057749470000000004,
+            "percent_instrumented_total": 1.1120061246842743
+          },
+          "rotation": {
+            "calls": 620,
+            "exclusive_ms": 21.657171,
+            "ms_per_tick": 0.036095285000000005,
+            "percent_instrumented_total": 0.6950397638666539
+          },
+          "telemetry composition": {
+            "calls": 620,
+            "exclusive_ms": 11.680471,
+            "ms_per_tick": 0.019467451666666667,
+            "percent_instrumented_total": 0.3748592928269024
+          },
+          "memory sender/reports": {
+            "calls": 600,
+            "exclusive_ms": 11.669825,
+            "ms_per_tick": 0.019449708333333333,
+            "percent_instrumented_total": 0.37451763262917276
+          },
+          "lookup/composition Python": {
+            "calls": 1860,
+            "exclusive_ms": 10.637916,
+            "ms_per_tick": 0.01772986,
+            "percent_instrumented_total": 0.3414007593454057
+          },
+          "sensor snapshot/slots": {
+            "calls": 680,
+            "exclusive_ms": 5.699007,
+            "ms_per_tick": 0.009498345,
+            "percent_instrumented_total": 0.18289722510638198
+          },
+          "buffer publish": {
+            "calls": 600,
+            "exclusive_ms": 3.075919,
+            "ms_per_tick": 0.0051265316666666665,
+            "percent_instrumented_total": 0.09871492520574152
+          }
+        },
+        "instrumented_total_ms": 3115.961435,
+        "cprofile_top_cumulative": [
+          {
+            "site": "benchmark_gif_rendering.py:183:tick",
+            "calls": 600,
+            "self_seconds": 0.00141777,
+            "cumulative_seconds": 4.8963104490000005
+          },
+          {
+            "site": "lcd_refresh.py:172:request_next_frame",
+            "calls": 600,
+            "self_seconds": 0.00023927,
+            "cumulative_seconds": 4.104978208
+          },
+          {
+            "site": "tuf_aio_gui.py:921:_request_transport_frame",
+            "calls": 600,
+            "self_seconds": 0.0010630980000000002,
+            "cumulative_seconds": 4.104738938000001
+          },
+          {
+            "site": "~:0:<method 'emit' of 'PySide6.QtCore.SignalInstance' objects>",
+            "calls": 600,
+            "self_seconds": 0.002573839,
+            "cumulative_seconds": 4.10337083
+          },
+          {
+            "site": "tuf_aio_gui.py:936:_produce_transport_frame",
+            "calls": 600,
+            "self_seconds": 0.003969366,
+            "cumulative_seconds": 4.100796991
+          },
+          {
+            "site": "tuf_aio_gui.py:877:_prepare_animation_frame",
+            "calls": 620,
+            "self_seconds": 0.00182273,
+            "cumulative_seconds": 3.5527259800000004
+          },
+          {
+            "site": "image_pipeline.py:837:render_prepared_animation_frame",
+            "calls": 620,
+            "self_seconds": 0.0021133790000000003,
+            "cumulative_seconds": 3.537385539
+          },
+          {
+            "site": "image_pipeline.py:563:_encode_and_validate_frame",
+            "calls": 620,
+            "self_seconds": 0.0015556300000000001,
+            "cumulative_seconds": 3.533806821
+          },
+          {
+            "site": "image_pipeline.py:592:compose_lcd_frame",
+            "calls": 620,
+            "self_seconds": 0.0012140100000000002,
+            "cumulative_seconds": 2.740921939
+          },
+          {
+            "site": "image_pipeline.py:458:render_data_overlay",
+            "calls": 620,
+            "self_seconds": 0.010382436,
+            "cumulative_seconds": 2.685706086
+          },
+          {
+            "site": "lcd_transport.py:281:validate_jpeg",
+            "calls": 1820,
+            "self_seconds": 0.026331278000000003,
+            "cumulative_seconds": 1.9821428060000001
+          },
+          {
+            "site": "lcd_transport.py:133:_find_scan_terminator",
+            "calls": 1820,
+            "self_seconds": 1.196916817,
+            "cumulative_seconds": 1.853385929
+          },
+          {
+            "site": "ImageDraw.py:530:text",
+            "calls": 4960,
+            "self_seconds": 0.015232641000000002,
+            "cumulative_seconds": 1.4148169380000002
+          },
+          {
+            "site": "ImageDraw.py:583:draw_text",
+            "calls": 9920,
+            "self_seconds": 0.022077274,
+            "cumulative_seconds": 1.377703291
+          },
+          {
+            "site": "ImageFont.py:562:getmask2",
+            "calls": 9920,
+            "self_seconds": 0.007927207,
+            "cumulative_seconds": 1.310464686
+          },
+          {
+            "site": "~:0:<method 'render' of 'Font' objects>",
+            "calls": 9920,
+            "self_seconds": 1.2838571170000002,
+            "cumulative_seconds": 1.298562473
+          },
+          {
+            "site": "ImageDraw.py:710:textbbox",
+            "calls": 32240,
+            "self_seconds": 0.022138642,
+            "cumulative_seconds": 1.191466889
+          },
+          {
+            "site": "ImageText.py:465:get_bbox",
+            "calls": 32240,
+            "self_seconds": 0.020272376,
+            "cumulative_seconds": 1.162238731
+          },
+          {
+            "site": "ImageText.py:449:_get_bbox",
+            "calls": 32240,
+            "self_seconds": 0.013695973,
+            "cumulative_seconds": 1.095157476
+          },
+          {
+            "site": "ImageFont.py:405:getbbox",
+            "calls": 32240,
+            "self_seconds": 0.016587782000000002,
+            "cumulative_seconds": 1.077826667
+          },
+          {
+            "site": "~:0:<method 'getsize' of 'Font' objects>",
+            "calls": 32240,
+            "self_seconds": 1.053273685,
+            "cumulative_seconds": 1.053273685
+          },
+          {
+            "site": "image_pipeline.py:242:_fit_font",
+            "calls": 9920,
+            "self_seconds": 0.014344068000000001,
+            "cumulative_seconds": 0.9354900140000001
+          },
+          {
+            "site": "image_pipeline.py:356:layout_data_overlay",
+            "calls": 620,
+            "self_seconds": 0.015458838,
+            "cumulative_seconds": 0.78419106
+          },
+          {
+            "site": "~:0:<built-in method builtins.len>",
+            "calls": 13256832,
+            "self_seconds": 0.676701258,
+            "cumulative_seconds": 0.676701258
+          },
+          {
+            "site": "benchmark_gif_rendering.py:70:send",
+            "calls": 600,
+            "self_seconds": 0.00093283,
+            "cumulative_seconds": 0.6743678900000001
+          }
+        ]
+      },
+      "combined": {
+        "runs": [
+          {
+            "total_ms": 6144.99509,
+            "ms_per_tick": 10.241658483333332,
+            "processing_ticks_per_second": 97.64043603165841,
+            "load_ms": 42.506395
+          },
+          {
+            "total_ms": 6113.200919,
+            "ms_per_tick": 10.188668198333334,
+            "processing_ticks_per_second": 98.14825456418146,
+            "load_ms": 42.051646
+          },
+          {
+            "total_ms": 5986.145022,
+            "ms_per_tick": 9.976908369999999,
+            "processing_ticks_per_second": 100.2314507575256,
+            "load_ms": 42.045386
+          }
+        ],
+        "median_ms_per_tick": 10.188668198333334,
+        "components_separate_pass": {
+          "font load/layout/draw": {
+            "calls": 79300,
+            "exclusive_ms": 4894.355718,
+            "ms_per_tick": 8.157259530000001,
+            "percent_instrumented_total": 79.01370050004492
+          },
+          "JPEG validation": {
+            "calls": 2420,
+            "exclusive_ms": 556.607762,
+            "ms_per_tick": 0.9276796033333334,
+            "percent_instrumented_total": 8.985787208094441
+          },
+          "JPEG encode": {
+            "calls": 1220,
+            "exclusive_ms": 194.895188,
+            "ms_per_tick": 0.32482531333333337,
+            "percent_instrumented_total": 3.146356926387169
+          },
+          "image copy/convert/bytes": {
+            "calls": 4880,
+            "exclusive_ms": 141.757881,
+            "ms_per_tick": 0.236263135,
+            "percent_instrumented_total": 2.2885166911063917
+          },
+          "Qt scaling/widget": {
+            "calls": 620,
+            "exclusive_ms": 111.696737,
+            "ms_per_tick": 0.18616122833333335,
+            "percent_instrumented_total": 1.8032143621462633
+          },
+          "Qt image/pixmap (+JPEG decode in baseline)": {
+            "calls": 620,
+            "exclusive_ms": 92.71758,
+            "ms_per_tick": 0.15452929999999998,
+            "percent_instrumented_total": 1.4968178692583036
+          },
+          "metadata widgets": {
+            "calls": 620,
+            "exclusive_ms": 44.354454,
+            "ms_per_tick": 0.07392409,
+            "percent_instrumented_total": 0.7160512529381746
+          },
+          "rotation": {
+            "calls": 1220,
+            "exclusive_ms": 42.743242,
+            "ms_per_tick": 0.07123873666666666,
+            "percent_instrumented_total": 0.6900401025957755
+          },
+          "lookup/composition Python": {
+            "calls": 3660,
+            "exclusive_ms": 42.001883,
+            "ms_per_tick": 0.07000313833333334,
+            "percent_instrumented_total": 0.6780717207771877
+          },
+          "telemetry composition": {
+            "calls": 1220,
+            "exclusive_ms": 23.26033,
+            "ms_per_tick": 0.038767216666666666,
+            "percent_instrumented_total": 0.3755110690857656
+          },
+          "memory sender/reports": {
+            "calls": 600,
+            "exclusive_ms": 12.22667,
+            "ms_per_tick": 0.020377783333333333,
+            "percent_instrumented_total": 0.19738541641751675
+          },
+          "sensor snapshot/slots": {
+            "calls": 1280,
+            "exclusive_ms": 11.152705,
+            "ms_per_tick": 0.018587841666666667,
+            "percent_instrumented_total": 0.18004749621988006
+          },
+          "buffer publish": {
+            "calls": 600,
+            "exclusive_ms": 3.306037,
+            "ms_per_tick": 0.0055100616666666664,
+            "percent_instrumented_total": 0.053372135662180936
+          }
+        },
+        "instrumented_total_ms": 6194.312742,
+        "cprofile_top_cumulative": [
+          {
+            "site": "benchmark_gif_rendering.py:183:tick",
+            "calls": 600,
+            "self_seconds": 0.0018531390000000002,
+            "cumulative_seconds": 8.728005101
+          },
+          {
+            "site": "tuf_aio_gui.py:877:_prepare_animation_frame",
+            "calls": 1220,
+            "self_seconds": 0.0037761780000000003,
+            "cumulative_seconds": 7.110079683
+          },
+          {
+            "site": "image_pipeline.py:837:render_prepared_animation_frame",
+            "calls": 1220,
+            "self_seconds": 0.025223082,
+            "cumulative_seconds": 7.077805721000001
+          },
+          {
+            "site": "image_pipeline.py:563:_encode_and_validate_frame",
+            "calls": 1220,
+            "self_seconds": 0.0032111780000000003,
+            "cumulative_seconds": 7.049879441000001
+          },
+          {
+            "site": "image_pipeline.py:592:compose_lcd_frame",
+            "calls": 1220,
+            "self_seconds": 0.00253834,
+            "cumulative_seconds": 5.483627510000001
+          },
+          {
+            "site": "image_pipeline.py:458:render_data_overlay",
+            "calls": 1220,
+            "self_seconds": 0.019454605,
+            "cumulative_seconds": 5.373035171000001
+          },
+          {
+            "site": "lcd_refresh.py:172:request_next_frame",
+            "calls": 600,
+            "self_seconds": 0.00023203,
+            "cumulative_seconds": 4.184497068000001
+          },
+          {
+            "site": "tuf_aio_gui.py:921:_request_transport_frame",
+            "calls": 600,
+            "self_seconds": 0.00108751,
+            "cumulative_seconds": 4.184265038
+          },
+          {
+            "site": "~:0:<method 'emit' of 'PySide6.QtCore.SignalInstance' objects>",
+            "calls": 600,
+            "self_seconds": 0.0032161950000000003,
+            "cumulative_seconds": 4.182831408
+          },
+          {
+            "site": "tuf_aio_gui.py:936:_produce_transport_frame",
+            "calls": 600,
+            "self_seconds": 0.004194579,
+            "cumulative_seconds": 4.179615213
+          },
+          {
+            "site": "tuf_aio_gui.py:911:_advance_gif_animation",
+            "calls": 600,
+            "self_seconds": 0.00082582,
+            "cumulative_seconds": 3.7424251930000003
+          },
+          {
+            "site": "tuf_aio_gui.py:900:_advance_preview_animation",
+            "calls": 600,
+            "self_seconds": 0.00081074,
+            "cumulative_seconds": 3.736221875
+          },
+          {
+            "site": "tuf_aio_gui.py:890:_render_preview_animation_frame",
+            "calls": 600,
+            "self_seconds": 0.0024502300000000003,
+            "cumulative_seconds": 3.733905437
+          },
+          {
+            "site": "ImageDraw.py:530:text",
+            "calls": 9760,
+            "self_seconds": 0.030381684000000003,
+            "cumulative_seconds": 2.787161407
+          },
+          {
+            "site": "ImageDraw.py:583:draw_text",
+            "calls": 19520,
+            "self_seconds": 0.043146614,
+            "cumulative_seconds": 2.714048614
+          },
+          {
+            "site": "lcd_transport.py:281:validate_jpeg",
+            "calls": 2420,
+            "self_seconds": 0.0384805,
+            "cumulative_seconds": 2.641797115
+          },
+          {
+            "site": "ImageFont.py:562:getmask2",
+            "calls": 19520,
+            "self_seconds": 0.015051513,
+            "cumulative_seconds": 2.58272299
+          },
+          {
+            "site": "~:0:<method 'render' of 'Font' objects>",
+            "calls": 19520,
+            "self_seconds": 2.529918072,
+            "cumulative_seconds": 2.5598559190000003
+          },
+          {
+            "site": "lcd_transport.py:133:_find_scan_terminator",
+            "calls": 2420,
+            "self_seconds": 1.58809401,
+            "cumulative_seconds": 2.459173035
+          },
+          {
+            "site": "ImageDraw.py:710:textbbox",
+            "calls": 63440,
+            "self_seconds": 0.044228244,
+            "cumulative_seconds": 2.3558085650000002
+          },
+          {
+            "site": "ImageText.py:465:get_bbox",
+            "calls": 63440,
+            "self_seconds": 0.040317024,
+            "cumulative_seconds": 2.29761205
+          },
+          {
+            "site": "ImageText.py:449:_get_bbox",
+            "calls": 63440,
+            "self_seconds": 0.026437297000000002,
+            "cumulative_seconds": 2.164232117
+          },
+          {
+            "site": "ImageFont.py:405:getbbox",
+            "calls": 63440,
+            "self_seconds": 0.033500014,
+            "cumulative_seconds": 2.13064418
+          },
+          {
+            "site": "~:0:<method 'getsize' of 'Font' objects>",
+            "calls": 63440,
+            "self_seconds": 2.081958992,
+            "cumulative_seconds": 2.081958992
+          },
+          {
+            "site": "image_pipeline.py:242:_fit_font",
+            "calls": 19520,
+            "self_seconds": 0.028180831000000003,
+            "cumulative_seconds": 1.8505827300000002
+          }
+        ]
+      }
+    },
+    "gif_sha256": "7e579a27fcfd857840103f9b2915779a2c7d90d9c85fe03ba033d010aec973af"
+  },
+  "optimized": {
+    "python": "3.14.7",
+    "platform": "Linux-7.1.13-200.fc44.x86_64-x86_64-with-glibc2.43",
+    "pillow": "12.3.0",
+    "pyside": "6.11.2",
+    "frames": 600,
+    "repeats": 3,
+    "overlay": "on",
+    "rotation": 90,
+    "preview_offset": 0,
+    "scenarios": {
+      "preview": {
+        "runs": [
+          {
+            "total_ms": 304.148422,
+            "ms_per_tick": 0.5069140366666667,
+            "processing_ticks_per_second": 1972.7210683999538,
+            "load_ms": 14.339234
+          },
+          {
+            "total_ms": 274.032345,
+            "ms_per_tick": 0.456720575,
+            "processing_ticks_per_second": 2189.5225543539395,
+            "load_ms": 11.844235
+          },
+          {
+            "total_ms": 274.113765,
+            "ms_per_tick": 0.45685627500000003,
+            "processing_ticks_per_second": 2188.87220056242,
+            "load_ms": 11.707175
+          }
+        ],
+        "median_ms_per_tick": 0.45685627500000003,
+        "components_separate_pass": {
+          "Qt scaling/widget": {
+            "calls": 620,
+            "exclusive_ms": 103.167495,
+            "ms_per_tick": 0.17194582500000002,
+            "percent_instrumented_total": 37.05185959060698
+          },
+          "telemetry composition": {
+            "calls": 620,
+            "exclusive_ms": 61.453671,
+            "ms_per_tick": 0.102422785,
+            "percent_instrumented_total": 22.070641428478574
+          },
+          "image copy/convert/bytes": {
+            "calls": 1240,
+            "exclusive_ms": 44.153587,
+            "ms_per_tick": 0.07358931166666666,
+            "percent_instrumented_total": 15.857441396106884
+          },
+          "font load/layout/draw": {
+            "calls": 6140,
+            "exclusive_ms": 24.99527,
+            "ms_per_tick": 0.04165878333333333,
+            "percent_instrumented_total": 8.976870422891542
+          },
+          "rotation": {
+            "calls": 620,
+            "exclusive_ms": 21.715272,
+            "ms_per_tick": 0.03619212,
+            "percent_instrumented_total": 7.7988828663121
+          },
+          "Qt image/pixmap (+JPEG decode in baseline)": {
+            "calls": 620,
+            "exclusive_ms": 8.631325,
+            "ms_per_tick": 0.014385541666666666,
+            "percent_instrumented_total": 3.099877941021014
+          },
+          "lookup/composition Python": {
+            "calls": 1860,
+            "exclusive_ms": 7.452387,
+            "ms_per_tick": 0.012420645000000001,
+            "percent_instrumented_total": 2.67647088590127
+          },
+          "metadata widgets": {
+            "calls": 20,
+            "exclusive_ms": 1.27321,
+            "ms_per_tick": 0.0021220166666666668,
+            "percent_instrumented_total": 0.4572641620246447
+          },
+          "sensor snapshot/slots": {
+            "calls": 680,
+            "exclusive_ms": 1.168987,
+            "ms_per_tick": 0.0019483116666666666,
+            "percent_instrumented_total": 0.4198332254480433
+          }
+        },
+        "instrumented_total_ms": 278.440802,
+        "cprofile_top_cumulative": [
+          {
+            "site": "benchmark_gif_rendering.py:191:tick",
+            "calls": 600,
+            "self_seconds": 0.00044055,
+            "cumulative_seconds": 0.362785627
+          },
+          {
+            "site": "tuf_aio_gui.py:927:_advance_gif_animation",
+            "calls": 600,
+            "self_seconds": 0.000661489,
+            "cumulative_seconds": 0.323122623
+          },
+          {
+            "site": "tuf_aio_gui.py:919:_advance_preview_animation",
+            "calls": 600,
+            "self_seconds": 0.000621139,
+            "cumulative_seconds": 0.319032975
+          },
+          {
+            "site": "tuf_aio_gui.py:913:_render_preview_animation_frame",
+            "calls": 600,
+            "self_seconds": 0.00089205,
+            "cumulative_seconds": 0.31720409600000005
+          },
+          {
+            "site": "tuf_aio_gui.py:889:_prepare_animation_frame",
+            "calls": 620,
+            "self_seconds": 0.0027173400000000004,
+            "cumulative_seconds": 0.21130773400000002
+          },
+          {
+            "site": "image_pipeline.py:884:render_prepared_animation_frame",
+            "calls": 620,
+            "self_seconds": 0.001387718,
+            "cumulative_seconds": 0.20201326800000002
+          },
+          {
+            "site": "image_pipeline.py:641:compose_lcd_frame",
+            "calls": 620,
+            "self_seconds": 0.0009339280000000001,
+            "cumulative_seconds": 0.199583691
+          },
+          {
+            "site": "image_pipeline.py:529:_draw_data_overlay",
+            "calls": 620,
+            "self_seconds": 0.003923569,
+            "cumulative_seconds": 0.14683610500000002
+          },
+          {
+            "site": "tuf_aio_gui.py:1280:_load_final_preview",
+            "calls": 620,
+            "self_seconds": 0.00090512,
+            "cumulative_seconds": 0.141688677
+          },
+          {
+            "site": "tuf_aio_gui.py:1287:_refresh_preview_if_needed",
+            "calls": 620,
+            "self_seconds": 0.0036918180000000004,
+            "cumulative_seconds": 0.140671537
+          },
+          {
+            "site": "Image.py:1840:paste",
+            "calls": 9920,
+            "self_seconds": 0.024246639,
+            "cumulative_seconds": 0.11523831500000001
+          },
+          {
+            "site": "tuf_aio_gui.py:1306:_update_scaled_preview",
+            "calls": 620,
+            "self_seconds": 0.0012213990000000002,
+            "cumulative_seconds": 0.10392305800000001
+          },
+          {
+            "site": "~:0:<method 'scaled' of 'PySide6.QtGui.QPixmap' objects>",
+            "calls": 620,
+            "self_seconds": 0.10077138100000001,
+            "cumulative_seconds": 0.101177531
+          },
+          {
+            "site": "~:0:<method 'paste' of 'ImagingCore' objects>",
+            "calls": 9920,
+            "self_seconds": 0.041566146000000005,
+            "cumulative_seconds": 0.041566146000000005
+          },
+          {
+            "site": "tuf_aio_gui.py:991:refresh_temperatures",
+            "calls": 20,
+            "self_seconds": 0.00009017,
+            "cumulative_seconds": 0.039222454000000004
+          },
+          {
+            "site": "tuf_aio_gui.py:1216:_rerender_temperature_overlay",
+            "calls": 20,
+            "self_seconds": 0.00007249,
+            "cumulative_seconds": 0.038196314
+          },
+          {
+            "site": "functools.py:1110:__get__",
+            "calls": 620,
+            "self_seconds": 0.00052358,
+            "cumulative_seconds": 0.027772872
+          },
+          {
+            "site": "image_pipeline.py:140:rgb_bytes",
+            "calls": 620,
+            "self_seconds": 0.00041764000000000005,
+            "cumulative_seconds": 0.027166552
+          },
+          {
+            "site": "Image.py:3242:frombytes",
+            "calls": 620,
+            "self_seconds": 0.000948679,
+            "cumulative_seconds": 0.02693614
+          },
+          {
+            "site": "Image.py:842:tobytes",
+            "calls": 620,
+            "self_seconds": 0.0036589490000000003,
+            "cumulative_seconds": 0.026748912000000003
+          },
+          {
+            "site": "image_pipeline.py:379:layout_data_overlay",
+            "calls": 20,
+            "self_seconds": 0.000509319,
+            "cumulative_seconds": 0.025662611000000002
+          },
+          {
+            "site": "image_pipeline.py:241:rotate_composition",
+            "calls": 620,
+            "self_seconds": 0.00047945,
+            "cumulative_seconds": 0.024554208
+          },
+          {
+            "site": "ImageDraw.py:710:textbbox",
+            "calls": 640,
+            "self_seconds": 0.00045904,
+            "cumulative_seconds": 0.024050213
+          },
+          {
+            "site": "Image.py:3097:transpose",
+            "calls": 620,
+            "self_seconds": 0.0005125300000000001,
+            "cumulative_seconds": 0.023897428000000002
+          },
+          {
+            "site": "ImageText.py:465:get_bbox",
+            "calls": 640,
+            "self_seconds": 0.00042685000000000005,
+            "cumulative_seconds": 0.023449173
+          }
+        ]
+      },
+      "lcd": {
+        "runs": [
+          {
+            "total_ms": 626.924706,
+            "ms_per_tick": 1.04487451,
+            "processing_ticks_per_second": 957.0527277959915,
+            "load_ms": 11.584125
+          },
+          {
+            "total_ms": 627.928815,
+            "ms_per_tick": 1.046548025,
+            "processing_ticks_per_second": 955.5223230200066,
+            "load_ms": 11.606325
+          },
+          {
+            "total_ms": 633.450063,
+            "ms_per_tick": 1.055750105,
+            "processing_ticks_per_second": 947.1938437552891,
+            "load_ms": 11.566345
+          }
+        ],
+        "median_ms_per_tick": 1.046548025,
+        "components_separate_pass": {
+          "JPEG validation": {
+            "calls": 1800,
+            "exclusive_ms": 400.156876,
+            "ms_per_tick": 0.6669281266666667,
+            "percent_instrumented_total": 62.969907575155695
+          },
+          "JPEG encode": {
+            "calls": 600,
+            "exclusive_ms": 82.382145,
+            "ms_per_tick": 0.137303575,
+            "percent_instrumented_total": 12.963905827006394
+          },
+          "telemetry composition": {
+            "calls": 600,
+            "exclusive_ms": 60.825767,
+            "ms_per_tick": 0.10137627833333333,
+            "percent_instrumented_total": 9.571728379291814
+          },
+          "font load/layout/draw": {
+            "calls": 5960,
+            "exclusive_ms": 24.802644,
+            "ms_per_tick": 0.04133774,
+            "percent_instrumented_total": 3.9030197754230014
+          },
+          "image copy/convert/bytes": {
+            "calls": 600,
+            "exclusive_ms": 21.564358,
+            "ms_per_tick": 0.035940596666666665,
+            "percent_instrumented_total": 3.3934332048753033
+          },
+          "rotation": {
+            "calls": 600,
+            "exclusive_ms": 18.589632,
+            "ms_per_tick": 0.030982720000000002,
+            "percent_instrumented_total": 2.9253212405030786
+          },
+          "memory sender/reports": {
+            "calls": 600,
+            "exclusive_ms": 9.339857,
+            "ms_per_tick": 0.015566428333333333,
+            "percent_instrumented_total": 1.469748409509202
+          },
+          "lookup/composition Python": {
+            "calls": 1800,
+            "exclusive_ms": 7.682199,
+            "ms_per_tick": 0.012803665,
+            "percent_instrumented_total": 1.2088942862597556
+          },
+          "buffer publish": {
+            "calls": 600,
+            "exclusive_ms": 2.087128,
+            "ms_per_tick": 0.0034785466666666666,
+            "percent_instrumented_total": 0.3284368335020677
+          },
+          "sensor snapshot/slots": {
+            "calls": 660,
+            "exclusive_ms": 1.08602,
+            "ms_per_tick": 0.0018100333333333333,
+            "percent_instrumented_total": 0.17089942251740936
+          }
+        },
+        "instrumented_total_ms": 635.473183,
+        "cprofile_top_cumulative": [
+          {
+            "site": "benchmark_gif_rendering.py:191:tick",
+            "calls": 600,
+            "self_seconds": 0.00111533,
+            "cumulative_seconds": 2.293882725
+          },
+          {
+            "site": "lcd_transport.py:281:validate_jpeg",
+            "calls": 1800,
+            "self_seconds": 0.023290849000000002,
+            "cumulative_seconds": 1.9505618530000002
+          },
+          {
+            "site": "lcd_transport.py:133:_find_scan_terminator",
+            "calls": 1800,
+            "self_seconds": 1.181181818,
+            "cumulative_seconds": 1.831486769
+          },
+          {
+            "site": "lcd_refresh.py:172:request_next_frame",
+            "calls": 600,
+            "self_seconds": 0.0002211,
+            "cumulative_seconds": 1.623768805
+          },
+          {
+            "site": "tuf_aio_gui.py:937:_request_transport_frame",
+            "calls": 600,
+            "self_seconds": 0.0009375900000000001,
+            "cumulative_seconds": 1.623547705
+          },
+          {
+            "site": "~:0:<method 'emit' of 'PySide6.QtCore.SignalInstance' objects>",
+            "calls": 600,
+            "self_seconds": 0.001230999,
+            "cumulative_seconds": 1.6223388950000002
+          },
+          {
+            "site": "tuf_aio_gui.py:952:_produce_transport_frame",
+            "calls": 600,
+            "self_seconds": 0.0031596190000000002,
+            "cumulative_seconds": 1.621107896
+          },
+          {
+            "site": "image_pipeline.py:148:jpeg_bytes",
+            "calls": 600,
+            "self_seconds": 0.000324069,
+            "cumulative_seconds": 0.755707023
+          },
+          {
+            "site": "functools.py:1110:__get__",
+            "calls": 600,
+            "self_seconds": 0.0005660600000000001,
+            "cumulative_seconds": 0.755382954
+          },
+          {
+            "site": "image_pipeline.py:144:_encoded",
+            "calls": 600,
+            "self_seconds": 0.00026403,
+            "cumulative_seconds": 0.754730164
+          },
+          {
+            "site": "image_pipeline.py:624:_encode_and_validate_image",
+            "calls": 600,
+            "self_seconds": 0.000656319,
+            "cumulative_seconds": 0.7544661340000001
+          },
+          {
+            "site": "benchmark_gif_rendering.py:71:send",
+            "calls": 600,
+            "self_seconds": 0.00083892,
+            "cumulative_seconds": 0.6679527000000001
+          },
+          {
+            "site": "~:0:<built-in method builtins.len>",
+            "calls": 13039348,
+            "self_seconds": 0.663636876,
+            "cumulative_seconds": 0.663636876
+          },
+          {
+            "site": "tuf_aio_gui.py:1265:_publish_running_frame",
+            "calls": 600,
+            "self_seconds": 0.00039626,
+            "cumulative_seconds": 0.650619641
+          },
+          {
+            "site": "lcd_refresh.py:120:publish",
+            "calls": 600,
+            "self_seconds": 0.001753659,
+            "cumulative_seconds": 0.650223381
+          },
+          {
+            "site": "lcd_refresh.py:65:__post_init__",
+            "calls": 600,
+            "self_seconds": 0.0005817,
+            "cumulative_seconds": 0.6467200430000001
+          },
+          {
+            "site": "tuf_aio_gui.py:889:_prepare_animation_frame",
+            "calls": 600,
+            "self_seconds": 0.002584897,
+            "cumulative_seconds": 0.207832014
+          },
+          {
+            "site": "image_pipeline.py:884:render_prepared_animation_frame",
+            "calls": 600,
+            "self_seconds": 0.0016091,
+            "cumulative_seconds": 0.19814130800000002
+          },
+          {
+            "site": "image_pipeline.py:641:compose_lcd_frame",
+            "calls": 600,
+            "self_seconds": 0.0010381000000000001,
+            "cumulative_seconds": 0.19543110000000002
+          },
+          {
+            "site": "image_pipeline.py:529:_draw_data_overlay",
+            "calls": 600,
+            "self_seconds": 0.004237848000000001,
+            "cumulative_seconds": 0.14673807900000002
+          },
+          {
+            "site": "Image.py:1840:paste",
+            "calls": 9600,
+            "self_seconds": 0.024437296,
+            "cumulative_seconds": 0.11495798500000001
+          },
+          {
+            "site": "image_pipeline.py:212:_encode_jpeg",
+            "calls": 600,
+            "self_seconds": 0.00057742,
+            "cumulative_seconds": 0.09820066100000001
+          },
+          {
+            "site": "Image.py:2592:save",
+            "calls": 600,
+            "self_seconds": 0.004410337,
+            "cumulative_seconds": 0.097525871
+          },
+          {
+            "site": "JpegImagePlugin.py:663:_save",
+            "calls": 600,
+            "self_seconds": 0.003892308,
+            "cumulative_seconds": 0.087664245
+          },
+          {
+            "site": "ImageFile.py:644:_save",
+            "calls": 600,
+            "self_seconds": 0.001515099,
+            "cumulative_seconds": 0.08132459800000001
+          }
+        ]
+      },
+      "combined": {
+        "runs": [
+          {
+            "total_ms": 791.165797,
+            "ms_per_tick": 1.3186096616666667,
+            "processing_ticks_per_second": 758.3745433322872,
+            "load_ms": 11.993135
+          },
+          {
+            "total_ms": 787.576088,
+            "ms_per_tick": 1.3126268133333332,
+            "processing_ticks_per_second": 761.8311540205116,
+            "load_ms": 11.841015
+          },
+          {
+            "total_ms": 786.238039,
+            "ms_per_tick": 1.3103967316666667,
+            "processing_ticks_per_second": 763.1276664801511,
+            "load_ms": 11.779185
+          }
+        ],
+        "median_ms_per_tick": 1.3126268133333332,
+        "components_separate_pass": {
+          "JPEG validation": {
+            "calls": 1800,
+            "exclusive_ms": 403.30756,
+            "ms_per_tick": 0.6721792666666667,
+            "percent_instrumented_total": 50.252193750605315
+          },
+          "Qt scaling/widget": {
+            "calls": 620,
+            "exclusive_ms": 105.054928,
+            "ms_per_tick": 0.17509154666666665,
+            "percent_instrumented_total": 13.089862724893852
+          },
+          "JPEG encode": {
+            "calls": 600,
+            "exclusive_ms": 84.984214,
+            "ms_per_tick": 0.14164035666666666,
+            "percent_instrumented_total": 10.589048188610459
+          },
+          "telemetry composition": {
+            "calls": 620,
+            "exclusive_ms": 63.709943,
+            "ms_per_tick": 0.10618323833333333,
+            "percent_instrumented_total": 7.93827023593612
+          },
+          "image copy/convert/bytes": {
+            "calls": 1240,
+            "exclusive_ms": 46.329875,
+            "ms_per_tick": 0.07721645833333333,
+            "percent_instrumented_total": 5.772710670093377
+          },
+          "font load/layout/draw": {
+            "calls": 6112,
+            "exclusive_ms": 24.581298,
+            "ms_per_tick": 0.040968830000000005,
+            "percent_instrumented_total": 3.0628341054091988
+          },
+          "rotation": {
+            "calls": 620,
+            "exclusive_ms": 22.080315,
+            "ms_per_tick": 0.036800525,
+            "percent_instrumented_total": 2.7512111785219115
+          },
+          "lookup/composition Python": {
+            "calls": 2460,
+            "exclusive_ms": 13.070225,
+            "ms_per_tick": 0.021783708333333332,
+            "percent_instrumented_total": 1.6285523610417945
+          },
+          "Qt image/pixmap (+JPEG decode in baseline)": {
+            "calls": 620,
+            "exclusive_ms": 10.300617,
+            "ms_per_tick": 0.017167695,
+            "percent_instrumented_total": 1.283458711348676
+          },
+          "memory sender/reports": {
+            "calls": 600,
+            "exclusive_ms": 10.051715,
+            "ms_per_tick": 0.016752858333333332,
+            "percent_instrumented_total": 1.2524454778528467
+          },
+          "buffer publish": {
+            "calls": 600,
+            "exclusive_ms": 2.40067,
+            "ms_per_tick": 0.004001116666666667,
+            "percent_instrumented_total": 0.2991239092350901
+          },
+          "sensor snapshot/slots": {
+            "calls": 1280,
+            "exclusive_ms": 1.816879,
+            "ms_per_tick": 0.0030281316666666666,
+            "percent_instrumented_total": 0.22638344674076036
+          },
+          "metadata widgets": {
+            "calls": 20,
+            "exclusive_ms": 1.516149,
+            "ms_per_tick": 0.002526915,
+            "percent_instrumented_total": 0.18891243522136428
+          }
+        },
+        "instrumented_total_ms": 802.567072,
+        "cprofile_top_cumulative": [
+          {
+            "site": "benchmark_gif_rendering.py:191:tick",
+            "calls": 600,
+            "self_seconds": 0.0015154600000000002,
+            "cumulative_seconds": 2.4712325600000002
+          },
+          {
+            "site": "lcd_transport.py:281:validate_jpeg",
+            "calls": 1800,
+            "self_seconds": 0.024389280000000003,
+            "cumulative_seconds": 1.940137736
+          },
+          {
+            "site": "lcd_transport.py:133:_find_scan_terminator",
+            "calls": 1800,
+            "self_seconds": 1.171040702,
+            "cumulative_seconds": 1.817931125
+          },
+          {
+            "site": "lcd_refresh.py:172:request_next_frame",
+            "calls": 600,
+            "self_seconds": 0.00024803,
+            "cumulative_seconds": 1.422721928
+          },
+          {
+            "site": "tuf_aio_gui.py:937:_request_transport_frame",
+            "calls": 600,
+            "self_seconds": 0.001019119,
+            "cumulative_seconds": 1.422473898
+          },
+          {
+            "site": "~:0:<method 'emit' of 'PySide6.QtCore.SignalInstance' objects>",
+            "calls": 600,
+            "self_seconds": 0.001597709,
+            "cumulative_seconds": 1.4211363190000001
+          },
+          {
+            "site": "tuf_aio_gui.py:952:_produce_transport_frame",
+            "calls": 600,
+            "self_seconds": 0.003214718,
+            "cumulative_seconds": 1.41953861
+          },
+          {
+            "site": "functools.py:1110:__get__",
+            "calls": 1220,
+            "self_seconds": 0.001115839,
+            "cumulative_seconds": 0.784750217
+          },
+          {
+            "site": "image_pipeline.py:148:jpeg_bytes",
+            "calls": 620,
+            "self_seconds": 0.00034531000000000004,
+            "cumulative_seconds": 0.755598171
+          },
+          {
+            "site": "image_pipeline.py:144:_encoded",
+            "calls": 600,
+            "self_seconds": 0.00027990000000000003,
+            "cumulative_seconds": 0.7546967710000001
+          },
+          {
+            "site": "image_pipeline.py:624:_encode_and_validate_image",
+            "calls": 600,
+            "self_seconds": 0.00075558,
+            "cumulative_seconds": 0.7544168710000001
+          },
+          {
+            "site": "benchmark_gif_rendering.py:71:send",
+            "calls": 600,
+            "self_seconds": 0.00089052,
+            "cumulative_seconds": 0.664935052
+          },
+          {
+            "site": "~:0:<built-in method builtins.len>",
+            "calls": 13041591,
+            "self_seconds": 0.660586018,
+            "cumulative_seconds": 0.660586018
+          },
+          {
+            "site": "tuf_aio_gui.py:1265:_publish_running_frame",
+            "calls": 600,
+            "self_seconds": 0.00041381,
+            "cumulative_seconds": 0.647290687
+          },
+          {
+            "site": "lcd_refresh.py:120:publish",
+            "calls": 600,
+            "self_seconds": 0.0019389300000000002,
+            "cumulative_seconds": 0.6468768770000001
+          },
+          {
+            "site": "lcd_refresh.py:65:__post_init__",
+            "calls": 600,
+            "self_seconds": 0.00061603,
+            "cumulative_seconds": 0.643044928
+          },
+          {
+            "site": "tuf_aio_gui.py:927:_advance_gif_animation",
+            "calls": 600,
+            "self_seconds": 0.000784079,
+            "cumulative_seconds": 0.342885206
+          },
+          {
+            "site": "tuf_aio_gui.py:919:_advance_preview_animation",
+            "calls": 600,
+            "self_seconds": 0.00073567,
+            "cumulative_seconds": 0.338081238
+          },
+          {
+            "site": "tuf_aio_gui.py:913:_render_preview_animation_frame",
+            "calls": 600,
+            "self_seconds": 0.001056019,
+            "cumulative_seconds": 0.33608000800000004
+          },
+          {
+            "site": "tuf_aio_gui.py:889:_prepare_animation_frame",
+            "calls": 1220,
+            "self_seconds": 0.004978636000000001,
+            "cumulative_seconds": 0.23147492600000003
+          },
+          {
+            "site": "image_pipeline.py:884:render_prepared_animation_frame",
+            "calls": 620,
+            "self_seconds": 0.0018482160000000002,
+            "cumulative_seconds": 0.211780878
+          },
+          {
+            "site": "image_pipeline.py:641:compose_lcd_frame",
+            "calls": 620,
+            "self_seconds": 0.0011612900000000002,
+            "cumulative_seconds": 0.208715282
+          },
+          {
+            "site": "image_pipeline.py:529:_draw_data_overlay",
+            "calls": 620,
+            "self_seconds": 0.004589679,
+            "cumulative_seconds": 0.151421944
+          },
+          {
+            "site": "tuf_aio_gui.py:1280:_load_final_preview",
+            "calls": 620,
+            "self_seconds": 0.0010590600000000001,
+            "cumulative_seconds": 0.14809213400000001
+          },
+          {
+            "site": "tuf_aio_gui.py:1287:_refresh_preview_if_needed",
+            "calls": 620,
+            "self_seconds": 0.004943699,
+            "cumulative_seconds": 0.146905374
+          }
+        ]
+      },
+      "static": {
+        "runs": [
+          {
+            "total_ms": 1475.962283,
+            "ms_per_tick": 2.4599371383333333,
+            "processing_ticks_per_second": 406.51445291708717,
+            "load_ms": 4.264493
+          },
+          {
+            "total_ms": 1477.087234,
+            "ms_per_tick": 2.4618120566666666,
+            "processing_ticks_per_second": 406.2048511347435,
+            "load_ms": 1.716091
+          },
+          {
+            "total_ms": 1485.6441,
+            "ms_per_tick": 2.4760735,
+            "processing_ticks_per_second": 403.8652325950744,
+            "load_ms": 1.754462
+          }
+        ],
+        "median_ms_per_tick": 2.4618120566666666,
+        "components_separate_pass": {
+          "font load/layout/draw": {
+            "calls": 22200,
+            "exclusive_ms": 701.759104,
+            "ms_per_tick": 1.1695985066666665,
+            "percent_instrumented_total": 46.0333972119692
+          },
+          "JPEG validation": {
+            "calls": 1800,
+            "exclusive_ms": 391.024634,
+            "ms_per_tick": 0.6517077233333334,
+            "percent_instrumented_total": 25.650101571873414
+          },
+          "Qt scaling/widget": {
+            "calls": 600,
+            "exclusive_ms": 104.861257,
+            "ms_per_tick": 0.17476876166666666,
+            "percent_instrumented_total": 6.87859960506816
+          },
+          "JPEG encode": {
+            "calls": 600,
+            "exclusive_ms": 92.535518,
+            "ms_per_tick": 0.15422586333333335,
+            "percent_instrumented_total": 6.070066254971343
+          },
+          "telemetry composition": {
+            "calls": 600,
+            "exclusive_ms": 64.907094,
+            "ms_per_tick": 0.10817849,
+            "percent_instrumented_total": 4.257720381461019
+          },
+          "image copy/convert/bytes": {
+            "calls": 1200,
+            "exclusive_ms": 49.90502,
+            "ms_per_tick": 0.08317503333333334,
+            "percent_instrumented_total": 3.2736270829074523
+          },
+          "metadata widgets": {
+            "calls": 600,
+            "exclusive_ms": 39.580801,
+            "ms_per_tick": 0.06596800166666666,
+            "percent_instrumented_total": 2.596387740487237
+          },
+          "sensor snapshot/slots": {
+            "calls": 2400,
+            "exclusive_ms": 28.870638,
+            "ms_per_tick": 0.048117730000000004,
+            "percent_instrumented_total": 1.893831571605763
+          },
+          "rotation": {
+            "calls": 600,
+            "exclusive_ms": 19.905474,
+            "ms_per_tick": 0.033175790000000004,
+            "percent_instrumented_total": 1.305742363884638
+          },
+          "memory sender/reports": {
+            "calls": 600,
+            "exclusive_ms": 12.397727,
+            "ms_per_tick": 0.020662878333333336,
+            "percent_instrumented_total": 0.8132555577313256
+          },
+          "Qt image/pixmap (+JPEG decode in baseline)": {
+            "calls": 600,
+            "exclusive_ms": 12.111221,
+            "ms_per_tick": 0.020185368333333332,
+            "percent_instrumented_total": 0.7944615806721943
+          },
+          "buffer publish": {
+            "calls": 600,
+            "exclusive_ms": 2.995424,
+            "ms_per_tick": 0.004992373333333333,
+            "percent_instrumented_total": 0.19649127745447198
+          },
+          "lookup/composition Python": {
+            "calls": 600,
+            "exclusive_ms": 2.15233,
+            "ms_per_tick": 0.0035872166666666666,
+            "percent_instrumented_total": 0.14118671386874898
+          }
+        },
+        "instrumented_total_ms": 1524.456474,
+        "cprofile_top_cumulative": [
+          {
+            "site": "benchmark_gif_rendering.py:191:tick",
+            "calls": 600,
+            "self_seconds": 0.0018758520000000001,
+            "cumulative_seconds": 3.152741443
+          },
+          {
+            "site": "tuf_aio_gui.py:991:refresh_temperatures",
+            "calls": 600,
+            "self_seconds": 0.0028710410000000004,
+            "cumulative_seconds": 2.516008466
+          },
+          {
+            "site": "tuf_aio_gui.py:1216:_rerender_temperature_overlay",
+            "calls": 600,
+            "self_seconds": 0.0033490620000000003,
+            "cumulative_seconds": 2.4864917980000003
+          },
+          {
+            "site": "lcd_transport.py:281:validate_jpeg",
+            "calls": 1800,
+            "self_seconds": 0.026197724000000002,
+            "cumulative_seconds": 1.8399232010000002
+          },
+          {
+            "site": "lcd_transport.py:133:_find_scan_terminator",
+            "calls": 1800,
+            "self_seconds": 1.106500583,
+            "cumulative_seconds": 1.711668908
+          },
+          {
+            "site": "image_pipeline.py:746:rerender_prepared_image",
+            "calls": 600,
+            "self_seconds": 0.0010893600000000002,
+            "cumulative_seconds": 0.948010789
+          },
+          {
+            "site": "image_pipeline.py:641:compose_lcd_frame",
+            "calls": 600,
+            "self_seconds": 0.001214791,
+            "cumulative_seconds": 0.9421825570000001
+          },
+          {
+            "site": "image_pipeline.py:529:_draw_data_overlay",
+            "calls": 600,
+            "self_seconds": 0.006509723,
+            "cumulative_seconds": 0.88964425
+          },
+          {
+            "site": "image_pipeline.py:379:layout_data_overlay",
+            "calls": 600,
+            "self_seconds": 0.014711091,
+            "cumulative_seconds": 0.7627353560000001
+          },
+          {
+            "site": "functools.py:1110:__get__",
+            "calls": 1200,
+            "self_seconds": 0.001184591,
+            "cumulative_seconds": 0.75567443
+          },
+          {
+            "site": "image_pipeline.py:148:jpeg_bytes",
+            "calls": 1200,
+            "self_seconds": 0.00040662,
+            "cumulative_seconds": 0.7258311190000001
+          },
+          {
+            "site": "image_pipeline.py:144:_encoded",
+            "calls": 600,
+            "self_seconds": 0.00029609,
+            "cumulative_seconds": 0.7247992390000001
+          },
+          {
+            "site": "image_pipeline.py:624:_encode_and_validate_image",
+            "calls": 600,
+            "self_seconds": 0.0008392920000000001,
+            "cumulative_seconds": 0.724503149
+          },
+          {
+            "site": "ImageDraw.py:710:textbbox",
+            "calls": 19200,
+            "self_seconds": 0.013220706,
+            "cumulative_seconds": 0.716366685
+          },
+          {
+            "site": "ImageText.py:465:get_bbox",
+            "calls": 19200,
+            "self_seconds": 0.012274569,
+            "cumulative_seconds": 0.6984295770000001
+          },
+          {
+            "site": "ImageText.py:449:_get_bbox",
+            "calls": 19200,
+            "self_seconds": 0.008087945000000001,
+            "cumulative_seconds": 0.6578660620000001
+          },
+          {
+            "site": "ImageFont.py:405:getbbox",
+            "calls": 19200,
+            "self_seconds": 0.009664406,
+            "cumulative_seconds": 0.647628345
+          },
+          {
+            "site": "benchmark_gif_rendering.py:71:send",
+            "calls": 600,
+            "self_seconds": 0.00102702,
+            "cumulative_seconds": 0.634857125
+          },
+          {
+            "site": "~:0:<method 'getsize' of 'Font' objects>",
+            "calls": 19200,
+            "self_seconds": 0.6333990150000001,
+            "cumulative_seconds": 0.6333990150000001
+          },
+          {
+            "site": "~:0:<built-in method builtins.len>",
+            "calls": 12386160,
+            "self_seconds": 0.622154517,
+            "cumulative_seconds": 0.622154517
+          },
+          {
+            "site": "tuf_aio_gui.py:1265:_publish_running_frame",
+            "calls": 600,
+            "self_seconds": 0.00047052000000000004,
+            "cumulative_seconds": 0.612648953
+          },
+          {
+            "site": "lcd_refresh.py:120:publish",
+            "calls": 600,
+            "self_seconds": 0.002096101,
+            "cumulative_seconds": 0.6121784330000001
+          },
+          {
+            "site": "lcd_refresh.py:65:__post_init__",
+            "calls": 600,
+            "self_seconds": 0.000671751,
+            "cumulative_seconds": 0.6080993010000001
+          },
+          {
+            "site": "image_pipeline.py:265:_fit_font",
+            "calls": 4800,
+            "self_seconds": 0.006794036000000001,
+            "cumulative_seconds": 0.463090449
+          },
+          {
+            "site": "tuf_aio_gui.py:1280:_load_final_preview",
+            "calls": 600,
+            "self_seconds": 0.001593571,
+            "cumulative_seconds": 0.148581171
+          }
+        ]
+      }
+    },
+    "source_sha256": {
+      "image_pipeline.py": "810864c7c64549f2ab0d828a27bbbfeadea1cb7cb1e9b718d7c092b5a2f87b97",
+      "tuf_aio_gui.py": "7ac910f94badd36434876e01546b211b11c356635bdb67918cd5761b3b047d37",
+      "gif_animation.py": "5cdda5106fa858045442e599e8f78a10f8b52712cce2c77a41e53b35ea0c7e87",
+      "lcd_refresh.py": "d01ddd6c9dfa31dcb07fa637d53640ac75fc8297287a0875e9a338bf3dcb98f6",
+      "lcd_transport.py": "9ff413774a26c6acc14487e9b1f9b51af36f96ae3d69855b52c4fe6cd098f151"
+    },
+    "gif_sha256": "7e579a27fcfd857840103f9b2915779a2c7d90d9c85fe03ba033d010aec973af"
+  },
+  "baseline_no_overlay": {
+    "python": "3.14.7",
+    "platform": "Linux-7.1.13-200.fc44.x86_64-x86_64-with-glibc2.43",
+    "pillow": "12.3.0",
+    "pyside": "6.11.2",
+    "frames": 600,
+    "repeats": 3,
+    "overlay": "off",
+    "rotation": 90,
+    "preview_offset": 0,
+    "scenarios": {
+      "preview": {
+        "runs": [
+          {
+            "total_ms": 480.042163,
+            "ms_per_tick": 0.8000702716666666,
+            "processing_ticks_per_second": 1249.8902101647268,
+            "load_ms": 18.094978
+          },
+          {
+            "total_ms": 441.4766,
+            "ms_per_tick": 0.7357943333333333,
+            "processing_ticks_per_second": 1359.075430045443,
+            "load_ms": 17.485509
+          },
+          {
+            "total_ms": 432.033701,
+            "ms_per_tick": 0.7200561683333333,
+            "processing_ticks_per_second": 1388.7805479323013,
+            "load_ms": 16.38811
+          }
+        ],
+        "median_ms_per_tick": 0.7357943333333333,
+        "components_separate_pass": {
+          "Qt scaling/widget": {
+            "calls": 600,
+            "exclusive_ms": 101.447748,
+            "ms_per_tick": 0.16907957999999998,
+            "percent_instrumented_total": 26.077854088548065
+          },
+          "JPEG encode": {
+            "calls": 600,
+            "exclusive_ms": 76.135479,
+            "ms_per_tick": 0.126892465,
+            "percent_instrumented_total": 19.57115807364906
+          },
+          "Qt image/pixmap (+JPEG decode in baseline)": {
+            "calls": 600,
+            "exclusive_ms": 68.579737,
+            "ms_per_tick": 0.11429956166666666,
+            "percent_instrumented_total": 17.62890167770901
+          },
+          "JPEG validation": {
+            "calls": 600,
+            "exclusive_ms": 50.862865,
+            "ms_per_tick": 0.08477144166666667,
+            "percent_instrumented_total": 13.074655654214403
+          },
+          "image copy/convert/bytes": {
+            "calls": 2400,
+            "exclusive_ms": 32.134401,
+            "ms_per_tick": 0.053557335,
+            "percent_instrumented_total": 8.260372822676091
+          },
+          "metadata widgets": {
+            "calls": 600,
+            "exclusive_ms": 23.811681,
+            "ms_per_tick": 0.039686135000000004,
+            "percent_instrumented_total": 6.120959360488241
+          },
+          "rotation": {
+            "calls": 600,
+            "exclusive_ms": 18.188096,
+            "ms_per_tick": 0.030313493333333334,
+            "percent_instrumented_total": 4.675377452799688
+          },
+          "lookup/composition Python": {
+            "calls": 1800,
+            "exclusive_ms": 7.289049,
+            "ms_per_tick": 0.012148415000000001,
+            "percent_instrumented_total": 1.873701092569124
+          },
+          "sensor snapshot/slots": {
+            "calls": 620,
+            "exclusive_ms": 3.866866,
+            "ms_per_tick": 0.0064447766666666665,
+            "percent_instrumented_total": 0.994004985975317
+          },
+          "telemetry composition": {
+            "calls": 600,
+            "exclusive_ms": 0.932268,
+            "ms_per_tick": 0.00155378,
+            "percent_instrumented_total": 0.2396460183169618
+          }
+        },
+        "instrumented_total_ms": 389.018773,
+        "cprofile_top_cumulative": [
+          {
+            "site": "benchmark_gif_rendering.py:191:tick",
+            "calls": 600,
+            "self_seconds": 0.0006551090000000001,
+            "cumulative_seconds": 0.702145565
+          },
+          {
+            "site": "tuf_aio_gui.py:911:_advance_gif_animation",
+            "calls": 600,
+            "self_seconds": 0.000712018,
+            "cumulative_seconds": 0.7014557760000001
+          },
+          {
+            "site": "tuf_aio_gui.py:900:_advance_preview_animation",
+            "calls": 600,
+            "self_seconds": 0.000751928,
+            "cumulative_seconds": 0.696238533
+          },
+          {
+            "site": "tuf_aio_gui.py:890:_render_preview_animation_frame",
+            "calls": 600,
+            "self_seconds": 0.0022191380000000003,
+            "cumulative_seconds": 0.6937790070000001
+          },
+          {
+            "site": "tuf_aio_gui.py:877:_prepare_animation_frame",
+            "calls": 600,
+            "self_seconds": 0.001629168,
+            "cumulative_seconds": 0.46263089300000004
+          },
+          {
+            "site": "image_pipeline.py:835:render_prepared_animation_frame",
+            "calls": 600,
+            "self_seconds": 0.011057089,
+            "cumulative_seconds": 0.447680791
+          },
+          {
+            "site": "image_pipeline.py:561:_encode_and_validate_frame",
+            "calls": 600,
+            "self_seconds": 0.00127217,
+            "cumulative_seconds": 0.435334182
+          },
+          {
+            "site": "lcd_transport.py:281:validate_jpeg",
+            "calls": 600,
+            "self_seconds": 0.009933635000000001,
+            "cumulative_seconds": 0.23240541
+          },
+          {
+            "site": "tuf_aio_gui.py:1225:_load_final_preview",
+            "calls": 600,
+            "self_seconds": 0.0010907690000000001,
+            "cumulative_seconds": 0.190987753
+          },
+          {
+            "site": "tuf_aio_gui.py:1232:_refresh_preview_if_needed",
+            "calls": 600,
+            "self_seconds": 0.0032547170000000003,
+            "cumulative_seconds": 0.189654165
+          },
+          {
+            "site": "lcd_transport.py:133:_find_scan_terminator",
+            "calls": 600,
+            "self_seconds": 0.11910964500000001,
+            "cumulative_seconds": 0.184418778
+          },
+          {
+            "site": "tuf_aio_gui.py:1244:_update_scaled_preview",
+            "calls": 600,
+            "self_seconds": 0.001575828,
+            "cumulative_seconds": 0.11206368900000001
+          },
+          {
+            "site": "~:0:<method 'scaled' of 'PySide6.QtGui.QPixmap' objects>",
+            "calls": 600,
+            "self_seconds": 0.106203612,
+            "cumulative_seconds": 0.10676843200000001
+          },
+          {
+            "site": "image_pipeline.py:590:compose_lcd_frame",
+            "calls": 600,
+            "self_seconds": 0.0009478100000000001,
+            "cumulative_seconds": 0.10306359100000001
+          },
+          {
+            "site": "image_pipeline.py:188:_encode_jpeg",
+            "calls": 600,
+            "self_seconds": 0.00074397,
+            "cumulative_seconds": 0.09859301100000001
+          },
+          {
+            "site": "Image.py:2592:save",
+            "calls": 600,
+            "self_seconds": 0.0064921300000000005,
+            "cumulative_seconds": 0.09772929100000001
+          },
+          {
+            "site": "JpegImagePlugin.py:663:_save",
+            "calls": 600,
+            "self_seconds": 0.004186548,
+            "cumulative_seconds": 0.08384478100000001
+          },
+          {
+            "site": "ImageFile.py:644:_save",
+            "calls": 600,
+            "self_seconds": 0.00178516,
+            "cumulative_seconds": 0.076951454
+          },
+          {
+            "site": "~:0:<method 'loadFromData' of 'PySide6.QtGui.QPixmap' objects>",
+            "calls": 600,
+            "self_seconds": 0.074335759,
+            "cumulative_seconds": 0.074335759
+          },
+          {
+            "site": "ImageFile.py:672:_encode_tile",
+            "calls": 600,
+            "self_seconds": 0.0016025780000000001,
+            "cumulative_seconds": 0.073327485
+          },
+          {
+            "site": "~:0:<built-in method builtins.len>",
+            "calls": 1298550,
+            "self_seconds": 0.06974776,
+            "cumulative_seconds": 0.06974776
+          },
+          {
+            "site": "~:0:<method 'encode' of 'ImagingEncoder' objects>",
+            "calls": 600,
+            "self_seconds": 0.068733191,
+            "cumulative_seconds": 0.068733191
+          },
+          {
+            "site": "image_pipeline.py:456:render_data_overlay",
+            "calls": 600,
+            "self_seconds": 0.0009313500000000001,
+            "cumulative_seconds": 0.050904153
+          },
+          {
+            "site": "Image.py:1356:copy",
+            "calls": 1200,
+            "self_seconds": 0.0009612170000000001,
+            "cumulative_seconds": 0.048442435000000006
+          },
+          {
+            "site": "~:0:<method 'copy' of 'ImagingCore' objects>",
+            "calls": 1200,
+            "self_seconds": 0.043862052000000006,
+            "cumulative_seconds": 0.043862052000000006
+          }
+        ]
+      },
+      "lcd": {
+        "runs": [
+          {
+            "total_ms": 276.528617,
+            "ms_per_tick": 0.46088102833333333,
+            "processing_ticks_per_second": 2169.757352816761,
+            "load_ms": 15.921881
+          },
+          {
+            "total_ms": 278.790945,
+            "ms_per_tick": 0.46465157500000004,
+            "processing_ticks_per_second": 2152.150242899747,
+            "load_ms": 15.729941
+          },
+          {
+            "total_ms": 276.029568,
+            "ms_per_tick": 0.46004928,
+            "processing_ticks_per_second": 2173.680176175909,
+            "load_ms": 15.802981
+          }
+        ],
+        "median_ms_per_tick": 0.46088102833333333,
+        "components_separate_pass": {
+          "JPEG validation": {
+            "calls": 1800,
+            "exclusive_ms": 141.368484,
+            "ms_per_tick": 0.23561414000000003,
+            "percent_instrumented_total": 49.49085019824401
+          },
+          "JPEG encode": {
+            "calls": 600,
+            "exclusive_ms": 72.450492,
+            "ms_per_tick": 0.12075082000000001,
+            "percent_instrumented_total": 25.36376103715646
+          },
+          "image copy/convert/bytes": {
+            "calls": 2400,
+            "exclusive_ms": 30.732342,
+            "ms_per_tick": 0.05122057,
+            "percent_instrumented_total": 10.758902487510603
+          },
+          "rotation": {
+            "calls": 600,
+            "exclusive_ms": 17.812786,
+            "ms_per_tick": 0.029687976666666664,
+            "percent_instrumented_total": 6.2359721105828525
+          },
+          "lookup/composition Python": {
+            "calls": 1800,
+            "exclusive_ms": 6.138846,
+            "ms_per_tick": 0.01023141,
+            "percent_instrumented_total": 2.149112016905334
+          },
+          "memory sender/reports": {
+            "calls": 600,
+            "exclusive_ms": 5.342677,
+            "ms_per_tick": 0.008904461666666667,
+            "percent_instrumented_total": 1.8703859557877394
+          },
+          "sensor snapshot/slots": {
+            "calls": 620,
+            "exclusive_ms": 3.448238,
+            "ms_per_tick": 0.005747063333333333,
+            "percent_instrumented_total": 1.2071730945766705
+          },
+          "buffer publish": {
+            "calls": 600,
+            "exclusive_ms": 1.899648,
+            "ms_per_tick": 0.00316608,
+            "percent_instrumented_total": 0.665036448982461
+          },
+          "telemetry composition": {
+            "calls": 600,
+            "exclusive_ms": 0.76444,
+            "ms_per_tick": 0.0012740666666666667,
+            "percent_instrumented_total": 0.2676182445696005
+          }
+        },
+        "instrumented_total_ms": 285.645697,
+        "cprofile_top_cumulative": [
+          {
+            "site": "benchmark_gif_rendering.py:191:tick",
+            "calls": 600,
+            "self_seconds": 0.000828348,
+            "cumulative_seconds": 0.845312315
+          },
+          {
+            "site": "lcd_transport.py:281:validate_jpeg",
+            "calls": 1800,
+            "self_seconds": 0.022370361000000002,
+            "cumulative_seconds": 0.657734155
+          },
+          {
+            "site": "lcd_refresh.py:172:request_next_frame",
+            "calls": 600,
+            "self_seconds": 0.00021009000000000002,
+            "cumulative_seconds": 0.618298036
+          },
+          {
+            "site": "tuf_aio_gui.py:921:_request_transport_frame",
+            "calls": 600,
+            "self_seconds": 0.0008432200000000001,
+            "cumulative_seconds": 0.618087946
+          },
+          {
+            "site": "~:0:<method 'emit' of 'PySide6.QtCore.SignalInstance' objects>",
+            "calls": 600,
+            "self_seconds": 0.00103619,
+            "cumulative_seconds": 0.616999536
+          },
+          {
+            "site": "tuf_aio_gui.py:936:_produce_transport_frame",
+            "calls": 600,
+            "self_seconds": 0.002800447,
+            "cumulative_seconds": 0.615963346
+          },
+          {
+            "site": "lcd_transport.py:133:_find_scan_terminator",
+            "calls": 1800,
+            "self_seconds": 0.35215055700000003,
+            "cumulative_seconds": 0.541416917
+          },
+          {
+            "site": "tuf_aio_gui.py:877:_prepare_animation_frame",
+            "calls": 600,
+            "self_seconds": 0.001273709,
+            "cumulative_seconds": 0.38686216300000004
+          },
+          {
+            "site": "image_pipeline.py:835:render_prepared_animation_frame",
+            "calls": 600,
+            "self_seconds": 0.0013753580000000001,
+            "cumulative_seconds": 0.37492740300000005
+          },
+          {
+            "site": "image_pipeline.py:561:_encode_and_validate_frame",
+            "calls": 600,
+            "self_seconds": 0.0009690870000000001,
+            "cumulative_seconds": 0.37249883500000003
+          },
+          {
+            "site": "benchmark_gif_rendering.py:71:send",
+            "calls": 600,
+            "self_seconds": 0.0007334990000000001,
+            "cumulative_seconds": 0.22616017100000002
+          },
+          {
+            "site": "tuf_aio_gui.py:1210:_publish_running_frame",
+            "calls": 600,
+            "self_seconds": 0.00037659900000000003,
+            "cumulative_seconds": 0.22302625
+          },
+          {
+            "site": "lcd_refresh.py:120:publish",
+            "calls": 600,
+            "self_seconds": 0.0015257180000000001,
+            "cumulative_seconds": 0.222649651
+          },
+          {
+            "site": "lcd_refresh.py:65:__post_init__",
+            "calls": 600,
+            "self_seconds": 0.000512938,
+            "cumulative_seconds": 0.219501206
+          },
+          {
+            "site": "~:0:<built-in method builtins.len>",
+            "calls": 3891450,
+            "self_seconds": 0.20086545500000003,
+            "cumulative_seconds": 0.20086545500000003
+          },
+          {
+            "site": "image_pipeline.py:188:_encode_jpeg",
+            "calls": 600,
+            "self_seconds": 0.00056462,
+            "cumulative_seconds": 0.08702535700000001
+          },
+          {
+            "site": "Image.py:2592:save",
+            "calls": 600,
+            "self_seconds": 0.004582074,
+            "cumulative_seconds": 0.08637143700000001
+          },
+          {
+            "site": "JpegImagePlugin.py:663:_save",
+            "calls": 600,
+            "self_seconds": 0.003590897,
+            "cumulative_seconds": 0.075826133
+          },
+          {
+            "site": "ImageFile.py:644:_save",
+            "calls": 600,
+            "self_seconds": 0.001441757,
+            "cumulative_seconds": 0.0698661
+          },
+          {
+            "site": "ImageFile.py:672:_encode_tile",
+            "calls": 600,
+            "self_seconds": 0.001269156,
+            "cumulative_seconds": 0.066965333
+          },
+          {
+            "site": "~:0:<method 'encode' of 'ImagingEncoder' objects>",
+            "calls": 600,
+            "self_seconds": 0.063612668,
+            "cumulative_seconds": 0.063612668
+          },
+          {
+            "site": "image_pipeline.py:590:compose_lcd_frame",
+            "calls": 600,
+            "self_seconds": 0.0007352600000000001,
+            "cumulative_seconds": 0.061371615000000004
+          },
+          {
+            "site": "lcd_transport.py:224:_parse_quantization_tables",
+            "calls": 3600,
+            "self_seconds": 0.018825371,
+            "cumulative_seconds": 0.030996674000000002
+          },
+          {
+            "site": "Image.py:3242:frombytes",
+            "calls": 600,
+            "self_seconds": 0.00095354,
+            "cumulative_seconds": 0.026586769000000003
+          },
+          {
+            "site": "Image.py:925:frombytes",
+            "calls": 600,
+            "self_seconds": 0.001294318,
+            "cumulative_seconds": 0.020134365
+          }
+        ]
+      },
+      "combined": {
+        "runs": [
+          {
+            "total_ms": 776.159147,
+            "ms_per_tick": 1.2935985783333335,
+            "processing_ticks_per_second": 773.0373368903942,
+            "load_ms": 16.35115
+          },
+          {
+            "total_ms": 674.443539,
+            "ms_per_tick": 1.1240725649999999,
+            "processing_ticks_per_second": 889.6222816362393,
+            "load_ms": 16.185301
+          },
+          {
+            "total_ms": 674.26891,
+            "ms_per_tick": 1.1237815166666667,
+            "processing_ticks_per_second": 889.8526850363011,
+            "load_ms": 16.14866
+          }
+        ],
+        "median_ms_per_tick": 1.1240725649999999,
+        "components_separate_pass": {
+          "JPEG validation": {
+            "calls": 2400,
+            "exclusive_ms": 192.366527,
+            "ms_per_tick": 0.32061087833333335,
+            "percent_instrumented_total": 27.904686985696596
+          },
+          "JPEG encode": {
+            "calls": 1200,
+            "exclusive_ms": 149.683929,
+            "ms_per_tick": 0.249473215,
+            "percent_instrumented_total": 21.713149635093394
+          },
+          "Qt scaling/widget": {
+            "calls": 600,
+            "exclusive_ms": 102.542953,
+            "ms_per_tick": 0.17090492166666665,
+            "percent_instrumented_total": 14.874880004742186
+          },
+          "Qt image/pixmap (+JPEG decode in baseline)": {
+            "calls": 600,
+            "exclusive_ms": 71.254472,
+            "ms_per_tick": 0.11875745333333333,
+            "percent_instrumented_total": 10.33617318199586
+          },
+          "image copy/convert/bytes": {
+            "calls": 4800,
+            "exclusive_ms": 64.108052,
+            "ms_per_tick": 0.10684675333333332,
+            "percent_instrumented_total": 9.29951354958319
+          },
+          "rotation": {
+            "calls": 1200,
+            "exclusive_ms": 36.567699,
+            "ms_per_tick": 0.060946165000000004,
+            "percent_instrumented_total": 5.304510146831161
+          },
+          "metadata widgets": {
+            "calls": 600,
+            "exclusive_ms": 27.354121,
+            "ms_per_tick": 0.04559020166666667,
+            "percent_instrumented_total": 3.9679885902076406
+          },
+          "lookup/composition Python": {
+            "calls": 3600,
+            "exclusive_ms": 13.914576,
+            "ms_per_tick": 0.02319096,
+            "percent_instrumented_total": 2.0184482917794018
+          },
+          "sensor snapshot/slots": {
+            "calls": 1220,
+            "exclusive_ms": 7.448924,
+            "ms_per_tick": 0.012414873333333333,
+            "percent_instrumented_total": 1.0805408604182112
+          },
+          "memory sender/reports": {
+            "calls": 600,
+            "exclusive_ms": 6.870094,
+            "ms_per_tick": 0.011450156666666666,
+            "percent_instrumented_total": 0.9965757848937631
+          },
+          "buffer publish": {
+            "calls": 600,
+            "exclusive_ms": 2.235774,
+            "ms_per_tick": 0.00372629,
+            "percent_instrumented_total": 0.32432135992536176
+          },
+          "telemetry composition": {
+            "calls": 1200,
+            "exclusive_ms": 1.653908,
+            "ms_per_tick": 0.0027565133333333335,
+            "percent_instrumented_total": 0.23991588226333935
+          }
+        },
+        "instrumented_total_ms": 689.369951,
+        "cprofile_top_cumulative": [
+          {
+            "site": "benchmark_gif_rendering.py:191:tick",
+            "calls": 600,
+            "self_seconds": 0.0013321700000000001,
+            "cumulative_seconds": 1.460847234
+          },
+          {
+            "site": "lcd_transport.py:281:validate_jpeg",
+            "calls": 2400,
+            "self_seconds": 0.031306886,
+            "cumulative_seconds": 0.871839476
+          },
+          {
+            "site": "tuf_aio_gui.py:877:_prepare_animation_frame",
+            "calls": 1200,
+            "self_seconds": 0.002875246,
+            "cumulative_seconds": 0.7813234720000001
+          },
+          {
+            "site": "image_pipeline.py:835:render_prepared_animation_frame",
+            "calls": 1200,
+            "self_seconds": 0.003053744,
+            "cumulative_seconds": 0.75514762
+          },
+          {
+            "site": "image_pipeline.py:561:_encode_and_validate_frame",
+            "calls": 1200,
+            "self_seconds": 0.002123856,
+            "cumulative_seconds": 0.74994262
+          },
+          {
+            "site": "lcd_transport.py:133:_find_scan_terminator",
+            "calls": 2400,
+            "self_seconds": 0.45841376600000006,
+            "cumulative_seconds": 0.7106765110000001
+          },
+          {
+            "site": "lcd_refresh.py:172:request_next_frame",
+            "calls": 600,
+            "self_seconds": 0.00023046900000000002,
+            "cumulative_seconds": 0.629018697
+          },
+          {
+            "site": "tuf_aio_gui.py:921:_request_transport_frame",
+            "calls": 600,
+            "self_seconds": 0.0009675080000000001,
+            "cumulative_seconds": 0.628788228
+          },
+          {
+            "site": "~:0:<method 'emit' of 'PySide6.QtCore.SignalInstance' objects>",
+            "calls": 600,
+            "self_seconds": 0.001862008,
+            "cumulative_seconds": 0.6275261200000001
+          },
+          {
+            "site": "tuf_aio_gui.py:936:_produce_transport_frame",
+            "calls": 600,
+            "self_seconds": 0.0030719740000000003,
+            "cumulative_seconds": 0.625664112
+          },
+          {
+            "site": "tuf_aio_gui.py:911:_advance_gif_animation",
+            "calls": 600,
+            "self_seconds": 0.000713079,
+            "cumulative_seconds": 0.60467671
+          },
+          {
+            "site": "tuf_aio_gui.py:900:_advance_preview_animation",
+            "calls": 600,
+            "self_seconds": 0.0007412670000000001,
+            "cumulative_seconds": 0.599999281
+          },
+          {
+            "site": "tuf_aio_gui.py:890:_render_preview_animation_frame",
+            "calls": 600,
+            "self_seconds": 0.0016062090000000002,
+            "cumulative_seconds": 0.597981206
+          },
+          {
+            "site": "~:0:<built-in method builtins.len>",
+            "calls": 5190000,
+            "self_seconds": 0.268161238,
+            "cumulative_seconds": 0.268161238
+          },
+          {
+            "site": "benchmark_gif_rendering.py:71:send",
+            "calls": 600,
+            "self_seconds": 0.000813639,
+            "cumulative_seconds": 0.22579395700000002
+          },
+          {
+            "site": "tuf_aio_gui.py:1210:_publish_running_frame",
+            "calls": 600,
+            "self_seconds": 0.00043250000000000005,
+            "cumulative_seconds": 0.221748566
+          },
+          {
+            "site": "lcd_refresh.py:120:publish",
+            "calls": 600,
+            "self_seconds": 0.0018681460000000002,
+            "cumulative_seconds": 0.221316066
+          },
+          {
+            "site": "lcd_refresh.py:65:__post_init__",
+            "calls": 600,
+            "self_seconds": 0.0005931980000000001,
+            "cumulative_seconds": 0.21764691200000003
+          },
+          {
+            "site": "image_pipeline.py:188:_encode_jpeg",
+            "calls": 1200,
+            "self_seconds": 0.001272289,
+            "cumulative_seconds": 0.182038252
+          },
+          {
+            "site": "Image.py:2592:save",
+            "calls": 1200,
+            "self_seconds": 0.010353169,
+            "cumulative_seconds": 0.180573553
+          },
+          {
+            "site": "tuf_aio_gui.py:1225:_load_final_preview",
+            "calls": 600,
+            "self_seconds": 0.0008813890000000001,
+            "cumulative_seconds": 0.177189899
+          },
+          {
+            "site": "tuf_aio_gui.py:1232:_refresh_preview_if_needed",
+            "calls": 600,
+            "self_seconds": 0.0025553670000000002,
+            "cumulative_seconds": 0.17618857000000002
+          },
+          {
+            "site": "JpegImagePlugin.py:663:_save",
+            "calls": 1200,
+            "self_seconds": 0.007659864000000001,
+            "cumulative_seconds": 0.157290698
+          },
+          {
+            "site": "ImageFile.py:644:_save",
+            "calls": 1200,
+            "self_seconds": 0.003013898,
+            "cumulative_seconds": 0.144715025
+          },
+          {
+            "site": "ImageFile.py:672:_encode_tile",
+            "calls": 1200,
+            "self_seconds": 0.0027543150000000002,
+            "cumulative_seconds": 0.138569269
+          }
+        ]
+      },
+      "static": {
+        "runs": [
+          {
+            "total_ms": 40.097225,
+            "ms_per_tick": 0.06682870833333333,
+            "processing_ticks_per_second": 14963.629029190923,
+            "load_ms": 1.792911
+          },
+          {
+            "total_ms": 40.102875,
+            "ms_per_tick": 0.066838125,
+            "processing_ticks_per_second": 14961.520838593244,
+            "load_ms": 1.694361
+          },
+          {
+            "total_ms": 40.298496,
+            "ms_per_tick": 0.06716416,
+            "processing_ticks_per_second": 14888.893123951822,
+            "load_ms": 1.652011
+          }
+        ],
+        "median_ms_per_tick": 0.066838125,
+        "components_separate_pass": {
+          "JPEG validation": {
+            "calls": 600,
+            "exclusive_ms": 36.31267,
+            "ms_per_tick": 0.060521116666666666,
+            "percent_instrumented_total": 87.59626739487882
+          },
+          "memory sender/reports": {
+            "calls": 600,
+            "exclusive_ms": 4.326374,
+            "ms_per_tick": 0.007210623333333333,
+            "percent_instrumented_total": 10.436418301222451
+          },
+          "sensor snapshot/slots": {
+            "calls": 600,
+            "exclusive_ms": 0.258721,
+            "ms_per_tick": 0.0004312016666666667,
+            "percent_instrumented_total": 0.6241070650180899
+          }
+        },
+        "instrumented_total_ms": 41.454586,
+        "cprofile_top_cumulative": [
+          {
+            "site": "benchmark_gif_rendering.py:191:tick",
+            "calls": 600,
+            "self_seconds": 0.00056695,
+            "cumulative_seconds": 0.183599176
+          },
+          {
+            "site": "benchmark_gif_rendering.py:71:send",
+            "calls": 600,
+            "self_seconds": 0.00056559,
+            "cumulative_seconds": 0.182564035
+          },
+          {
+            "site": "lcd_transport.py:281:validate_jpeg",
+            "calls": 600,
+            "self_seconds": 0.0066878120000000004,
+            "cumulative_seconds": 0.173393502
+          },
+          {
+            "site": "lcd_transport.py:133:_find_scan_terminator",
+            "calls": 600,
+            "self_seconds": 0.088490704,
+            "cumulative_seconds": 0.137443648
+          },
+          {
+            "site": "~:0:<built-in method builtins.len>",
+            "calls": 1037400,
+            "self_seconds": 0.052985988000000005,
+            "cumulative_seconds": 0.052985988000000005
+          },
+          {
+            "site": "lcd_transport.py:224:_parse_quantization_tables",
+            "calls": 1200,
+            "self_seconds": 0.006036336000000001,
+            "cumulative_seconds": 0.010058428000000001
+          },
+          {
+            "site": "lcd_transport.py:399:build_segments",
+            "calls": 600,
+            "self_seconds": 0.00246682,
+            "cumulative_seconds": 0.007980641
+          },
+          {
+            "site": "lcd_transport.py:248:_parse_standard_huffman_tables",
+            "calls": 2400,
+            "self_seconds": 0.0030281210000000004,
+            "cumulative_seconds": 0.005251261
+          },
+          {
+            "site": "lcd_transport.py:430:validate_transfer_invariants",
+            "calls": 600,
+            "self_seconds": 0.00221668,
+            "cumulative_seconds": 0.004288791
+          },
+          {
+            "site": "lcd_transport.py:102:_next_header_marker",
+            "calls": 5400,
+            "self_seconds": 0.00275878,
+            "cumulative_seconds": 0.0038847730000000002
+          },
+          {
+            "site": "lcd_transport.py:239:<genexpr>",
+            "calls": 78000,
+            "self_seconds": 0.0036903210000000003,
+            "cumulative_seconds": 0.0036903210000000003
+          },
+          {
+            "site": "lcd_transport.py:121:_read_segment_payload",
+            "calls": 5400,
+            "self_seconds": 0.002625662,
+            "cumulative_seconds": 0.0036595330000000004
+          },
+          {
+            "site": "lcd_transport.py:161:_parse_sof0",
+            "calls": 600,
+            "self_seconds": 0.001488282,
+            "cumulative_seconds": 0.0024616430000000003
+          },
+          {
+            "site": "~:0:<built-in method builtins.any>",
+            "calls": 600,
+            "self_seconds": 0.001124751,
+            "cumulative_seconds": 0.001124751
+          },
+          {
+            "site": "lcd_transport.py:190:_validate_scan_header",
+            "calls": 600,
+            "self_seconds": 0.0007273630000000001,
+            "cumulative_seconds": 0.001030853
+          },
+          {
+            "site": "<string>:2:__init__",
+            "calls": 1800,
+            "self_seconds": 0.00076895,
+            "cumulative_seconds": 0.00076895
+          },
+          {
+            "site": "~:0:<built-in method from_bytes>",
+            "calls": 7800,
+            "self_seconds": 0.0006520510000000001,
+            "cumulative_seconds": 0.0006520510000000001
+          },
+          {
+            "site": "lcd_transport.py:209:_validate_jfif",
+            "calls": 600,
+            "self_seconds": 0.00045488,
+            "cumulative_seconds": 0.00064221
+          },
+          {
+            "site": "lcd_refresh.py:142:snapshot",
+            "calls": 600,
+            "self_seconds": 0.00025050100000000003,
+            "cumulative_seconds": 0.0005844320000000001
+          },
+          {
+            "site": "~:0:<method 'hexdigest' of '_hashlib.HASH' objects>",
+            "calls": 2400,
+            "self_seconds": 0.00056955,
+            "cumulative_seconds": 0.00056955
+          },
+          {
+            "site": "~:0:<built-in method _hashlib.openssl_sha256>",
+            "calls": 2400,
+            "self_seconds": 0.00050226,
+            "cumulative_seconds": 0.00050226
+          },
+          {
+            "site": "tuf_aio_gui.py:974:refresh_temperatures",
+            "calls": 600,
+            "self_seconds": 0.00017648000000000002,
+            "cumulative_seconds": 0.000468191
+          },
+          {
+            "site": "~:0:<method 'intersection' of 'set' objects>",
+            "calls": 3600,
+            "self_seconds": 0.00044861,
+            "cumulative_seconds": 0.00044861
+          },
+          {
+            "site": "~:0:<method 'update' of 'set' objects>",
+            "calls": 3600,
+            "self_seconds": 0.00036147,
+            "cumulative_seconds": 0.00036147
+          },
+          {
+            "site": "~:0:<built-in method builtins.sum>",
+            "calls": 2400,
+            "self_seconds": 0.00035935000000000003,
+            "cumulative_seconds": 0.00035935000000000003
+          }
+        ]
+      }
+    },
+    "source_sha256": {
+      "image_pipeline.py": "1be7037e002e06b6ee5966695448a69a53c34aa3166f4cf5133fbe01434465f4",
+      "tuf_aio_gui.py": "0879547b18d7fc8abcfb3daa3c02350d845fc73c8ba78fed56657e51b9628832",
+      "gif_animation.py": "5cdda5106fa858045442e599e8f78a10f8b52712cce2c77a41e53b35ea0c7e87",
+      "lcd_refresh.py": "d01ddd6c9dfa31dcb07fa637d53640ac75fc8297287a0875e9a338bf3dcb98f6",
+      "lcd_transport.py": "9ff413774a26c6acc14487e9b1f9b51af36f96ae3d69855b52c4fe6cd098f151"
+    },
+    "gif_sha256": "7e579a27fcfd857840103f9b2915779a2c7d90d9c85fe03ba033d010aec973af"
+  },
+  "optimized_no_overlay": {
+    "python": "3.14.7",
+    "platform": "Linux-7.1.13-200.fc44.x86_64-x86_64-with-glibc2.43",
+    "pillow": "12.3.0",
+    "pyside": "6.11.2",
+    "frames": 600,
+    "repeats": 3,
+    "overlay": "off",
+    "rotation": 90,
+    "preview_offset": 0,
+    "scenarios": {
+      "preview": {
+        "runs": [
+          {
+            "total_ms": 174.754696,
+            "ms_per_tick": 0.29125782666666666,
+            "processing_ticks_per_second": 3433.3841306330332,
+            "load_ms": 11.411275
+          },
+          {
+            "total_ms": 178.746174,
+            "ms_per_tick": 0.29791028999999997,
+            "processing_ticks_per_second": 3356.7152044328514,
+            "load_ms": 11.364335
+          },
+          {
+            "total_ms": 177.006016,
+            "ms_per_tick": 0.29501002666666665,
+            "processing_ticks_per_second": 3389.7152964563643,
+            "load_ms": 11.190615
+          }
+        ],
+        "median_ms_per_tick": 0.29501002666666665,
+        "components_separate_pass": {
+          "Qt scaling/widget": {
+            "calls": 600,
+            "exclusive_ms": 99.505878,
+            "ms_per_tick": 0.16584313,
+            "percent_instrumented_total": 54.952432670623686
+          },
+          "image copy/convert/bytes": {
+            "calls": 1200,
+            "exclusive_ms": 41.221191,
+            "ms_per_tick": 0.06870198500000001,
+            "percent_instrumented_total": 22.76453179007595
+          },
+          "rotation": {
+            "calls": 600,
+            "exclusive_ms": 21.660344,
+            "ms_per_tick": 0.03610057333333334,
+            "percent_instrumented_total": 11.961992790843448
+          },
+          "Qt image/pixmap (+JPEG decode in baseline)": {
+            "calls": 600,
+            "exclusive_ms": 7.741838,
+            "ms_per_tick": 0.012903063333333334,
+            "percent_instrumented_total": 4.275454274589446
+          },
+          "lookup/composition Python": {
+            "calls": 1800,
+            "exclusive_ms": 6.493886,
+            "ms_per_tick": 0.010823143333333334,
+            "percent_instrumented_total": 3.5862688753493113
+          },
+          "sensor snapshot/slots": {
+            "calls": 620,
+            "exclusive_ms": 0.44184,
+            "ms_per_tick": 0.0007364,
+            "percent_instrumented_total": 0.24400752336649267
+          }
+        },
+        "instrumented_total_ms": 181.076384,
+        "cprofile_top_cumulative": [
+          {
+            "site": "benchmark_gif_rendering.py:191:tick",
+            "calls": 600,
+            "self_seconds": 0.00039563,
+            "cumulative_seconds": 0.20756643200000002
+          },
+          {
+            "site": "tuf_aio_gui.py:927:_advance_gif_animation",
+            "calls": 600,
+            "self_seconds": 0.00061368,
+            "cumulative_seconds": 0.207145652
+          },
+          {
+            "site": "tuf_aio_gui.py:919:_advance_preview_animation",
+            "calls": 600,
+            "self_seconds": 0.00058725,
+            "cumulative_seconds": 0.20336894200000002
+          },
+          {
+            "site": "tuf_aio_gui.py:913:_render_preview_animation_frame",
+            "calls": 600,
+            "self_seconds": 0.00079818,
+            "cumulative_seconds": 0.20167859300000002
+          },
+          {
+            "site": "tuf_aio_gui.py:1280:_load_final_preview",
+            "calls": 600,
+            "self_seconds": 0.00081276,
+            "cumulative_seconds": 0.137297108
+          },
+          {
+            "site": "tuf_aio_gui.py:1287:_refresh_preview_if_needed",
+            "calls": 600,
+            "self_seconds": 0.003574405,
+            "cumulative_seconds": 0.136382468
+          },
+          {
+            "site": "tuf_aio_gui.py:1306:_update_scaled_preview",
+            "calls": 600,
+            "self_seconds": 0.0010673400000000002,
+            "cumulative_seconds": 0.100605809
+          },
+          {
+            "site": "~:0:<method 'scaled' of 'PySide6.QtGui.QPixmap' objects>",
+            "calls": 600,
+            "self_seconds": 0.097794159,
+            "cumulative_seconds": 0.098194949
+          },
+          {
+            "site": "tuf_aio_gui.py:889:_prepare_animation_frame",
+            "calls": 600,
+            "self_seconds": 0.00280474,
+            "cumulative_seconds": 0.063583305
+          },
+          {
+            "site": "image_pipeline.py:884:render_prepared_animation_frame",
+            "calls": 600,
+            "self_seconds": 0.001171579,
+            "cumulative_seconds": 0.054810755
+          },
+          {
+            "site": "image_pipeline.py:641:compose_lcd_frame",
+            "calls": 600,
+            "self_seconds": 0.00065112,
+            "cumulative_seconds": 0.052676796000000005
+          },
+          {
+            "site": "functools.py:1110:__get__",
+            "calls": 600,
+            "self_seconds": 0.00044151000000000005,
+            "cumulative_seconds": 0.026618668
+          },
+          {
+            "site": "Image.py:3242:frombytes",
+            "calls": 600,
+            "self_seconds": 0.000834189,
+            "cumulative_seconds": 0.026217778
+          },
+          {
+            "site": "image_pipeline.py:140:rgb_bytes",
+            "calls": 600,
+            "self_seconds": 0.00036637000000000003,
+            "cumulative_seconds": 0.026091778000000003
+          },
+          {
+            "site": "Image.py:842:tobytes",
+            "calls": 600,
+            "self_seconds": 0.003604449,
+            "cumulative_seconds": 0.025725408
+          },
+          {
+            "site": "image_pipeline.py:241:rotate_composition",
+            "calls": 600,
+            "self_seconds": 0.00047968900000000005,
+            "cumulative_seconds": 0.025494158000000003
+          },
+          {
+            "site": "Image.py:3097:transpose",
+            "calls": 600,
+            "self_seconds": 0.00051041,
+            "cumulative_seconds": 0.024848709
+          },
+          {
+            "site": "~:0:<method 'transpose' of 'ImagingCore' objects>",
+            "calls": 600,
+            "self_seconds": 0.022476049,
+            "cumulative_seconds": 0.022476049
+          },
+          {
+            "site": "Image.py:925:frombytes",
+            "calls": 600,
+            "self_seconds": 0.0011017590000000001,
+            "cumulative_seconds": 0.018629642000000002
+          },
+          {
+            "site": "~:0:<method 'decode' of 'ImagingDecoder' objects>",
+            "calls": 600,
+            "self_seconds": 0.015869403,
+            "cumulative_seconds": 0.015869403
+          },
+          {
+            "site": "~:0:<method 'encode' of 'ImagingEncoder' objects>",
+            "calls": 3000,
+            "self_seconds": 0.014763042,
+            "cumulative_seconds": 0.014763042
+          },
+          {
+            "site": "Image.py:3193:new",
+            "calls": 600,
+            "self_seconds": 0.000674779,
+            "cumulative_seconds": 0.006109917
+          },
+          {
+            "site": "~:0:<built-in method fromImage>",
+            "calls": 600,
+            "self_seconds": 0.005145086,
+            "cumulative_seconds": 0.005145086
+          },
+          {
+            "site": "~:0:<built-in method PIL._imaging.fill>",
+            "calls": 600,
+            "self_seconds": 0.004027798,
+            "cumulative_seconds": 0.004027798
+          },
+          {
+            "site": "tuf_aio_gui.py:665:_overlay_config",
+            "calls": 600,
+            "self_seconds": 0.0005611500000000001,
+            "cumulative_seconds": 0.0027499100000000004
+          }
+        ]
+      },
+      "lcd": {
+        "runs": [
+          {
+            "total_ms": 272.429955,
+            "ms_per_tick": 0.45404992499999997,
+            "processing_ticks_per_second": 2202.4009804648686,
+            "load_ms": 10.933585
+          },
+          {
+            "total_ms": 271.215846,
+            "ms_per_tick": 0.45202641,
+            "processing_ticks_per_second": 2212.260119934143,
+            "load_ms": 10.942925
+          },
+          {
+            "total_ms": 270.845085,
+            "ms_per_tick": 0.451408475,
+            "processing_ticks_per_second": 2215.288492312866,
+            "load_ms": 11.077955
+          }
+        ],
+        "median_ms_per_tick": 0.45202641,
+        "components_separate_pass": {
+          "JPEG validation": {
+            "calls": 1800,
+            "exclusive_ms": 143.047011,
+            "ms_per_tick": 0.23841168499999998,
+            "percent_instrumented_total": 51.52228351647159
+          },
+          "JPEG encode": {
+            "calls": 600,
+            "exclusive_ms": 73.388769,
+            "ms_per_tick": 0.122314615,
+            "percent_instrumented_total": 26.432967294526982
+          },
+          "image copy/convert/bytes": {
+            "calls": 600,
+            "exclusive_ms": 20.743664,
+            "ms_per_tick": 0.034572773333333334,
+            "percent_instrumented_total": 7.471396503198695
+          },
+          "rotation": {
+            "calls": 600,
+            "exclusive_ms": 19.184832,
+            "ms_per_tick": 0.03197472,
+            "percent_instrumented_total": 6.909940631474479
+          },
+          "lookup/composition Python": {
+            "calls": 1800,
+            "exclusive_ms": 6.899045,
+            "ms_per_tick": 0.011498408333333333,
+            "percent_instrumented_total": 2.4848792714927526
+          },
+          "memory sender/reports": {
+            "calls": 600,
+            "exclusive_ms": 5.541227,
+            "ms_per_tick": 0.009235378333333334,
+            "percent_instrumented_total": 1.995824075786717
+          },
+          "buffer publish": {
+            "calls": 600,
+            "exclusive_ms": 1.89023,
+            "ms_per_tick": 0.0031503833333333332,
+            "percent_instrumented_total": 0.6808179023841338
+          },
+          "sensor snapshot/slots": {
+            "calls": 620,
+            "exclusive_ms": 0.48839,
+            "ms_per_tick": 0.0008139833333333334,
+            "percent_instrumented_total": 0.17590698240181726
+          }
+        },
+        "instrumented_total_ms": 277.641054,
+        "cprofile_top_cumulative": [
+          {
+            "site": "benchmark_gif_rendering.py:191:tick",
+            "calls": 600,
+            "self_seconds": 0.0008119700000000001,
+            "cumulative_seconds": 0.821979804
+          },
+          {
+            "site": "lcd_transport.py:281:validate_jpeg",
+            "calls": 1800,
+            "self_seconds": 0.021475174,
+            "cumulative_seconds": 0.651145948
+          },
+          {
+            "site": "lcd_refresh.py:172:request_next_frame",
+            "calls": 600,
+            "self_seconds": 0.00020519,
+            "cumulative_seconds": 0.594616284
+          },
+          {
+            "site": "tuf_aio_gui.py:937:_request_transport_frame",
+            "calls": 600,
+            "self_seconds": 0.0008072,
+            "cumulative_seconds": 0.594411094
+          },
+          {
+            "site": "~:0:<method 'emit' of 'PySide6.QtCore.SignalInstance' objects>",
+            "calls": 600,
+            "self_seconds": 0.0009685970000000001,
+            "cumulative_seconds": 0.593354224
+          },
+          {
+            "site": "tuf_aio_gui.py:952:_produce_transport_frame",
+            "calls": 600,
+            "self_seconds": 0.00272741,
+            "cumulative_seconds": 0.5923856270000001
+          },
+          {
+            "site": "lcd_transport.py:133:_find_scan_terminator",
+            "calls": 1800,
+            "self_seconds": 0.34575289400000003,
+            "cumulative_seconds": 0.5370491860000001
+          },
+          {
+            "site": "image_pipeline.py:148:jpeg_bytes",
+            "calls": 600,
+            "self_seconds": 0.00027423000000000004,
+            "cumulative_seconds": 0.310122457
+          },
+          {
+            "site": "functools.py:1110:__get__",
+            "calls": 600,
+            "self_seconds": 0.0005069100000000001,
+            "cumulative_seconds": 0.30984822700000003
+          },
+          {
+            "site": "image_pipeline.py:144:_encoded",
+            "calls": 600,
+            "self_seconds": 0.00020909000000000002,
+            "cumulative_seconds": 0.30923611700000003
+          },
+          {
+            "site": "image_pipeline.py:624:_encode_and_validate_image",
+            "calls": 600,
+            "self_seconds": 0.0005512000000000001,
+            "cumulative_seconds": 0.309027027
+          },
+          {
+            "site": "benchmark_gif_rendering.py:71:send",
+            "calls": 600,
+            "self_seconds": 0.0007238300000000001,
+            "cumulative_seconds": 0.22652611
+          },
+          {
+            "site": "tuf_aio_gui.py:1265:_publish_running_frame",
+            "calls": 600,
+            "self_seconds": 0.000347979,
+            "cumulative_seconds": 0.21783733200000002
+          },
+          {
+            "site": "lcd_refresh.py:120:publish",
+            "calls": 600,
+            "self_seconds": 0.00146169,
+            "cumulative_seconds": 0.21748935300000002
+          },
+          {
+            "site": "lcd_refresh.py:65:__post_init__",
+            "calls": 600,
+            "self_seconds": 0.000516869,
+            "cumulative_seconds": 0.214415515
+          },
+          {
+            "site": "~:0:<built-in method builtins.len>",
+            "calls": 3892050,
+            "self_seconds": 0.202977977,
+            "cumulative_seconds": 0.202977977
+          },
+          {
+            "site": "image_pipeline.py:212:_encode_jpeg",
+            "calls": 600,
+            "self_seconds": 0.000516279,
+            "cumulative_seconds": 0.087308649
+          },
+          {
+            "site": "Image.py:2592:save",
+            "calls": 600,
+            "self_seconds": 0.004416298,
+            "cumulative_seconds": 0.08670576
+          },
+          {
+            "site": "JpegImagePlugin.py:663:_save",
+            "calls": 600,
+            "self_seconds": 0.0035710980000000004,
+            "cumulative_seconds": 0.076375653
+          },
+          {
+            "site": "ImageFile.py:644:_save",
+            "calls": 600,
+            "self_seconds": 0.0013775690000000001,
+            "cumulative_seconds": 0.07047971700000001
+          },
+          {
+            "site": "ImageFile.py:672:_encode_tile",
+            "calls": 600,
+            "self_seconds": 0.0012580800000000002,
+            "cumulative_seconds": 0.06763988800000001
+          },
+          {
+            "site": "~:0:<method 'encode' of 'ImagingEncoder' objects>",
+            "calls": 600,
+            "self_seconds": 0.064292238,
+            "cumulative_seconds": 0.064292238
+          },
+          {
+            "site": "tuf_aio_gui.py:889:_prepare_animation_frame",
+            "calls": 600,
+            "self_seconds": 0.0022575390000000002,
+            "cumulative_seconds": 0.058502369000000005
+          },
+          {
+            "site": "image_pipeline.py:884:render_prepared_animation_frame",
+            "calls": 600,
+            "self_seconds": 0.00134859,
+            "cumulative_seconds": 0.049893874000000005
+          },
+          {
+            "site": "image_pipeline.py:641:compose_lcd_frame",
+            "calls": 600,
+            "self_seconds": 0.000746838,
+            "cumulative_seconds": 0.047480575000000004
+          }
+        ]
+      },
+      "combined": {
+        "runs": [
+          {
+            "total_ms": 416.889915,
+            "ms_per_tick": 0.694816525,
+            "processing_ticks_per_second": 1439.2288669300144,
+            "load_ms": 11.230726
+          },
+          {
+            "total_ms": 418.007055,
+            "ms_per_tick": 0.6966784250000001,
+            "processing_ticks_per_second": 1435.3824721929634,
+            "load_ms": 11.196975
+          },
+          {
+            "total_ms": 420.147203,
+            "ms_per_tick": 0.7002453383333334,
+            "processing_ticks_per_second": 1428.0709135174227,
+            "load_ms": 11.181366
+          }
+        ],
+        "median_ms_per_tick": 0.6966784250000001,
+        "components_separate_pass": {
+          "JPEG validation": {
+            "calls": 1800,
+            "exclusive_ms": 144.356549,
+            "ms_per_tick": 0.24059424833333332,
+            "percent_instrumented_total": 33.74725808661938
+          },
+          "Qt scaling/widget": {
+            "calls": 600,
+            "exclusive_ms": 100.402451,
+            "ms_per_tick": 0.16733741833333335,
+            "percent_instrumented_total": 23.471795702363014
+          },
+          "JPEG encode": {
+            "calls": 600,
+            "exclusive_ms": 74.702209,
+            "ms_per_tick": 0.12450368166666667,
+            "percent_instrumented_total": 17.463667178435948
+          },
+          "image copy/convert/bytes": {
+            "calls": 1200,
+            "exclusive_ms": 44.704104,
+            "ms_per_tick": 0.07450683999999999,
+            "percent_instrumented_total": 10.4507966259229
+          },
+          "rotation": {
+            "calls": 600,
+            "exclusive_ms": 22.421602,
+            "ms_per_tick": 0.03736933666666667,
+            "percent_instrumented_total": 5.241657511565071
+          },
+          "lookup/composition Python": {
+            "calls": 2400,
+            "exclusive_ms": 11.301835,
+            "ms_per_tick": 0.018836391666666667,
+            "percent_instrumented_total": 2.642110422003701
+          },
+          "Qt image/pixmap (+JPEG decode in baseline)": {
+            "calls": 600,
+            "exclusive_ms": 9.229268,
+            "ms_per_tick": 0.015382113333333332,
+            "percent_instrumented_total": 2.157591680489518
+          },
+          "memory sender/reports": {
+            "calls": 600,
+            "exclusive_ms": 5.808849,
+            "ms_per_tick": 0.009681415,
+            "percent_instrumented_total": 1.3579759820193602
+          },
+          "buffer publish": {
+            "calls": 600,
+            "exclusive_ms": 2.026298,
+            "ms_per_tick": 0.0033771633333333335,
+            "percent_instrumented_total": 0.47370210801035895
+          },
+          "sensor snapshot/slots": {
+            "calls": 1220,
+            "exclusive_ms": 0.977498,
+            "ms_per_tick": 0.0016291633333333335,
+            "percent_instrumented_total": 0.2285166659474124
+          }
+        },
+        "instrumented_total_ms": 427.75786,
+        "cprofile_top_cumulative": [
+          {
+            "site": "benchmark_gif_rendering.py:191:tick",
+            "calls": 600,
+            "self_seconds": 0.0011436600000000001,
+            "cumulative_seconds": 0.9987176700000001
+          },
+          {
+            "site": "lcd_transport.py:281:validate_jpeg",
+            "calls": 1800,
+            "self_seconds": 0.022853611000000003,
+            "cumulative_seconds": 0.659487826
+          },
+          {
+            "site": "lcd_refresh.py:172:request_next_frame",
+            "calls": 600,
+            "self_seconds": 0.00022097000000000002,
+            "cumulative_seconds": 0.555267144
+          },
+          {
+            "site": "tuf_aio_gui.py:937:_request_transport_frame",
+            "calls": 600,
+            "self_seconds": 0.000957378,
+            "cumulative_seconds": 0.555046174
+          },
+          {
+            "site": "~:0:<method 'emit' of 'PySide6.QtCore.SignalInstance' objects>",
+            "calls": 600,
+            "self_seconds": 0.001239679,
+            "cumulative_seconds": 0.5537747860000001
+          },
+          {
+            "site": "tuf_aio_gui.py:952:_produce_transport_frame",
+            "calls": 600,
+            "self_seconds": 0.00277507,
+            "cumulative_seconds": 0.5525351070000001
+          },
+          {
+            "site": "lcd_transport.py:133:_find_scan_terminator",
+            "calls": 1800,
+            "self_seconds": 0.348024163,
+            "cumulative_seconds": 0.54147853
+          },
+          {
+            "site": "functools.py:1110:__get__",
+            "calls": 1200,
+            "self_seconds": 0.001068839,
+            "cumulative_seconds": 0.345984467
+          },
+          {
+            "site": "image_pipeline.py:148:jpeg_bytes",
+            "calls": 600,
+            "self_seconds": 0.00028868000000000003,
+            "cumulative_seconds": 0.316808768
+          },
+          {
+            "site": "image_pipeline.py:144:_encoded",
+            "calls": 600,
+            "self_seconds": 0.00022616000000000002,
+            "cumulative_seconds": 0.315966948
+          },
+          {
+            "site": "image_pipeline.py:624:_encode_and_validate_image",
+            "calls": 600,
+            "self_seconds": 0.0006114790000000001,
+            "cumulative_seconds": 0.315740788
+          },
+          {
+            "site": "benchmark_gif_rendering.py:71:send",
+            "calls": 600,
+            "self_seconds": 0.00078003,
+            "cumulative_seconds": 0.22964155900000002
+          },
+          {
+            "site": "tuf_aio_gui.py:1265:_publish_running_frame",
+            "calls": 600,
+            "self_seconds": 0.00036351000000000005,
+            "cumulative_seconds": 0.220812314
+          },
+          {
+            "site": "lcd_refresh.py:120:publish",
+            "calls": 600,
+            "self_seconds": 0.00164748,
+            "cumulative_seconds": 0.22044880400000003
+          },
+          {
+            "site": "lcd_refresh.py:65:__post_init__",
+            "calls": 600,
+            "self_seconds": 0.00055982,
+            "cumulative_seconds": 0.217015744
+          },
+          {
+            "site": "tuf_aio_gui.py:927:_advance_gif_animation",
+            "calls": 600,
+            "self_seconds": 0.0007371200000000001,
+            "cumulative_seconds": 0.21263772700000003
+          },
+          {
+            "site": "tuf_aio_gui.py:919:_advance_preview_animation",
+            "calls": 600,
+            "self_seconds": 0.0006691500000000001,
+            "cumulative_seconds": 0.208380997
+          },
+          {
+            "site": "tuf_aio_gui.py:913:_render_preview_animation_frame",
+            "calls": 600,
+            "self_seconds": 0.0009244500000000001,
+            "cumulative_seconds": 0.206556597
+          },
+          {
+            "site": "~:0:<built-in method builtins.len>",
+            "calls": 3893850,
+            "self_seconds": 0.20543839300000002,
+            "cumulative_seconds": 0.20543839300000002
+          },
+          {
+            "site": "tuf_aio_gui.py:1280:_load_final_preview",
+            "calls": 600,
+            "self_seconds": 0.0009434090000000001,
+            "cumulative_seconds": 0.140894994
+          },
+          {
+            "site": "tuf_aio_gui.py:1287:_refresh_preview_if_needed",
+            "calls": 600,
+            "self_seconds": 0.00392181,
+            "cumulative_seconds": 0.13984517500000002
+          },
+          {
+            "site": "tuf_aio_gui.py:1306:_update_scaled_preview",
+            "calls": 600,
+            "self_seconds": 0.0012746790000000001,
+            "cumulative_seconds": 0.101253909
+          },
+          {
+            "site": "~:0:<method 'scaled' of 'PySide6.QtGui.QPixmap' objects>",
+            "calls": 600,
+            "self_seconds": 0.0978528,
+            "cumulative_seconds": 0.09826278000000001
+          },
+          {
+            "site": "image_pipeline.py:212:_encode_jpeg",
+            "calls": 600,
+            "self_seconds": 0.00058976,
+            "cumulative_seconds": 0.09049043100000001
+          },
+          {
+            "site": "Image.py:2592:save",
+            "calls": 600,
+            "self_seconds": 0.004620899,
+            "cumulative_seconds": 0.089806171
+          }
+        ]
+      },
+      "static": {
+        "runs": [
+          {
+            "total_ms": 39.889455,
+            "ms_per_tick": 0.066482425,
+            "processing_ticks_per_second": 15041.569256837427,
+            "load_ms": 1.204551
+          },
+          {
+            "total_ms": 39.992155,
+            "ms_per_tick": 0.06665359166666666,
+            "processing_ticks_per_second": 15002.942452088415,
+            "load_ms": 1.247221
+          },
+          {
+            "total_ms": 39.930795,
+            "ms_per_tick": 0.066551325,
+            "processing_ticks_per_second": 15025.99685280496,
+            "load_ms": 1.203551
+          }
+        ],
+        "median_ms_per_tick": 0.066551325,
+        "components_separate_pass": {
+          "JPEG validation": {
+            "calls": 600,
+            "exclusive_ms": 36.959983,
+            "ms_per_tick": 0.06159997166666666,
+            "percent_instrumented_total": 87.66042772853346
+          },
+          "memory sender/reports": {
+            "calls": 600,
+            "exclusive_ms": 4.385303,
+            "ms_per_tick": 0.007308838333333333,
+            "percent_instrumented_total": 10.400912162195015
+          },
+          "sensor snapshot/slots": {
+            "calls": 600,
+            "exclusive_ms": 0.26385,
+            "ms_per_tick": 0.00043975,
+            "percent_instrumented_total": 0.6257904354602531
+          }
+        },
+        "instrumented_total_ms": 42.162677,
+        "cprofile_top_cumulative": [
+          {
+            "site": "benchmark_gif_rendering.py:191:tick",
+            "calls": 600,
+            "self_seconds": 0.00055753,
+            "cumulative_seconds": 0.18400280600000002
+          },
+          {
+            "site": "benchmark_gif_rendering.py:71:send",
+            "calls": 600,
+            "self_seconds": 0.000549161,
+            "cumulative_seconds": 0.182979565
+          },
+          {
+            "site": "lcd_transport.py:281:validate_jpeg",
+            "calls": 600,
+            "self_seconds": 0.006624594,
+            "cumulative_seconds": 0.173885059
+          },
+          {
+            "site": "lcd_transport.py:133:_find_scan_terminator",
+            "calls": 600,
+            "self_seconds": 0.08905776500000001,
+            "cumulative_seconds": 0.138089863
+          },
+          {
+            "site": "~:0:<built-in method builtins.len>",
+            "calls": 1037400,
+            "self_seconds": 0.053118481,
+            "cumulative_seconds": 0.053118481
+          },
+          {
+            "site": "lcd_transport.py:224:_parse_quantization_tables",
+            "calls": 1200,
+            "self_seconds": 0.0060098650000000005,
+            "cumulative_seconds": 0.009944187
+          },
+          {
+            "site": "lcd_transport.py:399:build_segments",
+            "calls": 600,
+            "self_seconds": 0.002426442,
+            "cumulative_seconds": 0.007924575
+          },
+          {
+            "site": "lcd_transport.py:248:_parse_standard_huffman_tables",
+            "calls": 2400,
+            "self_seconds": 0.003032892,
+            "cumulative_seconds": 0.005244344000000001
+          },
+          {
+            "site": "lcd_transport.py:430:validate_transfer_invariants",
+            "calls": 600,
+            "self_seconds": 0.002208451,
+            "cumulative_seconds": 0.004277963
+          },
+          {
+            "site": "lcd_transport.py:102:_next_header_marker",
+            "calls": 5400,
+            "self_seconds": 0.002756042,
+            "cumulative_seconds": 0.0038971120000000003
+          },
+          {
+            "site": "lcd_transport.py:121:_read_segment_payload",
+            "calls": 5400,
+            "self_seconds": 0.002658152,
+            "cumulative_seconds": 0.0036918320000000004
+          },
+          {
+            "site": "lcd_transport.py:239:<genexpr>",
+            "calls": 78000,
+            "self_seconds": 0.0035982920000000003,
+            "cumulative_seconds": 0.0035982920000000003
+          },
+          {
+            "site": "lcd_transport.py:161:_parse_sof0",
+            "calls": 600,
+            "self_seconds": 0.0014924810000000001,
+            "cumulative_seconds": 0.002469933
+          },
+          {
+            "site": "~:0:<built-in method builtins.any>",
+            "calls": 600,
+            "self_seconds": 0.0011226720000000001,
+            "cumulative_seconds": 0.0011226720000000001
+          },
+          {
+            "site": "lcd_transport.py:190:_validate_scan_header",
+            "calls": 600,
+            "self_seconds": 0.000723821,
+            "cumulative_seconds": 0.001021781
+          },
+          {
+            "site": "<string>:2:__init__",
+            "calls": 1800,
+            "self_seconds": 0.00076289,
+            "cumulative_seconds": 0.00076289
+          },
+          {
+            "site": "~:0:<built-in method from_bytes>",
+            "calls": 7800,
+            "self_seconds": 0.0006478,
+            "cumulative_seconds": 0.0006478
+          },
+          {
+            "site": "lcd_transport.py:209:_validate_jfif",
+            "calls": 600,
+            "self_seconds": 0.000453641,
+            "cumulative_seconds": 0.000641651
+          },
+          {
+            "site": "lcd_refresh.py:142:snapshot",
+            "calls": 600,
+            "self_seconds": 0.00025038,
+            "cumulative_seconds": 0.0005786400000000001
+          },
+          {
+            "site": "~:0:<method 'hexdigest' of '_hashlib.HASH' objects>",
+            "calls": 2400,
+            "self_seconds": 0.00055632,
+            "cumulative_seconds": 0.00055632
+          },
+          {
+            "site": "~:0:<built-in method _hashlib.openssl_sha256>",
+            "calls": 2400,
+            "self_seconds": 0.00049052,
+            "cumulative_seconds": 0.00049052
+          },
+          {
+            "site": "tuf_aio_gui.py:991:refresh_temperatures",
+            "calls": 600,
+            "self_seconds": 0.000173641,
+            "cumulative_seconds": 0.00046571100000000005
+          },
+          {
+            "site": "~:0:<method 'intersection' of 'set' objects>",
+            "calls": 3600,
+            "self_seconds": 0.00044339000000000005,
+            "cumulative_seconds": 0.00044339000000000005
+          },
+          {
+            "site": "~:0:<method 'update' of 'set' objects>",
+            "calls": 3600,
+            "self_seconds": 0.00036415000000000004,
+            "cumulative_seconds": 0.00036415000000000004
+          },
+          {
+            "site": "~:0:<built-in method builtins.sum>",
+            "calls": 2400,
+            "self_seconds": 0.00036239100000000005,
+            "cumulative_seconds": 0.00036239100000000005
+          }
+        ]
+      }
+    },
+    "source_sha256": {
+      "image_pipeline.py": "810864c7c64549f2ab0d828a27bbbfeadea1cb7cb1e9b718d7c092b5a2f87b97",
+      "tuf_aio_gui.py": "7ac910f94badd36434876e01546b211b11c356635bdb67918cd5761b3b047d37",
+      "gif_animation.py": "5cdda5106fa858045442e599e8f78a10f8b52712cce2c77a41e53b35ea0c7e87",
+      "lcd_refresh.py": "d01ddd6c9dfa31dcb07fa637d53640ac75fc8297287a0875e9a338bf3dcb98f6",
+      "lcd_transport.py": "9ff413774a26c6acc14487e9b1f9b51af36f96ae3d69855b52c4fe6cd098f151"
+    },
+    "gif_sha256": "7e579a27fcfd857840103f9b2915779a2c7d90d9c85fe03ba033d010aec973af"
+  },
+  "baseline_offset": {
+    "python": "3.14.7",
+    "platform": "Linux-7.1.13-200.fc44.x86_64-x86_64-with-glibc2.43",
+    "pillow": "12.3.0",
+    "pyside": "6.11.2",
+    "frames": 600,
+    "repeats": 3,
+    "overlay": "on",
+    "rotation": 90,
+    "preview_offset": 1,
+    "scenarios": {
+      "combined": {
+        "runs": [
+          {
+            "total_ms": 15887.208846,
+            "ms_per_tick": 26.47868141,
+            "processing_ticks_per_second": 37.76623104888968,
+            "load_ms": 87.040775
+          },
+          {
+            "total_ms": 15618.259389,
+            "ms_per_tick": 26.030432315000002,
+            "processing_ticks_per_second": 38.416572875117076,
+            "load_ms": 85.872367
+          },
+          {
+            "total_ms": 15784.690339,
+            "ms_per_tick": 26.307817231666665,
+            "processing_ticks_per_second": 38.011515406010275,
+            "load_ms": 84.916488
+          }
+        ],
+        "median_ms_per_tick": 26.307817231666665,
+        "components_separate_pass": {
+          "font load/layout/draw": {
+            "calls": 79300,
+            "exclusive_ms": 14516.810022,
+            "ms_per_tick": 24.19468337,
+            "percent_instrumented_total": 91.71808015562088
+          },
+          "JPEG validation": {
+            "calls": 2420,
+            "exclusive_ms": 567.449515,
+            "ms_per_tick": 0.9457491916666666,
+            "percent_instrumented_total": 3.5851802167393685
+          },
+          "JPEG encode": {
+            "calls": 1220,
+            "exclusive_ms": 201.920331,
+            "ms_per_tick": 0.33653388500000003,
+            "percent_instrumented_total": 1.2757448141596615
+          },
+          "Qt scaling/widget": {
+            "calls": 620,
+            "exclusive_ms": 113.654539,
+            "ms_per_tick": 0.18942423166666666,
+            "percent_instrumented_total": 0.7180762235129111
+          },
+          "Qt image/pixmap (+JPEG decode in baseline)": {
+            "calls": 620,
+            "exclusive_ms": 97.360617,
+            "ms_per_tick": 0.16226769500000002,
+            "percent_instrumented_total": 0.6151302428339173
+          },
+          "telemetry composition": {
+            "calls": 1220,
+            "exclusive_ms": 82.434738,
+            "ms_per_tick": 0.13739123,
+            "percent_instrumented_total": 0.5208276402345555
+          },
+          "image copy/convert/bytes": {
+            "calls": 4880,
+            "exclusive_ms": 75.09043,
+            "ms_per_tick": 0.12515071666666666,
+            "percent_instrumented_total": 0.4744258598977785
+          },
+          "metadata widgets": {
+            "calls": 620,
+            "exclusive_ms": 48.309265,
+            "ms_per_tick": 0.08051544166666666,
+            "percent_instrumented_total": 0.30522084623372986
+          },
+          "rotation": {
+            "calls": 1220,
+            "exclusive_ms": 46.069238,
+            "ms_per_tick": 0.07678206333333334,
+            "percent_instrumented_total": 0.2910682207171461
+          },
+          "lookup/composition Python": {
+            "calls": 3660,
+            "exclusive_ms": 24.006957,
+            "ms_per_tick": 0.040011595000000004,
+            "percent_instrumented_total": 0.15167740041246258
+          },
+          "memory sender/reports": {
+            "calls": 600,
+            "exclusive_ms": 12.95207,
+            "ms_per_tick": 0.02158678333333333,
+            "percent_instrumented_total": 0.08183195844272326
+          },
+          "sensor snapshot/slots": {
+            "calls": 1280,
+            "exclusive_ms": 11.588172,
+            "ms_per_tick": 0.01931362,
+            "percent_instrumented_total": 0.07321476872277012
+          },
+          "buffer publish": {
+            "calls": 600,
+            "exclusive_ms": 3.334083,
+            "ms_per_tick": 0.005556805000000001,
+            "percent_instrumented_total": 0.02106493722629588
+          }
+        },
+        "instrumented_total_ms": 15827.642704,
+        "cprofile_top_cumulative": [
+          {
+            "site": "benchmark_gif_rendering.py:191:tick",
+            "calls": 600,
+            "self_seconds": 0.002026852,
+            "cumulative_seconds": 29.122720585000003
+          },
+          {
+            "site": "tuf_aio_gui.py:877:_prepare_animation_frame",
+            "calls": 1220,
+            "self_seconds": 0.003994666,
+            "cumulative_seconds": 27.484907364
+          },
+          {
+            "site": "image_pipeline.py:835:render_prepared_animation_frame",
+            "calls": 1220,
+            "self_seconds": 0.023858447,
+            "cumulative_seconds": 27.451239755000003
+          },
+          {
+            "site": "image_pipeline.py:561:_encode_and_validate_frame",
+            "calls": 1220,
+            "self_seconds": 0.0033295250000000003,
+            "cumulative_seconds": 27.424712643000003
+          },
+          {
+            "site": "image_pipeline.py:590:compose_lcd_frame",
+            "calls": 1220,
+            "self_seconds": 0.016540685,
+            "cumulative_seconds": 25.845185733
+          },
+          {
+            "site": "image_pipeline.py:456:render_data_overlay",
+            "calls": 1220,
+            "self_seconds": 0.077212916,
+            "cumulative_seconds": 25.715017708
+          },
+          {
+            "site": "image_pipeline.py:240:_fit_font",
+            "calls": 19520,
+            "self_seconds": 0.171322156,
+            "cumulative_seconds": 21.837394768000003
+          },
+          {
+            "site": "image_pipeline.py:230:_overlay_font",
+            "calls": 48800,
+            "self_seconds": 0.080719128,
+            "cumulative_seconds": 18.183434091000002
+          },
+          {
+            "site": "ImageFont.py:808:truetype",
+            "calls": 48800,
+            "self_seconds": 0.6630388610000001,
+            "cumulative_seconds": 18.102714963
+          },
+          {
+            "site": "<frozen os>:297:walk",
+            "calls": 976000,
+            "self_seconds": 8.330606105000001,
+            "cumulative_seconds": 15.643712269000002
+          },
+          {
+            "site": "lcd_refresh.py:172:request_next_frame",
+            "calls": 600,
+            "self_seconds": 0.000235798,
+            "cumulative_seconds": 14.192158823000002
+          },
+          {
+            "site": "tuf_aio_gui.py:921:_request_transport_frame",
+            "calls": 600,
+            "self_seconds": 0.0011240710000000001,
+            "cumulative_seconds": 14.191923025000001
+          },
+          {
+            "site": "~:0:<method 'emit' of 'PySide6.QtCore.SignalInstance' objects>",
+            "calls": 600,
+            "self_seconds": 0.0035216580000000004,
+            "cumulative_seconds": 14.190457814
+          },
+          {
+            "site": "tuf_aio_gui.py:936:_produce_transport_frame",
+            "calls": 600,
+            "self_seconds": 0.004826254,
+            "cumulative_seconds": 14.186936156000002
+          },
+          {
+            "site": "tuf_aio_gui.py:911:_advance_gif_animation",
+            "calls": 600,
+            "self_seconds": 0.000842128,
+            "cumulative_seconds": 13.790940242000001
+          },
+          {
+            "site": "tuf_aio_gui.py:900:_advance_preview_animation",
+            "calls": 600,
+            "self_seconds": 0.000890783,
+            "cumulative_seconds": 13.784281187000001
+          },
+          {
+            "site": "tuf_aio_gui.py:890:_render_preview_animation_frame",
+            "calls": 600,
+            "self_seconds": 0.003029242,
+            "cumulative_seconds": 13.781793029000001
+          },
+          {
+            "site": "image_pipeline.py:354:layout_data_overlay",
+            "calls": 1220,
+            "self_seconds": 0.08171453000000001,
+            "cumulative_seconds": 11.677365078000001
+          },
+          {
+            "site": "ImageDraw.py:710:textbbox",
+            "calls": 63440,
+            "self_seconds": 0.066099767,
+            "cumulative_seconds": 4.058230208
+          },
+          {
+            "site": "ImageText.py:465:get_bbox",
+            "calls": 63440,
+            "self_seconds": 0.057775639000000004,
+            "cumulative_seconds": 3.972878295
+          },
+          {
+            "site": "ImageText.py:449:_get_bbox",
+            "calls": 63440,
+            "self_seconds": 0.036421701,
+            "cumulative_seconds": 3.786371368
+          },
+          {
+            "site": "ImageFont.py:405:getbbox",
+            "calls": 63440,
+            "self_seconds": 0.046311279000000004,
+            "cumulative_seconds": 3.74015969
+          },
+          {
+            "site": "~:0:<method 'getsize' of 'Font' objects>",
+            "calls": 63440,
+            "self_seconds": 3.673504759,
+            "cumulative_seconds": 3.673504759
+          },
+          {
+            "site": "ImageDraw.py:530:text",
+            "calls": 9760,
+            "self_seconds": 0.035625130000000005,
+            "cumulative_seconds": 2.977059605
+          },
+          {
+            "site": "ImageDraw.py:583:draw_text",
+            "calls": 19520,
+            "self_seconds": 0.053867126,
+            "cumulative_seconds": 2.888617147
+          }
+        ]
+      }
+    },
+    "source_sha256": {
+      "image_pipeline.py": "1be7037e002e06b6ee5966695448a69a53c34aa3166f4cf5133fbe01434465f4",
+      "tuf_aio_gui.py": "0879547b18d7fc8abcfb3daa3c02350d845fc73c8ba78fed56657e51b9628832",
+      "gif_animation.py": "5cdda5106fa858045442e599e8f78a10f8b52712cce2c77a41e53b35ea0c7e87",
+      "lcd_refresh.py": "d01ddd6c9dfa31dcb07fa637d53640ac75fc8297287a0875e9a338bf3dcb98f6",
+      "lcd_transport.py": "9ff413774a26c6acc14487e9b1f9b51af36f96ae3d69855b52c4fe6cd098f151"
+    },
+    "gif_sha256": "7e579a27fcfd857840103f9b2915779a2c7d90d9c85fe03ba033d010aec973af"
+  },
+  "optimized_offset": {
+    "python": "3.14.7",
+    "platform": "Linux-7.1.13-200.fc44.x86_64-x86_64-with-glibc2.43",
+    "pillow": "12.3.0",
+    "pyside": "6.11.2",
+    "frames": 600,
+    "repeats": 3,
+    "overlay": "on",
+    "rotation": 90,
+    "preview_offset": 1,
+    "scenarios": {
+      "combined": {
+        "runs": [
+          {
+            "total_ms": 937.266016,
+            "ms_per_tick": 1.5621100266666665,
+            "processing_ticks_per_second": 640.1597729539359,
+            "load_ms": 14.309054
+          },
+          {
+            "total_ms": 900.91145,
+            "ms_per_tick": 1.5015190833333332,
+            "processing_ticks_per_second": 665.9922015643158,
+            "load_ms": 11.878505
+          },
+          {
+            "total_ms": 907.928397,
+            "ms_per_tick": 1.513213995,
+            "processing_ticks_per_second": 660.8450644153605,
+            "load_ms": 11.869486
+          }
+        ],
+        "median_ms_per_tick": 1.513213995,
+        "components_separate_pass": {
+          "JPEG validation": {
+            "calls": 1800,
+            "exclusive_ms": 407.828785,
+            "ms_per_tick": 0.6797146416666667,
+            "percent_instrumented_total": 44.47410204025385
+          },
+          "telemetry composition": {
+            "calls": 1200,
+            "exclusive_ms": 121.63246,
+            "ms_per_tick": 0.20272076666666666,
+            "percent_instrumented_total": 13.264131018724179
+          },
+          "Qt scaling/widget": {
+            "calls": 620,
+            "exclusive_ms": 104.75256,
+            "ms_per_tick": 0.1745876,
+            "percent_instrumented_total": 11.42336248388601
+          },
+          "JPEG encode": {
+            "calls": 600,
+            "exclusive_ms": 87.396414,
+            "ms_per_tick": 0.14566069,
+            "percent_instrumented_total": 9.530658887131446
+          },
+          "image copy/convert/bytes": {
+            "calls": 1820,
+            "exclusive_ms": 68.067878,
+            "ms_per_tick": 0.11344646333333333,
+            "percent_instrumented_total": 7.422864356755862
+          },
+          "rotation": {
+            "calls": 1200,
+            "exclusive_ms": 42.737123,
+            "ms_per_tick": 0.07122853833333333,
+            "percent_instrumented_total": 4.660522354273938
+          },
+          "font load/layout/draw": {
+            "calls": 11332,
+            "exclusive_ms": 26.129751,
+            "ms_per_tick": 0.043549585,
+            "percent_instrumented_total": 2.849473247113798
+          },
+          "lookup/composition Python": {
+            "calls": 3620,
+            "exclusive_ms": 15.236562,
+            "ms_per_tick": 0.02539427,
+            "percent_instrumented_total": 1.6615610227969912
+          },
+          "memory sender/reports": {
+            "calls": 600,
+            "exclusive_ms": 10.506503,
+            "ms_per_tick": 0.017510838333333334,
+            "percent_instrumented_total": 1.1457437623198499
+          },
+          "Qt image/pixmap (+JPEG decode in baseline)": {
+            "calls": 620,
+            "exclusive_ms": 10.446212,
+            "ms_per_tick": 0.017410353333333333,
+            "percent_instrumented_total": 1.139168973622409
+          },
+          "buffer publish": {
+            "calls": 600,
+            "exclusive_ms": 2.510999,
+            "ms_per_tick": 0.004184998333333333,
+            "percent_instrumented_total": 0.2738267377300878
+          },
+          "sensor snapshot/slots": {
+            "calls": 1280,
+            "exclusive_ms": 1.85651,
+            "ms_per_tick": 0.0030941833333333335,
+            "percent_instrumented_total": 0.20245411362700078
+          },
+          "metadata widgets": {
+            "calls": 20,
+            "exclusive_ms": 1.56321,
+            "ms_per_tick": 0.0026053499999999998,
+            "percent_instrumented_total": 0.1704694803490764
+          }
+        },
+        "instrumented_total_ms": 917.002854,
+        "cprofile_top_cumulative": [
+          {
+            "site": "benchmark_gif_rendering.py:191:tick",
+            "calls": 600,
+            "self_seconds": 0.001570819,
+            "cumulative_seconds": 2.667252878
+          },
+          {
+            "site": "lcd_transport.py:281:validate_jpeg",
+            "calls": 1800,
+            "self_seconds": 0.024761994000000002,
+            "cumulative_seconds": 1.9668203970000002
+          },
+          {
+            "site": "lcd_transport.py:133:_find_scan_terminator",
+            "calls": 1800,
+            "self_seconds": 1.191262902,
+            "cumulative_seconds": 1.8436783300000001
+          },
+          {
+            "site": "lcd_refresh.py:172:request_next_frame",
+            "calls": 600,
+            "self_seconds": 0.00022286000000000002,
+            "cumulative_seconds": 1.6085610490000002
+          },
+          {
+            "site": "tuf_aio_gui.py:937:_request_transport_frame",
+            "calls": 600,
+            "self_seconds": 0.00097657,
+            "cumulative_seconds": 1.6083381890000001
+          },
+          {
+            "site": "~:0:<method 'emit' of 'PySide6.QtCore.SignalInstance' objects>",
+            "calls": 600,
+            "self_seconds": 0.0016643,
+            "cumulative_seconds": 1.607049779
+          },
+          {
+            "site": "tuf_aio_gui.py:952:_produce_transport_frame",
+            "calls": 600,
+            "self_seconds": 0.004594756,
+            "cumulative_seconds": 1.6053854790000002
+          },
+          {
+            "site": "functools.py:1110:__get__",
+            "calls": 1220,
+            "self_seconds": 0.00118004,
+            "cumulative_seconds": 0.7890872760000001
+          },
+          {
+            "site": "image_pipeline.py:148:jpeg_bytes",
+            "calls": 620,
+            "self_seconds": 0.0003589,
+            "cumulative_seconds": 0.760123918
+          },
+          {
+            "site": "image_pipeline.py:144:_encoded",
+            "calls": 600,
+            "self_seconds": 0.00024753000000000004,
+            "cumulative_seconds": 0.7591186080000001
+          },
+          {
+            "site": "image_pipeline.py:624:_encode_and_validate_image",
+            "calls": 600,
+            "self_seconds": 0.000743309,
+            "cumulative_seconds": 0.7588710780000001
+          },
+          {
+            "site": "benchmark_gif_rendering.py:71:send",
+            "calls": 600,
+            "self_seconds": 0.0008858000000000001,
+            "cumulative_seconds": 0.6783248550000001
+          },
+          {
+            "site": "~:0:<built-in method builtins.len>",
+            "calls": 13054931,
+            "self_seconds": 0.6671055130000001,
+            "cumulative_seconds": 0.6671055130000001
+          },
+          {
+            "site": "tuf_aio_gui.py:1265:_publish_running_frame",
+            "calls": 600,
+            "self_seconds": 0.00043653,
+            "cumulative_seconds": 0.656085098
+          },
+          {
+            "site": "lcd_refresh.py:120:publish",
+            "calls": 600,
+            "self_seconds": 0.001934759,
+            "cumulative_seconds": 0.655648568
+          },
+          {
+            "site": "lcd_refresh.py:65:__post_init__",
+            "calls": 600,
+            "self_seconds": 0.0006331700000000001,
+            "cumulative_seconds": 0.651764362
+          },
+          {
+            "site": "tuf_aio_gui.py:889:_prepare_animation_frame",
+            "calls": 1220,
+            "self_seconds": 0.004250338,
+            "cumulative_seconds": 0.39703681100000005
+          },
+          {
+            "site": "image_pipeline.py:884:render_prepared_animation_frame",
+            "calls": 1200,
+            "self_seconds": 0.0031527200000000003,
+            "cumulative_seconds": 0.378407979
+          },
+          {
+            "site": "image_pipeline.py:641:compose_lcd_frame",
+            "calls": 1200,
+            "self_seconds": 0.002078368,
+            "cumulative_seconds": 0.37303515000000004
+          },
+          {
+            "site": "tuf_aio_gui.py:927:_advance_gif_animation",
+            "calls": 600,
+            "self_seconds": 0.0007325000000000001,
+            "cumulative_seconds": 0.339729581
+          },
+          {
+            "site": "tuf_aio_gui.py:919:_advance_preview_animation",
+            "calls": 600,
+            "self_seconds": 0.00075018,
+            "cumulative_seconds": 0.33510138300000003
+          },
+          {
+            "site": "tuf_aio_gui.py:913:_render_preview_animation_frame",
+            "calls": 600,
+            "self_seconds": 0.00109676,
+            "cumulative_seconds": 0.333062134
+          },
+          {
+            "site": "image_pipeline.py:529:_draw_data_overlay",
+            "calls": 1200,
+            "self_seconds": 0.008374914,
+            "cumulative_seconds": 0.265638941
+          },
+          {
+            "site": "Image.py:1840:paste",
+            "calls": 19200,
+            "self_seconds": 0.048286798000000006,
+            "cumulative_seconds": 0.22838428300000002
+          },
+          {
+            "site": "tuf_aio_gui.py:1280:_load_final_preview",
+            "calls": 620,
+            "self_seconds": 0.0024496,
+            "cumulative_seconds": 0.15027004800000002
+          }
+        ]
+      }
+    },
+    "source_sha256": {
+      "image_pipeline.py": "810864c7c64549f2ab0d828a27bbbfeadea1cb7cb1e9b718d7c092b5a2f87b97",
+      "tuf_aio_gui.py": "7ac910f94badd36434876e01546b211b11c356635bdb67918cd5761b3b047d37",
+      "gif_animation.py": "5cdda5106fa858045442e599e8f78a10f8b52712cce2c77a41e53b35ea0c7e87",
+      "lcd_refresh.py": "d01ddd6c9dfa31dcb07fa637d53640ac75fc8297287a0875e9a338bf3dcb98f6",
+      "lcd_transport.py": "9ff413774a26c6acc14487e9b1f9b51af36f96ae3d69855b52c4fe6cd098f151"
+    },
+    "gif_sha256": "7e579a27fcfd857840103f9b2915779a2c7d90d9c85fe03ba033d010aec973af"
+  },
+  "methodology": {
+    "date": "2026-09-05",
+    "completed_date": "2026-09-06",
+    "baseline_commit": "4941d3c",
+    "baseline_preview_note": "Preview repeated after baseline test suite had finished; LCD/combined/static had already run without concurrent test work.",
+    "font_cache_only": "Baseline with functools.lru_cache(maxsize=32) on _overlay_font only.",
+    "timing": "600 measured steps after 60 warmup steps, median of 3 uninstrumented passes; components/cProfile from separate passes. GIF: 30 scheduling opportunities per simulated second, telemetry at 1 Hz. Static: 600 1-Hz updates (600 simulated seconds); no-overlay static re-sends existing JPEG only.",
+    "hardware": "None; offscreen Qt, generated fixture, injected snapshots, MemoryController validates/builds reports only.",
+    "mask_memory": {
+      "snapshots": 20,
+      "font_faces": 8,
+      "mask_pairs": 84,
+      "mask_pixel_bytes": 314060,
+      "largest_pair_pixel_bytes": 4320,
+      "excludes": "Python/FreeType metadata and total process RSS"
+    }
+  }
+}

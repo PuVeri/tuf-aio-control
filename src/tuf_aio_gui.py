@@ -9,6 +9,7 @@ import signal
 import sys
 import threading
 import time
+from collections import OrderedDict
 from enum import Enum
 from pathlib import Path
 from typing import Callable, Protocol
@@ -19,6 +20,7 @@ from PySide6.QtGui import (
     QColor,
     QCloseEvent,
     QHideEvent,
+    QImage,
     QPixmap,
     QResizeEvent,
     QShowEvent,
@@ -284,6 +286,11 @@ class MainWindow(QMainWindow):
         self._lcd_animation_scheduler = gif_animation.GifAnimationScheduler()
         self._lcd_animation_frame_index = 0
         self._lcd_prepared: image_pipeline.PreparedImage | None = None
+        self._animation_render_cache: OrderedDict[
+            tuple, image_pipeline.PreparedImage
+        ] = OrderedDict()
+        self._overlay_slots_key: tuple | None = None
+        self._cached_overlay_slots = image_pipeline.OverlaySlots()
         self._transport_frame_request_lock = threading.Lock()
         self._transport_frame_request_pending = False
         self._device_ready = False
@@ -295,7 +302,7 @@ class MainWindow(QMainWindow):
         self._refresh_diagnostics: refresh_diagnostics.RefreshDiagnostics = (
             refresh_diagnostics.NULL_DIAGNOSTICS
         )
-        self._preview_jpeg: bytes | None = None
+        self._preview_prepared: image_pipeline.PreparedImage | None = None
         self._preview_dirty = False
         self._quit_when_stopped = False
         self._quit_requested = False
@@ -683,20 +690,24 @@ class MainWindow(QMainWindow):
         self,
         snapshot: system_sensors.TemperatureSnapshot | None = None,
     ) -> image_pipeline.OverlaySlots:
-        metrics = system_sensors.metric_values(
-            snapshot or self._latest_temperature_snapshot
-        )
+        snapshot = snapshot or self._latest_temperature_snapshot
+        key = (snapshot, tuple(self._slot_metric_ids.items()))
+        if key == self._overlay_slots_key:
+            return self._cached_overlay_slots
+        metrics = system_sensors.metric_values(snapshot)
 
         def selected(slot: str) -> telemetry.MetricValue | None:
             metric_id = self._slot_metric_ids[slot]
             return None if metric_id is telemetry.MetricId.OFF else metrics[metric_id]
 
-        return image_pipeline.OverlaySlots(
+        self._cached_overlay_slots = image_pipeline.OverlaySlots(
             top_left=selected("top_left"),
             top_right=selected("top_right"),
             bottom_left=selected("bottom_left"),
             bottom_right=selected("bottom_right"),
         )
+        self._overlay_slots_key = key
+        return self._cached_overlay_slots
 
     def _visible_metric_signature(
         self, snapshot: system_sensors.TemperatureSnapshot
@@ -834,6 +845,7 @@ class MainWindow(QMainWindow):
         self._animation_scheduler.stop()
         self._lcd_animation_scheduler.stop()
         self._prepared_animation = prepared
+        self._animation_render_cache.clear()
         self._animation_frame_index = 0
         self._lcd_animation_frame_index = 0
         self._lcd_prepared = None
@@ -878,33 +890,37 @@ class MainWindow(QMainWindow):
         animation = self._prepared_animation
         if animation is None:
             raise RuntimeError("Kein GIF für die Frame-Erzeugung geladen")
-        return image_pipeline.render_prepared_animation_frame(
+        config, slots = self._overlay_config(), self._overlay_slots()
+        key = (frame_index, config, slots, self._rotation_degrees)
+        cached = self._animation_render_cache.get(key)
+        if cached is not None:
+            self._animation_render_cache.move_to_end(key)
+            return cached
+        rendered = image_pipeline.render_prepared_animation_frame(
             animation,
             frame_index,
-            overlay_config=self._overlay_config(),
+            overlay_config=config,
             temperatures=self._overlay_values(self._latest_temperature_snapshot),
-            overlay_slots=self._overlay_slots(),
+            overlay_slots=slots,
             rotation_degrees=self._rotation_degrees,
+            encode=False,
         )
+        self._animation_render_cache[key] = rendered
+        if len(self._animation_render_cache) > 2:
+            self._animation_render_cache.popitem(last=False)
+        return rendered
 
-    def _render_preview_animation_frame(
-        self, frame_index: int, *, update_widgets: bool
-    ) -> None:
+    def _render_preview_animation_frame(self, frame_index: int) -> None:
         prepared = self._prepare_animation_frame(frame_index)
         self._animation_frame_index = frame_index
         self._prepared = prepared
-        self._load_final_preview(prepared.jpeg_bytes)
-        if update_widgets:
-            self._show_prepared_image(prepared)
+        self._load_final_preview(prepared)
 
-    def _advance_preview_animation(self, *, update_widgets: bool) -> bool:
+    def _advance_preview_animation(self) -> bool:
         state = self._animation_scheduler.advance(now=self._animation_clock())
         rendered = False
         if state is not None and state.frame_index != self._animation_frame_index:
-            self._render_preview_animation_frame(
-                state.frame_index,
-                update_widgets=update_widgets,
-            )
+            self._render_preview_animation_frame(state.frame_index)
             rendered = True
         return rendered
 
@@ -913,7 +929,7 @@ class MainWindow(QMainWindow):
             self._animation_timer.stop()
             return
         try:
-            self._advance_preview_animation(update_widgets=True)
+            self._advance_preview_animation()
         except (image_pipeline.ImagePipelineError, OSError, RuntimeError, ValueError) as error:
             self._show_render_error(error)
         self._update_animation_scheduling()
@@ -954,9 +970,10 @@ class MainWindow(QMainWindow):
                 )
                 if state is not None and state.frame_index != self._lcd_animation_frame_index:
                     prepared = self._prepare_animation_frame(state.frame_index)
+                    jpeg = prepared.jpeg_bytes
                     self._lcd_animation_frame_index = state.frame_index
                     self._lcd_prepared = prepared
-                    self._publish_running_frame(prepared.jpeg_bytes)
+                    self._publish_running_frame(jpeg)
                 elif self._frame_buffer is not None and self._lcd_prepared is not None:
                     # The finite final frame is held while the sender returns to
                     # static cadence; publishing also releases its generation wait.
@@ -1092,6 +1109,7 @@ class MainWindow(QMainWindow):
                     ),
                     overlay_slots=self._overlay_slots(),
                     rotation_degrees=self._rotation_degrees,
+                    encode=False,
                 )
                 prepared = image_pipeline.render_prepared_animation_frame(
                     animation,
@@ -1102,6 +1120,7 @@ class MainWindow(QMainWindow):
                     ),
                     overlay_slots=self._overlay_slots(),
                     rotation_degrees=self._rotation_degrees,
+                    encode=False,
                 )
             else:
                 prepared = image_pipeline.prepare_image(
@@ -1113,11 +1132,24 @@ class MainWindow(QMainWindow):
                     ),
                     overlay_slots=self._overlay_slots(),
                     rotation_degrees=self._rotation_degrees,
+                    encode=False,
                 )
+            if self._refresh_state is GuiRefreshState.RUNNING:
+                # Validate before replacing any running source/scheduler state.
+                _ = prepared.jpeg_info
             self._replace_animation(animation)
-            self._lcd_prepared = prepared
-            self._load_final_preview(prepared.jpeg_bytes)
-            self._publish_running_frame(prepared.jpeg_bytes)
+            if animation is not None:
+                key = (
+                    0, self._overlay_config(), self._overlay_slots(),
+                    self._rotation_degrees,
+                )
+                self._animation_render_cache[key] = prepared
+            self._lcd_prepared = (
+                prepared if self._refresh_state is GuiRefreshState.RUNNING else None
+            )
+            self._load_final_preview(prepared)
+            if self._refresh_state is GuiRefreshState.RUNNING:
+                self._publish_running_frame(prepared.jpeg_bytes)
         except (image_pipeline.ImagePipelineError, OSError, RuntimeError, ValueError) as error:
             if self._refresh_state is GuiRefreshState.RUNNING:
                 self._prepared = previous_prepared
@@ -1155,12 +1187,22 @@ class MainWindow(QMainWindow):
         self.input_format_value.setText(input_text)
         self.output_size_value.setText("320×320")
         self.profile_value.setText("SOF0 · 8 Bit · JFIF-YCbCr 4:2:0 · Qualität 60")
-        self.jpeg_size_value.setText(f"{len(prepared.jpeg_bytes)} Byte")
-        self.segments_value.setText(str(prepared.jpeg_info.segment_count))
-        self.padding_value.setText(
-            f"{prepared.jpeg_info.padding_length} Byte · ausschließlich 00"
+        encoded = (
+            self._lcd_prepared
+            if self._refresh_state is GuiRefreshState.RUNNING else prepared
         )
-        self.validation_value.setText("ASUS-JPEG-Validator: PASS")
+        if encoded is not None and encoded.jpeg_is_prepared:
+            self.jpeg_size_value.setText(f"{len(encoded.jpeg_bytes)} Byte")
+            self.segments_value.setText(str(encoded.jpeg_info.segment_count))
+            self.padding_value.setText(
+                f"{encoded.jpeg_info.padding_length} Byte · ausschließlich 00"
+            )
+            self.validation_value.setText("ASUS-JPEG-Validator: PASS · letzter LCD-Frame")
+        else:
+            self.jpeg_size_value.setText("—")
+            self.segments_value.setText("—")
+            self.padding_value.setText("—")
+            self.validation_value.setText("RGB vorbereitet · JPEG-Prüfung beim LCD-Start")
         self.validation_value.setStyleSheet("color: #55c987;")
         if self._refresh_state is GuiRefreshState.RUNNING:
             generation = self._frame_buffer.snapshot().generation if self._frame_buffer else 0
@@ -1176,7 +1218,12 @@ class MainWindow(QMainWindow):
             return
         try:
             if self._prepared_animation is not None:
-                prepared = self._prepare_animation_frame(self._animation_frame_index)
+                # Active GIF telemetry is consumed by the next sender request.
+                # Do not render the frozen preview timeline while hidden.
+                self._preview_dirty = True
+                prepared = self._prepared
+                if self.isVisible():
+                    prepared = self._prepare_animation_frame(self._animation_frame_index)
                 if (
                     self._refresh_state is GuiRefreshState.RUNNING
                     and not self._lcd_animation_scheduler.is_running
@@ -1184,8 +1231,9 @@ class MainWindow(QMainWindow):
                     lcd_prepared = self._prepare_animation_frame(
                         self._lcd_animation_frame_index
                     )
+                    jpeg = lcd_prepared.jpeg_bytes
                     self._lcd_prepared = lcd_prepared
-                    self._publish_running_frame(lcd_prepared.jpeg_bytes)
+                    self._publish_running_frame(jpeg)
             else:
                 prepared = image_pipeline.rerender_prepared_image(
                     self._prepared,
@@ -1195,10 +1243,17 @@ class MainWindow(QMainWindow):
                     ),
                     overlay_slots=self._overlay_slots(),
                     rotation_degrees=self._rotation_degrees,
+                    encode=False,
                 )
-            self._load_final_preview(prepared.jpeg_bytes)
-            if self._prepared_animation is None:
-                self._publish_running_frame(prepared.jpeg_bytes)
+            if self._prepared_animation is None or self.isVisible():
+                self._load_final_preview(prepared)
+            if (
+                self._prepared_animation is None
+                and self._refresh_state is GuiRefreshState.RUNNING
+            ):
+                jpeg = prepared.jpeg_bytes
+                self._lcd_prepared = prepared
+                self._publish_running_frame(jpeg)
         except (image_pipeline.ImagePipelineError, OSError, RuntimeError, ValueError) as error:
             self._show_render_error(error)
             return
@@ -1222,20 +1277,27 @@ class MainWindow(QMainWindow):
             f"Frame bleibt aktiv: {error}"
         )
 
-    def _load_final_preview(self, jpeg: bytes) -> None:
-        self._preview_jpeg = jpeg
+    def _load_final_preview(self, prepared: image_pipeline.PreparedImage) -> None:
+        self._preview_prepared = prepared
         self._preview_dirty = True
         if not self.isVisible():
             return
         self._refresh_preview_if_needed()
 
     def _refresh_preview_if_needed(self) -> None:
-        if not self._preview_dirty or self._preview_jpeg is None:
+        if (
+            not self.isVisible()
+            or not self._preview_dirty
+            or self._preview_prepared is None
+        ):
             return
-        pixmap = QPixmap()
-        if not pixmap.loadFromData(self._preview_jpeg, "JPEG"):
+        rgb = self._preview_prepared.rgb_bytes
+        image = QImage(rgb, 320, 320, 320 * 3, QImage.Format.Format_RGB888)
+        # rgb stays alive through conversion; QPixmap owns its Qt image storage.
+        pixmap = QPixmap.fromImage(image)
+        if pixmap.isNull():
             raise image_pipeline.ImagePipelineError(
-                "Das validierte JPEG konnte nicht als Vorschau geladen werden"
+                "Das RGB-Bild konnte nicht als Vorschau geladen werden"
             )
         self._final_pixmap = pixmap
         self._preview_dirty = False
@@ -1348,8 +1410,8 @@ class MainWindow(QMainWindow):
             )
             self._lcd_animation_frame_index = 0
             initial_prepared = self._prepare_animation_frame(0)
-            self._lcd_prepared = initial_prepared
 
+        self._lcd_prepared = initial_prepared
         self._set_refresh_state(GuiRefreshState.STARTING)
         self.status_label.setText("Status: LCD-Session wird gestartet …")
         controller: RefreshControllerLike | None = None
@@ -1426,6 +1488,8 @@ class MainWindow(QMainWindow):
             self._enter_refresh_error("LCD-Session endete ohne Controller")
             return
         if controller.is_running:
+            if self.isVisible() and self._prepared is not None:
+                self._show_prepared_image(self._prepared)
             return
 
         result = controller.result
@@ -1477,6 +1541,11 @@ class MainWindow(QMainWindow):
 
     def showEvent(self, event: QShowEvent) -> None:  # noqa: N802 - Qt API
         super().showEvent(event)
+        if self._preview_dirty and self._prepared_animation is not None:
+            try:
+                self._render_preview_animation_frame(self._animation_frame_index)
+            except (image_pipeline.ImagePipelineError, OSError, RuntimeError, ValueError) as error:
+                self._show_render_error(error)
         self._refresh_preview_if_needed()
         self._update_sensor_polling()
         self._update_animation_scheduling()

@@ -233,6 +233,8 @@ class ImagePipelineOfflineTests(unittest.TestCase):
             "NotoSansMono-Bold.ttf",
         )
         fallback_font = ImageFont.load_default(size=13)
+        image_pipeline._overlay_font.cache_clear()
+        self.addCleanup(image_pipeline._overlay_font.cache_clear)
         with (
             mock.patch.object(
                 image_pipeline.ImageFont,

@@ -1,5 +1,55 @@
 # Aktueller Projektstand
 
+## Aktueller V1-Stand: GIF-Rendering-Efficiency
+
+Stand: 2026-09-06. Dieser Abschnitt ergänzt die chronologischen Altstände unten.
+
+Die zuvor manuell bestätigte flüssige GIF-Wiedergabe mit persistentem Transport
+(ungefähr 29–32 FPS im beobachteten Ausschnitt) bleibt die Referenz. Der Benutzer
+meldete bei sichtbarem GIF etwa 41–45 % eines logischen CPU-Threads mit LCD und
+40–42 % bei gestopptem LCD; statische Bilder lagen bei 0–2 %.
+
+Offline-Profiling belegte wiederholte Fontsuche/Textvermessung als dominanten
+Renderaufwand (rund 92 % der instrumentierten Baseline). Ein begrenzter Font-,
+Layout- und Textmaskencache beseitigt diese wiederholte Arbeit. Die GUI nutzt
+jetzt direkt die fertige RGB-Komposition; JPEG-Encoding und -Validierung
+erfolgen erst auf tatsächlichen LCD-Bedarf und höchstens einmal je
+Kompositionsobjekt. Ein Zwei-Einträge-Cache teilt gleiche visuelle Frames
+zwischen den unveränderten unabhängigen Preview-/LCD-Schedulern. GIF-Decode,
+Disposal, Alpha-Aufbereitung und Resize bleiben vollständig beim Laden.
+
+LCD gestoppt und sichtbar: nur Preview, keine LCD-JPEGs/Publikationen.
+LCD gestoppt und verborgen: Animationstimer und Sensorpolling inaktiv.
+LCD aktiv und verborgen: nur erforderliche LCD-Kompositionen, keine
+QImage-/QPixmap-/Previewarbeit. Telemetrie bleibt bedarfsgesteuert bei 1 Hz;
+aktuelle Werte werden beim Öffnen einmal nachgezogen. Die JPEG-Metadaten der
+UI beziehen sich auf tatsächlich erzeugte LCD-Frames und erzwingen keinen
+Encode für die Preview.
+
+Mit demselben Offline-Fixture und 600 Frames je Lauf sinkt der Median von
+13,211 auf 0,457 ms für Preview, von 13,471 auf 1,047 ms für LCD mit
+Memory-Sender und von 26,339 auf 1,313 ms für den kombinierten Schritt.
+Das sind 96,54 %, 92,23 % beziehungsweise 95,02 % weniger gemessene Arbeit,
+keine Vorhersage realer CPU-Prozente. Mit versetzten Frameindizes bleiben
+94,25 % Einsparung im kombinierten Test.
+
+Unverändert: GIF-Frameorder, Dauern/Geschwindigkeitsfaktoren, 12-ms-
+Senderperiode, queuefreier serieller Producer-/Sender-Handshake, persistenter
+HID-Transport, 0x08-Protokoll und JPEG 320×320/Q60/4:2:0/SOF0 mit
+`progressive=False`, `optimize=False` sowie alle Validator-/Safety-Gates.
+Die neuen Tests prüfen pixel- und JPEG-bytegleiche Overlays/Rotationen und
+ergänzen die bestehenden Lifecycle-, Autostart-, Single-Instance- und
+Transporttests. Die vollständige Suite besteht mit 260 Tests; separat bestehen
+alle 14 neuen Efficiency-Tests. `python -m compileall -q src tests` und
+`git diff --check` sind sauber. Der neue Stand wurde ausschließlich offline
+geprüft.
+
+Audit, Methodik, Rohmessungen, Cachegrenzen, Testergebnis und die exakten
+nachfolgenden manuellen CPU-/Sichttestbefehle:
+[`research/reports/gif-rendering-performance.md`](../research/reports/gif-rendering-performance.md).
+Keine reale Gerätekommunikation, keine Installation, kein Live-Test, Commit
+oder Push in diesem Block. Die neue reale CPU-Last bleibt manuell zu messen.
+
 ## CURRENT LIVE HARDWARE STATE
 
 Kanonischer Live-Stand vom 2026-09-03:

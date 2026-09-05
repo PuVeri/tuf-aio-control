@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
+from functools import cached_property, lru_cache
 from io import BytesIO
 import math
 from pathlib import Path
@@ -122,6 +123,8 @@ class TemperatureOverlayPlacement:
 
 @dataclass(frozen=True)
 class PreparedImage:
+    """GUI-owned composition with lazy, single-encode immutable output snapshots."""
+
     source_path: Path
     source_format: str
     source_size: tuple[int, int]
@@ -129,9 +132,30 @@ class PreparedImage:
     scale_mode: ScaleMode
     gif_first_frame_only: bool
     base_rgb_bytes: bytes
-    jpeg_bytes: bytes
-    jpeg_info: lcd_transport.JpegInfo
+    # Owned only by the renderer/GUI; never exposed to the sender or mutated
+    # after construction. Qt and LatestFrameBuffer receive immutable bytes.
+    _composition: Image.Image = field(repr=False, compare=False)
     rotation_degrees: int = 0
+
+    @cached_property
+    def rgb_bytes(self) -> bytes:
+        return self._composition.tobytes()
+
+    @cached_property
+    def _encoded(self) -> tuple[bytes, lcd_transport.JpegInfo]:
+        return _encode_and_validate_image(self._composition)
+
+    @property
+    def jpeg_bytes(self) -> bytes:
+        return self._encoded[0]
+
+    @property
+    def jpeg_info(self) -> lcd_transport.JpegInfo:
+        return self._encoded[1]
+
+    @property
+    def jpeg_is_prepared(self) -> bool:
+        return "_encoded" in self.__dict__
 
 
 @dataclass(frozen=True)
@@ -139,8 +163,8 @@ class PreparedAnimationFrame:
     source_index: int
     duration_ms: int
     base_rgb_bytes: bytes
-    jpeg_bytes: bytes
-    jpeg_info: lcd_transport.JpegInfo
+    jpeg_bytes: bytes | None
+    jpeg_info: lcd_transport.JpegInfo | None
 
 
 @dataclass(frozen=True)
@@ -227,6 +251,7 @@ def rotate_composition(image: Image.Image, rotation_degrees: object) -> Image.Im
     return image.copy() if operation is None else image.transpose(operation)
 
 
+@lru_cache(maxsize=32)
 def _overlay_font(size: int, role: OverlayFontRole) -> ImageFont.FreeTypeFont:
     """Load a technical semibold/bold mono face with a safe Pillow fallback."""
     for candidate in OVERLAY_FONT_CANDIDATES[role]:
@@ -351,6 +376,7 @@ def layout_temperature_overlay(
     return tuple(placements)
 
 
+@lru_cache(maxsize=8)
 def layout_data_overlay(
     slots: OverlaySlots,
     config: TemperatureOverlayConfig,
@@ -460,46 +486,63 @@ def render_data_overlay(
 ) -> Image.Image:
     if base_image.size != OUTPUT_SIZE:
         raise ImagePipelineError("Datenoverlay benötigt exakt 320×320 Pixel")
-    rendered = base_image.convert("RGB").copy()
+    rendered = (
+        base_image.copy() if base_image.mode == "RGB" else base_image.convert("RGB")
+    )
     if not config.enabled:
         return rendered
-    draw = ImageDraw.Draw(rendered)
-    for placement in layout_data_overlay(slots, config):
-        label_font = _fit_font(
-            draw,
-            placement.label,
-            preferred_size=OVERLAY_DATA_LABEL_PREFERRED_SIZE,
-            minimum_size=OVERLAY_LABEL_MINIMUM_SIZE,
-            maximum_width=OVERLAY_DATA_LABEL_MAXIMUM_WIDTH,
-            role="label",
-        )
-        value_font = _fit_font(
-            draw,
-            placement.value_text,
-            preferred_size=OVERLAY_VALUE_PREFERRED_SIZE,
-            minimum_size=OVERLAY_VALUE_MINIMUM_SIZE,
-            maximum_width=OVERLAY_DATA_VALUE_MAXIMUM_WIDTH,
-            role="value",
-        )
-        draw.text(
-            placement.label_center,
-            placement.label,
-            fill=placement.color,
-            font=label_font,
-            anchor="mm",
-            stroke_width=1,
-            stroke_fill="#000000",
-        )
-        draw.text(
-            placement.center,
-            placement.value_text,
-            fill=placement.color,
-            font=value_font,
-            anchor="mm",
-            stroke_width=1,
-            stroke_fill="#000000",
-        )
+    _draw_data_overlay(rendered, slots, config)
     return rendered
+
+
+@lru_cache(maxsize=128)
+def _text_masks(
+    text: str,
+    center: tuple[int, int],
+    preferred_size: int,
+    minimum_size: int,
+    maximum_width: int,
+    role: OverlayFontRole,
+) -> tuple[Image.Image, Image.Image, tuple[int, int, int, int]]:
+    """Cache cropped coverage masks, retaining Pillow's stroke-then-fill order.
+
+    A single RGBA layer would introduce different rounding at antialiased
+    edges. Two L masks reproduce drawing directly onto any RGB background.
+    Masks are private and read-only after creation, independent of text color.
+    """
+    stroke = Image.new("L", OUTPUT_SIZE)
+    draw = ImageDraw.Draw(stroke)
+    font = _fit_font(
+        draw, text, preferred_size=preferred_size, minimum_size=minimum_size,
+        maximum_width=maximum_width, role=role,
+    )
+    draw.text(
+        center, text, fill=255, font=font, anchor="mm",
+        stroke_width=1, stroke_fill=255,
+    )
+    fill = Image.new("L", OUTPUT_SIZE)
+    ImageDraw.Draw(fill).text(center, text, fill=255, font=font, anchor="mm")
+    bounds = stroke.getbbox() or (0, 0, 1, 1)
+    return stroke.crop(bounds), fill.crop(bounds), bounds
+
+
+def _draw_data_overlay(
+    rendered: Image.Image, slots: OverlaySlots, config: TemperatureOverlayConfig,
+) -> None:
+    for placement in layout_data_overlay(slots, config):
+        for text, center, preferred, minimum, maximum, role in (
+            (placement.label, placement.label_center,
+             OVERLAY_DATA_LABEL_PREFERRED_SIZE, OVERLAY_LABEL_MINIMUM_SIZE,
+             OVERLAY_DATA_LABEL_MAXIMUM_WIDTH, "label"),
+            (placement.value_text, placement.center,
+             OVERLAY_VALUE_PREFERRED_SIZE, OVERLAY_VALUE_MINIMUM_SIZE,
+             OVERLAY_DATA_VALUE_MAXIMUM_WIDTH, "value"),
+        ):
+            stroke, fill, bounds = _text_masks(
+                text, center, preferred, minimum, maximum, role
+            )
+            rendered.paste("#000000", bounds, stroke)
+            rendered.paste(placement.color, bounds, fill)
 
 
 def render_temperature_overlay(
@@ -510,7 +553,9 @@ def render_temperature_overlay(
     """Render the shared preview/LCD overlay without mutating the base image."""
     if base_image.size != OUTPUT_SIZE:
         raise ImagePipelineError("Temperaturoverlay benötigt exakt 320×320 Pixel")
-    rendered = base_image.convert("RGB").copy()
+    rendered = (
+        base_image.copy() if base_image.mode == "RGB" else base_image.convert("RGB")
+    )
     if not config.enabled:
         return rendered
 
@@ -573,6 +618,12 @@ def _encode_and_validate_frame(
         overlay_slots=overlay_slots,
         rotation_degrees=rotation_degrees,
     )
+    return _encode_and_validate_image(final_image)
+
+
+def _encode_and_validate_image(
+    final_image: Image.Image,
+) -> tuple[bytes, lcd_transport.JpegInfo]:
     try:
         jpeg_bytes = _encode_jpeg(final_image)
     except OSError as error:
@@ -600,23 +651,22 @@ def compose_lcd_frame(
     if len(base_rgb_bytes) != expected_length:
         raise ImagePipelineError("Ungültiger interner 320×320-RGB-Basispuffer")
     base_image = Image.frombytes("RGB", OUTPUT_SIZE, base_rgb_bytes)
-    composed = (
-        render_temperature_overlay(base_image, temperatures, overlay_config)
-        if overlay_slots is None
-        else render_data_overlay(base_image, overlay_slots, overlay_config)
-    )
-    return rotate_composition(composed, rotation_degrees)
+    if overlay_config.enabled:
+        if overlay_slots is None:
+            base_image = render_temperature_overlay(
+                base_image, temperatures, overlay_config
+            )
+        else:
+            # frombytes owns this fresh image: composition needs no extra copy.
+            _draw_data_overlay(base_image, overlay_slots, overlay_config)
+    if normalize_rotation(rotation_degrees) == 0:
+        return base_image
+    return rotate_composition(base_image, rotation_degrees)
 
 
-def _prepare_frame(
-    source_frame: Image.Image,
-    mode: ScaleMode,
-    overlay_config: TemperatureOverlayConfig,
-    temperatures: TemperatureOverlayValues,
-    *,
-    overlay_slots: OverlaySlots | None = None,
-    rotation_degrees: object = 0,
-) -> tuple[tuple[int, int], bytes, bytes, lcd_transport.JpegInfo]:
+def _prepare_base(
+    source_frame: Image.Image, mode: ScaleMode,
+) -> tuple[tuple[int, int], bytes]:
     oriented = ImageOps.exif_transpose(source_frame)
     oriented_size = oriented.size
     rgb = _rgb_on_black(oriented)
@@ -624,15 +674,7 @@ def _prepare_frame(
     if prepared.mode != "RGB" or prepared.size != OUTPUT_SIZE:
         raise ImagePipelineError("Interne Bildvorbereitung verletzte RGB-/Größeninvariante")
 
-    base_rgb_bytes = prepared.tobytes()
-    jpeg_bytes, jpeg_info = _encode_and_validate_frame(
-        base_rgb_bytes,
-        overlay_config,
-        temperatures,
-        overlay_slots=overlay_slots,
-        rotation_degrees=rotation_degrees,
-    )
-    return oriented_size, base_rgb_bytes, jpeg_bytes, jpeg_info
+    return oriented_size, prepared.tobytes()
 
 
 def prepare_image(
@@ -643,6 +685,7 @@ def prepare_image(
     temperatures: TemperatureOverlayValues = TemperatureOverlayValues(),
     overlay_slots: OverlaySlots | None = None,
     rotation_degrees: object = 0,
+    encode: bool = True,
 ) -> PreparedImage:
     """Prepare only frame 0 of one supported file entirely in memory."""
     if mode not in ("crop", "fit"):
@@ -675,16 +718,16 @@ def prepare_image(
     except (FileNotFoundError, PermissionError, UnidentifiedImageError, OSError) as error:
         raise ImagePipelineError(f"Bild kann nicht gelesen werden: {error}") from error
 
-    oriented_size, base_rgb_bytes, jpeg_bytes, jpeg_info = _prepare_frame(
-        first_frame,
-        mode,
+    oriented_size, base_rgb_bytes = _prepare_base(first_frame, mode)
+    composition = compose_lcd_frame(
+        base_rgb_bytes,
         overlay_config,
         temperatures,
         overlay_slots=overlay_slots,
         rotation_degrees=rotation_degrees,
     )
 
-    return PreparedImage(
+    prepared = PreparedImage(
         source_path=resolved,
         source_format=source_format,
         source_size=source_size,
@@ -692,10 +735,12 @@ def prepare_image(
         scale_mode=mode,
         gif_first_frame_only=source_format == "GIF",
         base_rgb_bytes=base_rgb_bytes,
-        jpeg_bytes=jpeg_bytes,
-        jpeg_info=jpeg_info,
+        _composition=composition,
         rotation_degrees=normalize_rotation(rotation_degrees),
     )
+    if encode:
+        _ = prepared.jpeg_info
+    return prepared
 
 
 def rerender_prepared_image(
@@ -705,9 +750,10 @@ def rerender_prepared_image(
     temperatures: TemperatureOverlayValues,
     overlay_slots: OverlaySlots | None = None,
     rotation_degrees: object | None = None,
+    encode: bool = True,
 ) -> PreparedImage:
     """Rebuild JPEG bytes from the cached base without reading sensors or source."""
-    jpeg_bytes, jpeg_info = _encode_and_validate_frame(
+    composition = compose_lcd_frame(
         prepared.base_rgb_bytes,
         overlay_config,
         temperatures,
@@ -718,16 +764,18 @@ def rerender_prepared_image(
             else rotation_degrees
         ),
     )
-    return replace(
+    rendered = replace(
         prepared,
-        jpeg_bytes=jpeg_bytes,
-        jpeg_info=jpeg_info,
+        _composition=composition,
         rotation_degrees=normalize_rotation(
             prepared.rotation_degrees
             if rotation_degrees is None
             else rotation_degrees
         ),
     )
+    if encode:
+        _ = rendered.jpeg_info
+    return rendered
 
 
 def rerender_prepared_animation(
@@ -760,8 +808,9 @@ def prepare_gif(
     temperatures: TemperatureOverlayValues = TemperatureOverlayValues(),
     overlay_slots: OverlaySlots | None = None,
     rotation_degrees: object = 0,
+    encode: bool = True,
 ) -> PreparedAnimation:
-    """Decode and cache every GIF base frame and its validated composition."""
+    """Cache decoded RGB bases; encode=True also prepares legacy JPEG outputs."""
     if mode not in ("crop", "fit"):
         raise ImagePipelineError(f"Unbekannter Skalierungsmodus: {mode}")
 
@@ -800,14 +849,14 @@ def prepare_gif(
                 duration_ms = int(raw_duration)
                 if duration_ms < 0:
                     raise ImagePipelineError("GIF-Framedauer darf nicht negativ sein")
-                frame = source.convert("RGBA").copy()
-                _, base_rgb_bytes, jpeg_bytes, jpeg_info = _prepare_frame(
-                    frame,
-                    mode,
-                    overlay_config,
-                    temperatures,
-                    overlay_slots=overlay_slots,
-                    rotation_degrees=rotation_degrees,
+                frame = source.convert("RGBA")
+                _, base_rgb_bytes = _prepare_base(frame, mode)
+                jpeg_bytes, jpeg_info = (
+                    _encode_and_validate_frame(
+                        base_rgb_bytes, overlay_config, temperatures,
+                        overlay_slots=overlay_slots,
+                        rotation_degrees=rotation_degrees,
+                    ) if encode else (None, None)
                 )
                 frames.append(
                     PreparedAnimationFrame(
@@ -840,6 +889,7 @@ def render_prepared_animation_frame(
     temperatures: TemperatureOverlayValues,
     overlay_slots: OverlaySlots | None = None,
     rotation_degrees: object = 0,
+    encode: bool = True,
 ) -> PreparedImage:
     """Compose one cached GIF base frame through the shared LCD render path."""
     if (
@@ -849,14 +899,14 @@ def render_prepared_animation_frame(
     ):
         raise ImagePipelineError("GIF-Frameindex liegt außerhalb der Animation")
     frame = prepared.frames[frame_index]
-    jpeg_bytes, jpeg_info = _encode_and_validate_frame(
+    composition = compose_lcd_frame(
         frame.base_rgb_bytes,
         overlay_config,
         temperatures,
         overlay_slots=overlay_slots,
         rotation_degrees=rotation_degrees,
     )
-    return PreparedImage(
+    rendered = PreparedImage(
         source_path=prepared.source_path,
         source_format="GIF",
         source_size=prepared.source_size,
@@ -864,7 +914,9 @@ def render_prepared_animation_frame(
         scale_mode=prepared.scale_mode,
         gif_first_frame_only=False,
         base_rgb_bytes=frame.base_rgb_bytes,
-        jpeg_bytes=jpeg_bytes,
-        jpeg_info=jpeg_info,
+        _composition=composition,
         rotation_degrees=normalize_rotation(rotation_degrees),
     )
+    if encode:
+        _ = rendered.jpeg_info
+    return rendered

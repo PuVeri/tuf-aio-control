@@ -7,8 +7,10 @@ Hardwaretemperaturen anzeigen können.
 
 Der sichere JPEG-Pfad und kontinuierliche Betrieb sind auf dem realen Gerät
 bestätigt. Die Desktop-UI bereitet JPEG, PNG, WebP, BMP und vollständige GIF-
-Animationen als validierte 320×320-Kompositionen vor. GIF-Liveanimation ist
-offline implementiert, aber noch nicht real validiert. Vier frei wählbare
+Animationen als 320×320-Kompositionen vor; LCD-JPEGs werden vor dem Senden
+validiert. GIF-Wiedergabe wurde mit dem persistenten Transport manuell
+flüssig bestätigt. Der neue Efficiency-Stand des Renderers ist offline geprüft;
+seine reale CPU-Last wird anschließend manuell gemessen. Vier frei wählbare
 CPU-/GPU-Metrics können als LCD-Overlay angezeigt werden.
 
 ## Desktop-UI starten
@@ -26,17 +28,18 @@ produktive Benutzerbetrieb. Verwendet werden die bereits vorhandenen lokalen
 Pakete PySide6 6.11.2 und
 Pillow 12.3.0 mit libjpeg-turbo; das Projekt installiert keine Pakete selbst.
 
-Die UI sendet niemals automatisch. Sie zeigt Original und finale
+Ohne ausdrücklich aktivierten LCD-Autostart sendet die UI erst nach `LCD starten`.
+Sie zeigt Quellmetadaten und die finale
 320×320-Vorschau und bietet mittiges Zuschneiden oder Einpassen auf Schwarz.
-Optional legt derselbe Renderer `CPU Package / Tctl`, `GPU / edge` und
-`CPU CCD / Tccd1` dreiecksförmig über Vorschau und finalen JPEG-Frame. Die
+Optional legt derselbe Renderer vier frei wählbare CPU-/GPU-Metrics als
+2×2-Overlay über Vorschau und finalen JPEG-Frame. Die
 gemeinsame Schriftfarbe ist frei wählbar, wird sofort sichtbar und als
 `#RRGGBB` in den App-Einstellungen gespeichert; Default ist Weiß.
 Erst nach erfolgreicher Konvertierung und erneuter ASUS-JPEG-Validierung
 startet ein ausdrücklicher Klick auf `LCD starten` die kontrollierte Session.
 GIF-Frames verwenden ein transportgeführtes serielles Pacing ohne feste
 App-seitige FPS-Grenze. Die reale Transferdauer begrenzt die Bildrate
-natürlich; dieses Verhalten muss erneut am realen LCD validiert werden.
+natürlich; der vorherige manuelle Lauf war mit ungefähr 29–32 FPS flüssig.
 `GIF-Geschwindigkeit` ist persistent auf 1×, 1.5×, 2× oder 3× einstellbar;
 neue und fehlende Einstellungen verwenden 2×. Die sichtbare Preview folgt
 diesem Faktor unabhängig von der LCD-Transportgeschwindigkeit.
@@ -76,7 +79,7 @@ unbestätigte Änderung des empirisch belegten Transportprotokolls.
 
 ### Noch nicht bestätigt
 
-- Reale GIF-Liveanimation und die endgültige sichere Hardware-Framerate.
+- Reale CPU-Last und erneute Sichtprüfung nach der Renderer-Optimierung.
 - Weitere Eingabeformate außerhalb JPEG, PNG, WebP, BMP und GIF.
 - Fehler-, Timeout- und Recoveryverhalten des realen v49-Geräts.
 - Andere JPEG-Profile und Segmentzahlen als der erfolgreiche Referenztransfer.
@@ -145,29 +148,32 @@ explizite Angaben zu Quelle, Einheit, Zeitstempel und Verfügbarkeit.
 `src/image_pipeline.py` berücksichtigt EXIF-Orientierung und Transparenz,
 skaliert per Crop oder Fit und erzeugt im Speicher ein konservatives
 320×320-JPEG. Ein optionales Temperaturoverlay wird aus einem gecachten
-Basisframe gerendert, ohne Sensor- oder Transportzugriff. Der bestehende
-ASUS-Validator prüft jede Ausgabe erneut.
+Basisframe gerendert, ohne Sensor- oder Transportzugriff. Die Preview verwendet
+direkt RGB; JPEG wird nur bei LCD-Bedarf erzeugt. Der bestehende ASUS-Validator
+prüft jedes erzeugte LCD-JPEG erneut. Details und reproduzierbare Offline-
+Messungen: [GIF-Rendering-Performance](research/reports/gif-rendering-performance.md).
 
 ### Anwendung und Benutzeroberfläche
 
 `src/tuf_aio_gui.py` zeigt Gerätestatus, Vorschau, Bildmetadaten und Fehler.
-Sie ruft für einen expliziten Sendeklick genau einmal die Transport-API auf und
-ist ohne angeschlossenes Gerät testbar.
+`LCD starten` erzeugt eine serielle Refreshsession bis Stop, Beenden oder Fehler.
+Die Oberfläche ist ohne angeschlossenes Gerät testbar.
 
 ## Sicherheitsregeln
 
 Für alle aktuellen Senderpfade gelten enge Sicherheitsgrenzen:
 
-- Es wird niemals automatisch gesendet; jeder Frame benötigt eine explizite
-  Benutzeraktion.
+- Eine LCD-Session benötigt `LCD starten` oder die zuvor ausdrücklich
+  aktivierte LCD-Autostartoption; der Default ist aus.
 - Zulässig ist ausschließlich der bestätigte `0x08`-JPEG-Pfad auf Interface 1.
-- Es gibt keinen Retry, Reconnect, IN-Read, Recovery-Command oder Folgeframe.
+- Es gibt keinen Retry, Reconnect, IN-Read, Recovery-Command oder parallelen
+  Transfer. GIF-Folgeframes verwenden ausschließlich den bestätigten Bildpfad.
 - Es werden keine willkürlichen oder geratenen HID-Pakete ausprobiert.
 - Beobachtete `/dev/hidrawX`-Pfade werden nicht fest codiert.
 - Mitschnitte, Deskriptoren und andere Originaldaten werden unverändert
   aufbewahrt und nicht überschrieben.
 - Beobachtung, Hypothese und bestätigte Erkenntnis werden klar getrennt.
-- Andere Commands, Animationen und weitere Betriebsarten benötigen eine neue
+- Andere Commands und weitere unbestätigte Betriebsarten benötigen eine neue
   Sicherheitsbewertung und ausdrückliche Freigabe.
 
 Die verbindlichen Einzelheiten stehen in [docs/SAFETY.md](docs/SAFETY.md).
@@ -246,5 +252,5 @@ offline getestet. Die GUI liest CPU-, Package- und GPU-Werte ausschließlich
 lokal und read-only aus hwmon; fehlende getrennte Werte erscheinen als `N/A`.
 Der vorbereitete LCD-Frame kann Tctl, Tccd1 und `edge` der primären GPU mit
 persistenter gemeinsamer Schriftfarbe darstellen; fehlende Overlaywerte
-erscheinen als `—`. Die offline implementierte GIF-Animation benötigt noch
-eine eigene reale Validierung und Freigabe.
+erscheinen als `—`. Die GIF-Wiedergabe wurde manuell bestätigt; die neue
+Renderer-Effizienz benötigt noch die anschließende manuelle CPU-/Sichtprüfung.
